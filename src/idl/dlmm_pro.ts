@@ -182,6 +182,90 @@ export type DlmmPro = {
       ];
     },
     {
+      name: "addLiquidityImbalance";
+      discriminator: [12, 68, 222, 87, 138, 56, 203, 54];
+      accounts: [
+        {
+          name: "pool";
+          writable: true;
+          relations: ["position", "tickArrayBitmapExtension"];
+        },
+        {
+          name: "position";
+          writable: true;
+        },
+        {
+          name: "nftAccount";
+          docs: ["The token account for nft"];
+        },
+        {
+          name: "tickArrayBitmapExtension";
+          writable: true;
+          optional: true;
+        },
+        {
+          name: "userTokenX";
+          writable: true;
+        },
+        {
+          name: "userTokenY";
+          writable: true;
+        },
+        {
+          name: "reserveX";
+          writable: true;
+          relations: ["pool"];
+        },
+        {
+          name: "reserveY";
+          writable: true;
+          relations: ["pool"];
+        },
+        {
+          name: "tokenXMint";
+          relations: ["pool"];
+        },
+        {
+          name: "tokenYMint";
+          relations: ["pool"];
+        },
+        {
+          name: "signer";
+          signer: true;
+        },
+        {
+          name: "tokenXProgram";
+        },
+        {
+          name: "tokenYProgram";
+        },
+        {
+          name: "eventAuthority";
+        },
+        {
+          name: "program";
+        },
+      ];
+      args: [
+        {
+          name: "parameters";
+          type: {
+            defined: {
+              name: "addLiquidityImbalanceParameters";
+            };
+          };
+        },
+        {
+          name: "remainingAccountInfo";
+          type: {
+            defined: {
+              name: "remainingAccountsInfo";
+            };
+          };
+        },
+      ];
+    },
+    {
       name: "cancelLimitOrder";
       discriminator: [132, 156, 132, 31, 67, 40, 232, 97];
       accounts: [
@@ -2294,6 +2378,48 @@ export type DlmmPro = {
       ];
     },
     {
+      name: "removePosition";
+      discriminator: [219, 24, 236, 110, 138, 80, 129, 6];
+      accounts: [
+        {
+          name: "pool";
+          relations: ["position"];
+        },
+        {
+          name: "position";
+          writable: true;
+        },
+        {
+          name: "nftAccount";
+          docs: ["The token account for nft"];
+        },
+        {
+          name: "signer";
+          signer: true;
+        },
+        {
+          name: "rentReceiver";
+          writable: true;
+        },
+        {
+          name: "eventAuthority";
+        },
+        {
+          name: "program";
+        },
+      ];
+      args: [
+        {
+          name: "parameters";
+          type: {
+            defined: {
+              name: "removePositionParameters";
+            };
+          };
+        },
+      ];
+    },
+    {
       name: "setPoolStatus";
       discriminator: [112, 87, 135, 223, 83, 204, 132, 53];
       accounts: [
@@ -2796,6 +2922,10 @@ export type DlmmPro = {
       discriminator: [87, 46, 88, 98, 175, 96, 34, 91];
     },
     {
+      name: "evtRemovePosition";
+      discriminator: [198, 89, 5, 246, 12, 176, 181, 123];
+    },
+    {
       name: "evtSetPoolStatus";
       discriminator: [100, 213, 74, 3, 95, 91, 228, 146];
     },
@@ -3120,6 +3250,54 @@ export type DlmmPro = {
           {
             name: "liquidities";
             type: "bytes";
+          },
+        ];
+      };
+    },
+    {
+      name: "addLiquidityImbalanceParameters";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "maxAmountXAndFeeBps";
+            type: {
+              option: {
+                defined: {
+                  name: "maxAmountAndFeeBps";
+                };
+              };
+            };
+          },
+          {
+            name: "maxAmountYAndFeeBps";
+            type: {
+              option: {
+                defined: {
+                  name: "maxAmountAndFeeBps";
+                };
+              };
+            };
+          },
+          {
+            name: "observedTickId";
+            type: "i32";
+          },
+          {
+            name: "maxTickSlippage";
+            type: "u32";
+          },
+          {
+            name: "index";
+            type: "u8";
+          },
+          {
+            name: "expectedTickRange";
+            type: {
+              defined: {
+                name: "tickRange";
+              };
+            };
           },
         ];
       };
@@ -4146,6 +4324,48 @@ export type DlmmPro = {
       };
     },
     {
+      name: "evtRemovePosition";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "pool";
+            type: "pubkey";
+          },
+          {
+            name: "owner";
+            type: "pubkey";
+          },
+          {
+            name: "position";
+            type: "pubkey";
+          },
+          {
+            name: "nftMint";
+            type: "pubkey";
+          },
+          {
+            name: "nftAccount";
+            type: "pubkey";
+          },
+          {
+            name: "bitmap";
+            type: "u64";
+          },
+          {
+            name: "tickRanges";
+            type: {
+              vec: {
+                defined: {
+                  name: "tickRange";
+                };
+              };
+            };
+          },
+        ];
+      };
+    },
+    {
       name: "evtSetPoolStatus";
       type: {
         kind: "struct";
@@ -4522,6 +4742,22 @@ export type DlmmPro = {
           },
           {
             name: "bps";
+            type: "u16";
+          },
+        ];
+      };
+    },
+    {
+      name: "maxAmountAndFeeBps";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "maxAmount";
+            type: "u64";
+          },
+          {
+            name: "maxFeeBps";
             type: "u16";
           },
         ];
@@ -5084,6 +5320,18 @@ export type DlmmPro = {
             type: {
               vec: "u128";
             };
+          },
+        ];
+      };
+    },
+    {
+      name: "removePositionParameters";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "bitmap";
+            type: "u64";
           },
         ];
       };

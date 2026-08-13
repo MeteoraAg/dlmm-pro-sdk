@@ -220,6 +220,112 @@
             ]
         },
         {
+            "name": "add_liquidity_imbalance",
+            "discriminator": [
+                12,
+                68,
+                222,
+                87,
+                138,
+                56,
+                203,
+                54
+            ],
+            "accounts": [
+                {
+                    "name": "pool",
+                    "writable": true,
+                    "relations": [
+                        "position",
+                        "tick_array_bitmap_extension"
+                    ]
+                },
+                {
+                    "name": "position",
+                    "writable": true
+                },
+                {
+                    "name": "nft_account",
+                    "docs": [
+                        "The token account for nft"
+                    ]
+                },
+                {
+                    "name": "tick_array_bitmap_extension",
+                    "writable": true,
+                    "optional": true
+                },
+                {
+                    "name": "user_token_x",
+                    "writable": true
+                },
+                {
+                    "name": "user_token_y",
+                    "writable": true
+                },
+                {
+                    "name": "reserve_x",
+                    "writable": true,
+                    "relations": [
+                        "pool"
+                    ]
+                },
+                {
+                    "name": "reserve_y",
+                    "writable": true,
+                    "relations": [
+                        "pool"
+                    ]
+                },
+                {
+                    "name": "token_x_mint",
+                    "relations": [
+                        "pool"
+                    ]
+                },
+                {
+                    "name": "token_y_mint",
+                    "relations": [
+                        "pool"
+                    ]
+                },
+                {
+                    "name": "signer",
+                    "signer": true
+                },
+                {
+                    "name": "token_x_program"
+                },
+                {
+                    "name": "token_y_program"
+                },
+                {
+                    "name": "event_authority"
+                },
+                {
+                    "name": "program"
+                }
+            ],
+            "args": [
+                {
+                    "name": "parameters",
+                    "type": {
+                        "defined": {
+                            "name": "AddLiquidityImbalanceParameters"
+                        }
+                    }
+                },
+                {
+                    "name": "remaining_account_info",
+                    "type": {
+                        "defined": {
+                            "name": "RemainingAccountsInfo"
+                        }
+                    }
+                }
+            ]
+        },
+        {
             "name": "cancel_limit_order",
             "discriminator": [
                 132,
@@ -2969,6 +3075,61 @@
             ]
         },
         {
+            "name": "remove_position",
+            "discriminator": [
+                219,
+                24,
+                236,
+                110,
+                138,
+                80,
+                129,
+                6
+            ],
+            "accounts": [
+                {
+                    "name": "pool",
+                    "relations": [
+                        "position"
+                    ]
+                },
+                {
+                    "name": "position",
+                    "writable": true
+                },
+                {
+                    "name": "nft_account",
+                    "docs": [
+                        "The token account for nft"
+                    ]
+                },
+                {
+                    "name": "signer",
+                    "signer": true
+                },
+                {
+                    "name": "rent_receiver",
+                    "writable": true
+                },
+                {
+                    "name": "event_authority"
+                },
+                {
+                    "name": "program"
+                }
+            ],
+            "args": [
+                {
+                    "name": "parameters",
+                    "type": {
+                        "defined": {
+                            "name": "RemovePositionParameters"
+                        }
+                    }
+                }
+            ]
+        },
+        {
             "name": "set_pool_status",
             "discriminator": [
                 112,
@@ -3868,6 +4029,19 @@
             ]
         },
         {
+            "name": "EvtRemovePosition",
+            "discriminator": [
+                198,
+                89,
+                5,
+                246,
+                12,
+                176,
+                181,
+                123
+            ]
+        },
+        {
             "name": "EvtSetPoolStatus",
             "discriminator": [
                 100,
@@ -4264,6 +4438,54 @@
                     {
                         "name": "liquidities",
                         "type": "bytes"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "AddLiquidityImbalanceParameters",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "max_amount_x_and_fee_bps",
+                        "type": {
+                            "option": {
+                                "defined": {
+                                    "name": "MaxAmountAndFeeBps"
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "name": "max_amount_y_and_fee_bps",
+                        "type": {
+                            "option": {
+                                "defined": {
+                                    "name": "MaxAmountAndFeeBps"
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "name": "observed_tick_id",
+                        "type": "i32"
+                    },
+                    {
+                        "name": "max_tick_slippage",
+                        "type": "u32"
+                    },
+                    {
+                        "name": "index",
+                        "type": "u8"
+                    },
+                    {
+                        "name": "expected_tick_range",
+                        "type": {
+                            "defined": {
+                                "name": "TickRange"
+                            }
+                        }
                     }
                 ]
             }
@@ -5307,6 +5529,48 @@
             }
         },
         {
+            "name": "EvtRemovePosition",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "pool",
+                        "type": "pubkey"
+                    },
+                    {
+                        "name": "owner",
+                        "type": "pubkey"
+                    },
+                    {
+                        "name": "position",
+                        "type": "pubkey"
+                    },
+                    {
+                        "name": "nft_mint",
+                        "type": "pubkey"
+                    },
+                    {
+                        "name": "nft_account",
+                        "type": "pubkey"
+                    },
+                    {
+                        "name": "bitmap",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "tick_ranges",
+                        "type": {
+                            "vec": {
+                                "defined": {
+                                    "name": "TickRange"
+                                }
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
             "name": "EvtSetPoolStatus",
             "type": {
                 "kind": "struct",
@@ -5690,6 +5954,22 @@
                     },
                     {
                         "name": "bps",
+                        "type": "u16"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "MaxAmountAndFeeBps",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "max_amount",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "max_fee_bps",
                         "type": "u16"
                     }
                 ]
@@ -6319,6 +6599,18 @@
                         "type": {
                             "vec": "u128"
                         }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "RemovePositionParameters",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "bitmap",
+                        "type": "u64"
                     }
                 ]
             }
