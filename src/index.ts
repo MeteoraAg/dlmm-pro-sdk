@@ -2,6 +2,7 @@ export * from "./dlmm_pro";
 export * from "./services";
 export * from "./helpers";
 export * from "./math";
+export * from "./base_fee";
 export * from "./errors";
 export * from "./types";
 

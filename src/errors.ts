@@ -1,6 +1,7 @@
 export enum PoolErrorCode {
   MathOverflow = 6000,
   TypeCastFailed = 6001,
+  UndeterminedError = 6024,
   InvalidParameters = 6036,
 }
 
@@ -21,10 +22,11 @@ export class PoolError extends Error {
     return new PoolError(PoolErrorCode.TypeCastFailed, "Type cast error");
   }
 
+  static undeterminedError(): PoolError {
+    return new PoolError(PoolErrorCode.UndeterminedError, "Undetermined error");
+  }
+
   static invalidParameters(): PoolError {
-    return new PoolError(
-      PoolErrorCode.InvalidParameters,
-      "Invalid parameters",
-    );
+    return new PoolError(PoolErrorCode.InvalidParameters, "Invalid parameters");
   }
 }
