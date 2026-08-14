@@ -122,3 +122,49 @@ export type DecodedObservation = {
   lastUpdatedTimestamp: BN;
   tickCumulative: BN;
 };
+
+export enum Rounding {
+  Up,
+  Down,
+}
+
+export enum CollectFeeMode {
+  OutputToken = 0,
+  OnlyY = 1,
+}
+
+export enum BaseFeeMode {
+  Fixed = 0,
+  TimeSchedulerLinear = 1,
+  TimeSchedulerExponential = 2,
+  MarketCapSchedulerLinear = 3,
+  MarketCapSchedulerExponential = 4,
+}
+
+export type FeeSetting = {
+  feesOnInput: boolean;
+  feesOnTokenX: boolean;
+  hasReferral: boolean;
+  hasPartner: boolean;
+  mmProtocolFeeBps: number;
+  limitOrderProtocolFeeBps: number;
+  partnerFeeBps: number;
+};
+
+export type SplitFees = {
+  mmFee: BN;
+  limitOrderFee: BN;
+  protocolFeeOnLimitOrderFee: BN;
+  protocolFeeOnMmFee: BN;
+};
+
+export type FilledAmountResult = {
+  amountIn: BN;
+  amountLeft: BN;
+  outAmount: BN;
+  mmAmountIn: BN;
+  mmAmountOut: BN;
+  processedOrderAmountOut: BN;
+  openOrderAmountOut: BN;
+  nextSqrtPrice: BN;
+};
