@@ -34,7 +34,7 @@ export const MAX_TICKS_PER_ARRAY = Number(
 );
 export const NUM_REWARDS = Number(idlConstant("NUM_REWARDS_U64"));
 export const MAX_TICK_SPACING = Number(idlConstant("MAX_TICK_SPACING"));
-export const MAX_BASIS_POINT = Number(idlConstant("MAX_BASIC_POINT"));
+export const MAX_BASIS_POINT = Number(idlConstant("MAX_BASIS_POINT"));
 export const FEE_DENOMINATOR = new BN(idlConstant("FEE_DENOMINATOR"));
 export const HOST_FEE_BPS = Number(idlConstant("HOST_FEE_BPS"));
 export const MM_PROTOCOL_FEE_BPS = Number(idlConstant("MM_PROTOCOL_FEE_BPS"));
