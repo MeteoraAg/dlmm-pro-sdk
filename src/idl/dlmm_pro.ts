@@ -5680,7 +5680,7 @@ export type DlmmPro = {
       value: "2000";
     },
     {
-      name: "maxBasicPoint";
+      name: "maxBasisPoint";
       type: "u16";
       value: "10000";
     },

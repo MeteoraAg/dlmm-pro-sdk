@@ -6996,7 +6996,7 @@
             "value": "2000"
         },
         {
-            "name": "MAX_BASIC_POINT",
+            "name": "MAX_BASIS_POINT",
             "type": "u16",
             "value": "10000"
         },
