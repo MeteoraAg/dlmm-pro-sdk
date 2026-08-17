@@ -128,6 +128,11 @@ export enum Rounding {
   Down,
 }
 
+export enum TokenProgramFlags {
+  TokenProgram = 0,
+  TokenProgram2022 = 1,
+}
+
 export enum CollectFeeMode {
   OutputToken = 0,
   OnlyY = 1,
