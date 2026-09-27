@@ -5,6 +5,7 @@ export * from "./math";
 export * from "./base_fee";
 export * from "./errors";
 export * from "./types";
+export * from "./constants";
 
 export type { DlmmPro as DlmmProTypes } from "./idl/dlmm_pro.ts";
 export { default as DlmmProIDL } from "./idl/dlmm_pro.json";

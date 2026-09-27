@@ -2,7 +2,9 @@ export enum PoolErrorCode {
   MathOverflow = 6000,
   TypeCastFailed = 6001,
   UndeterminedError = 6024,
+  InvalidBaseFeeMode = 6035,
   InvalidParameters = 6036,
+  InvalidActivationAccess = 6039,
 }
 
 export class PoolError extends Error {
@@ -28,5 +30,19 @@ export class PoolError extends Error {
 
   static invalidParameters(): PoolError {
     return new PoolError(PoolErrorCode.InvalidParameters, "Invalid parameters");
+  }
+
+  static invalidBaseFeeMode(): PoolError {
+    return new PoolError(
+      PoolErrorCode.InvalidBaseFeeMode,
+      "Invalid base fee mode",
+    );
+  }
+
+  static invalidActivationAccess(): PoolError {
+    return new PoolError(
+      PoolErrorCode.InvalidActivationAccess,
+      "Invalid activation access",
+    );
   }
 }

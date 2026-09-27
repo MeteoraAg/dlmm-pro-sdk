@@ -68,6 +68,17 @@ export function splitFees(
     ? [filledAmountResult.mmAmountIn, filledAmountResult.amountIn]
     : [filledAmountResult.mmAmountOut, filledAmountResult.outAmount];
 
+  // A fee numerator high enough to consume the whole input leaves no filled
+  // amount to share against, so the protocol takes the fee outright.
+  if (totalShare.isZero()) {
+    return {
+      mmFee: new BN(0),
+      limitOrderFee: new BN(0),
+      protocolFeeOnLimitOrderFee: new BN(0),
+      protocolFeeOnMmFee: tradingFee,
+    };
+  }
+
   const [totalMmFee, totalLimitOrderFee] = calculateSharedAmounts(
     tradingFee,
     mmShare,

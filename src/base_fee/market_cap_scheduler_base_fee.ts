@@ -1,21 +1,24 @@
 import BN from "bn.js";
-import {
-  FEE_DENOMINATOR,
-  MAX_BASIS_POINT,
-  MAX_FEE_NUMERATOR,
-  MIN_FEE_NUMERATOR,
-} from "../constants";
+import { MAX_BASIS_POINT } from "../constants";
 import { PoolError } from "../errors";
+import {
+  encodePodU16,
+  encodePodU32,
+  encodePodU64,
+  toPodBuffer,
+} from "../helpers/codec";
 import { getFeeInPeriod } from "../math/base_fee_math";
 import {
   safeAdd,
   safeDiv,
   safeMul,
   safeSub,
+  tryCastU16,
   U64_MAX,
   U256_MAX,
 } from "../math/safe_math";
 import type { BaseFeeConfig } from "../types";
+import { validateFeeBounds } from "./fee_fraction";
 
 export type PodAlignedFeeMarketCapScheduler = {
   baseFeeMode: number;
@@ -30,7 +33,7 @@ export type PodAlignedFeeMarketCapScheduler = {
 export function decodePodAlignedFeeMarketCapScheduler(
   baseFee: BaseFeeConfig,
 ): PodAlignedFeeMarketCapScheduler {
-  const data = Buffer.from(baseFee.data);
+  const data = toPodBuffer(baseFee.data, 31);
   return {
     baseFeeMode: baseFee.baseFeeMode,
     cliffFeeNumerator: new BN(data.subarray(0, 8), "le"),
@@ -40,6 +43,26 @@ export function decodePodAlignedFeeMarketCapScheduler(
     numberOfPeriod: data.readUInt16LE(24),
     padding: [...data.subarray(26, 31)],
   };
+}
+
+export type MarketCapSchedulerParams = {
+  cliffFeeNumerator: BN | number;
+  reductionFactor: BN | number;
+  sqrtPriceStepBps: number;
+  schedulerExpirationDuration: number;
+  numberOfPeriod: number;
+};
+
+export function encodeMarketCapSchedulerBaseFeeData(
+  params: MarketCapSchedulerParams,
+): number[] {
+  const buf = Buffer.alloc(31, 0);
+  buf.set(encodePodU64(params.cliffFeeNumerator), 0);
+  buf.set(encodePodU64(params.reductionFactor), 8);
+  buf.set(encodePodU32(params.sqrtPriceStepBps), 16);
+  buf.set(encodePodU32(params.schedulerExpirationDuration), 20);
+  buf.set(encodePodU16(params.numberOfPeriod), 24);
+  return Array.from(buf);
 }
 
 function validateScheduler(inner: PodAlignedFeeMarketCapScheduler): void {
@@ -73,7 +96,10 @@ function getPassedPeriod(
     U64_MAX,
   );
 
-  if (currentPoint.gt(schedulerExpirationPoint) || currentPoint.lt(activationPoint)) {
+  if (
+    currentPoint.gt(schedulerExpirationPoint) ||
+    currentPoint.lt(activationPoint)
+  ) {
     return inner.numberOfPeriod;
   }
 
@@ -99,34 +125,7 @@ function getPassedPeriod(
     return inner.numberOfPeriod;
   }
 
-  try {
-    const period = passedPeriod.toNumber();
-    if (!Number.isInteger(period) || period < 0 || period > 0xffff) {
-      throw PoolError.undeterminedError();
-    }
-    return period;
-  } catch (err) {
-    if (err instanceof PoolError) {
-      throw err;
-    }
-    throw PoolError.undeterminedError();
-  }
-}
-
-function validateFeeBounds(minFeeNumerator: BN, maxFeeNumerator: BN): void {
-  if (
-    FEE_DENOMINATOR.isZero() ||
-    minFeeNumerator.gte(FEE_DENOMINATOR) ||
-    maxFeeNumerator.gte(FEE_DENOMINATOR)
-  ) {
-    throw PoolError.invalidParameters();
-  }
-  if (
-    minFeeNumerator.lt(MIN_FEE_NUMERATOR) ||
-    maxFeeNumerator.gt(MAX_FEE_NUMERATOR)
-  ) {
-    throw PoolError.invalidParameters();
-  }
+  return tryCastU16(passedPeriod);
 }
 
 export class FeeMarketCapSchedulerLinear {

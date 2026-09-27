@@ -146,6 +146,17 @@ export enum BaseFeeMode {
   MarketCapSchedulerExponential = 4,
 }
 
+export enum ActivationType {
+  Slot = 0,
+  Timestamp = 1,
+}
+
+export enum ActivationMode {
+  Open = 0,
+  BondingCurve = 1,
+  TimeBased = 2,
+}
+
 export type FeeSetting = {
   feesOnInput: boolean;
   feesOnTokenX: boolean;

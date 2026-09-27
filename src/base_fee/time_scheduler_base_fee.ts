@@ -1,13 +1,16 @@
 import BN from "bn.js";
-import {
-  FEE_DENOMINATOR,
-  MAX_FEE_NUMERATOR,
-  MIN_FEE_NUMERATOR,
-} from "../constants";
 import { PoolError } from "../errors";
+import { encodePodU16, encodePodU64, toPodBuffer } from "../helpers/codec";
 import { getFeeInPeriod } from "../math/base_fee_math";
-import { safeDiv, safeMul, safeSub, tryCastU16, U64_MAX } from "../math/safe_math";
+import {
+  safeDiv,
+  safeMul,
+  safeSub,
+  tryCastU16,
+  U64_MAX,
+} from "../math/safe_math";
 import type { BaseFeeConfig } from "../types";
+import { validateFeeBounds } from "./fee_fraction";
 
 export type PodAlignedFeeTimeScheduler = {
   baseFeeMode: number;
@@ -21,7 +24,7 @@ export type PodAlignedFeeTimeScheduler = {
 export function decodePodAlignedFeeTimeScheduler(
   baseFee: BaseFeeConfig,
 ): PodAlignedFeeTimeScheduler {
-  const data = Buffer.from(baseFee.data);
+  const data = toPodBuffer(baseFee.data, 31);
   return {
     baseFeeMode: baseFee.baseFeeMode,
     cliffFeeNumerator: new BN(data.subarray(0, 8), "le"),
@@ -30,6 +33,24 @@ export function decodePodAlignedFeeTimeScheduler(
     numberOfPeriod: data.readUInt16LE(24),
     padding: [...data.subarray(26, 31)],
   };
+}
+
+export type TimeSchedulerParams = {
+  cliffFeeNumerator: BN | number;
+  periodFrequency: BN | number;
+  reductionFactor: BN | number;
+  numberOfPeriod: number;
+};
+
+export function encodeTimeSchedulerBaseFeeData(
+  params: TimeSchedulerParams,
+): number[] {
+  const buf = Buffer.alloc(31, 0);
+  buf.set(encodePodU64(params.cliffFeeNumerator), 0);
+  buf.set(encodePodU64(params.periodFrequency), 8);
+  buf.set(encodePodU64(params.reductionFactor), 16);
+  buf.set(encodePodU16(params.numberOfPeriod), 24);
+  return Array.from(buf);
 }
 
 function validateInternal(inner: PodAlignedFeeTimeScheduler): void {
@@ -65,22 +86,6 @@ function getPassedPeriod(
   return tryCastU16(period);
 }
 
-function validateFeeBounds(minFeeNumerator: BN, maxFeeNumerator: BN): void {
-  if (
-    FEE_DENOMINATOR.isZero() ||
-    minFeeNumerator.gte(FEE_DENOMINATOR) ||
-    maxFeeNumerator.gte(FEE_DENOMINATOR)
-  ) {
-    throw PoolError.invalidParameters();
-  }
-  if (
-    minFeeNumerator.lt(MIN_FEE_NUMERATOR) ||
-    maxFeeNumerator.gt(MAX_FEE_NUMERATOR)
-  ) {
-    throw PoolError.invalidParameters();
-  }
-}
-
 export class FeeTimeSchedulerLinear {
   readonly inner: PodAlignedFeeTimeScheduler;
 
@@ -89,7 +94,9 @@ export class FeeTimeSchedulerLinear {
   }
 
   static fromBaseFeeConfig(baseFee: BaseFeeConfig): FeeTimeSchedulerLinear {
-    return new FeeTimeSchedulerLinear(decodePodAlignedFeeTimeScheduler(baseFee));
+    return new FeeTimeSchedulerLinear(
+      decodePodAlignedFeeTimeScheduler(baseFee),
+    );
   }
 
   getBaseFeeNumeratorByPeriod(period: number): BN {

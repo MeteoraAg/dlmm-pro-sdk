@@ -3,6 +3,7 @@ import { PoolError } from "../errors";
 import { Rounding } from "../types";
 import {
   divCeil,
+  downScaleCeil,
   safeAdd,
   safeDiv,
   safeMul,
@@ -11,7 +12,6 @@ import {
   tryCastU64,
   tryCastU128,
   U128_MAX,
-  U192_MAX,
   U256_MAX,
   U320_MAX,
 } from "./safe_math";
@@ -28,18 +28,22 @@ export function getDeltaAmountXUnchecked(
   liquidity: BN,
   round: Rounding,
 ): BN {
+  tryCastU128(lowerSqrtPrice);
+  tryCastU128(upperSqrtPrice);
+  tryCastU128(liquidity);
   if (lowerSqrtPrice.lte(new BN(0))) {
     throw PoolError.mathOverflow();
   }
-  const numerator1 = liquidity.clone();
+  // (L << 64) * (√P_upper - √P_lower) passes 2^256 at the per-tick liquidity cap.
+  const numerator1 = safeShl(liquidity, 64, U320_MAX);
   const numerator2 = safeSub(upperSqrtPrice, lowerSqrtPrice, U128_MAX);
-  const prod = safeMul(numerator1, numerator2, U256_MAX);
-  const denominator = safeMul(lowerSqrtPrice, upperSqrtPrice, U256_MAX);
+  const prod = safeMul(numerator1, numerator2, U320_MAX);
+  const denominator = safeMul(lowerSqrtPrice, upperSqrtPrice, U320_MAX);
 
   if (round === Rounding.Up) {
     return divCeil(prod, denominator);
   }
-  return safeDiv(prod, denominator, U256_MAX);
+  return safeDiv(prod, denominator, U320_MAX);
 }
 
 export function getDeltaAmountX(
@@ -61,14 +65,17 @@ export function getDeltaAmountYUnchecked(
   liquidity: BN,
   round: Rounding,
 ): BN {
+  tryCastU128(lowerSqrtPrice);
+  tryCastU128(upperSqrtPrice);
+  tryCastU128(liquidity);
   const deltaSqrtPrice = safeSub(upperSqrtPrice, lowerSqrtPrice, U128_MAX);
+  // u128 liquidity * Q64.64 delta overflows U192 at the per-tick liquidity cap.
   const prod = safeMul(liquidity, deltaSqrtPrice, U256_MAX);
 
   if (round === Rounding.Up) {
-    const denominator = safeShl(new BN(1), 128, U256_MAX);
-    return divCeil(prod, denominator);
+    return downScaleCeil(prod, 64);
   }
-  return prod.shrn(128);
+  return prod.shrn(64);
 }
 
 export function getDeltaAmountY(
@@ -90,6 +97,9 @@ export function getNextSqrtPriceFromInput(
   amountIn: BN,
   swapForY: boolean,
 ): BN {
+  tryCastU128(sqrtPrice);
+  tryCastU128(liquidity);
+  tryCastU64(amountIn);
   if (amountIn.isZero()) {
     return sqrtPrice;
   }
@@ -108,60 +118,35 @@ export function getNextSqrtPriceFromInput(
   );
 }
 
-/// Gets the next sqrt price √P' given a delta of token_x
-///
-/// Always round up because
-/// 1. In the exact output case, token_x supply decreases leading to price increase.
-/// Move price up so that exact output is met.
-/// 2. In the exact input case, token_x supply increases leading to price decrease.
-/// Do not round down to minimize price impact. We only need to meet input
-/// change and not guarantee exact output.
-///
-/// Use function for exact input or exact output swaps for token_x
-///
-/// # Formula
-///
-/// * `√P' = √P * L / (L + Δx * √P)`
-/// * If Δx * √P overflows, use alternate form `√P' = L / (L/√P + Δx)`
+/** `√P' = √P × L / (L + Δx × √P)`, rounded up. */
 function getNextSqrtPriceFromAmountInXRoundingUp(
   sqrtPrice: BN,
   liquidity: BN,
   amount: BN,
 ): BN {
-  const product = safeMul(amount, sqrtPrice, U256_MAX);
-  const denominator = safeAdd(liquidity, product, U256_MAX);
-  const result = divCeil(safeMul(liquidity, sqrtPrice, U256_MAX), denominator);
+  const shiftedLiquidity = safeShl(liquidity, 64, U320_MAX);
+  const product = safeMul(amount, sqrtPrice, U320_MAX);
+  const denominator = safeAdd(shiftedLiquidity, product, U320_MAX);
+  const result = divCeil(
+    safeMul(shiftedLiquidity, sqrtPrice, U320_MAX),
+    denominator,
+  );
   return tryCastU128(result);
 }
 
-/// Gets the next sqrt price given a delta of token_y
-///
-/// Always round down because
-/// 1. In the exact output case, token_y supply decreases leading to price decrease.
-/// Move price down by rounding down so that exact output of token_a is met.
-/// 2. In the exact input case, token_y supply increases leading to price increase.
-/// Do not round down to minimize price impact. We only need to meet input
-/// change and not guarantee exact output for token_x.
-///
-/// # Formula
-///
-/// * `√P' = √P + Δy / L`
+/** `√P' = √P + Δy / L`, rounded down. */
 function getNextSqrtPriceFromAmountInYRoundingDown(
   sqrtPrice: BN,
   liquidity: BN,
   amount: BN,
 ): BN {
-  const quotient = safeDiv(
-    safeShl(amount, 128, U256_MAX),
-    liquidity,
-    U256_MAX,
-  );
-  const result = safeAdd(sqrtPrice, quotient, U256_MAX);
+  const quotient = safeDiv(safeShl(amount, 64, U128_MAX), liquidity, U128_MAX);
+  const result = sqrtPrice.add(quotient);
 
   if (result.gt(U128_MAX)) {
     return U128_MAX.clone();
   }
-  return tryCastU128(result);
+  return result;
 }
 
 /// Gets the liquidity for a given amount_x and price range.
@@ -179,6 +164,9 @@ export function getLiquidityFromAmountX(
   upperSqrtPrice: BN,
   amountX: BN,
 ): BN | null {
+  tryCastU128(lowerSqrtPrice);
+  tryCastU128(upperSqrtPrice);
+  tryCastU64(amountX);
   if (lowerSqrtPrice.gte(upperSqrtPrice)) {
     return null;
   }
@@ -189,7 +177,7 @@ export function getLiquidityFromAmountX(
     U320_MAX,
   );
   const denominator = safeSub(upperSqrtPrice, lowerSqrtPrice, U128_MAX);
-  return safeDiv(prod, denominator, U320_MAX);
+  return safeDiv(prod, denominator, U320_MAX).shrn(64);
 }
 
 /// Gets the liquidity for a given amount_y and price range.
@@ -198,19 +186,22 @@ export function getLiquidityFromAmountX(
 ///
 /// # Formula
 ///
-/// From `Δy = L * (√P_upper - √P_lower) / 2^128`:
+/// From `Δy = L * (√P_upper - √P_lower) / 2^64`:
 ///
-/// * `L = (Δy << 128) / (√P_upper - √P_lower)`
+/// * `L = (Δy << 64) / (√P_upper - √P_lower)`
 /// return null if √P_upper <= √P_lower, indicate no Y side
 export function getLiquidityFromAmountY(
   lowerSqrtPrice: BN,
   upperSqrtPrice: BN,
   amountY: BN,
 ): BN | null {
+  tryCastU128(lowerSqrtPrice);
+  tryCastU128(upperSqrtPrice);
+  tryCastU64(amountY);
   if (lowerSqrtPrice.gte(upperSqrtPrice)) {
     return null;
   }
   const deltaSqrtPrice = safeSub(upperSqrtPrice, lowerSqrtPrice, U128_MAX);
-  const prod = safeShl(amountY, 128, U192_MAX);
-  return safeDiv(prod, deltaSqrtPrice, U192_MAX);
+  const prod = safeShl(amountY, 64, U128_MAX);
+  return safeDiv(prod, deltaSqrtPrice, U128_MAX);
 }
