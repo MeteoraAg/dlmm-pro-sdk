@@ -1,7 +1,8 @@
-import { Program } from "@coral-xyz/anchor";
-import { Commitment, Connection, PublicKey } from "@solana/web3.js";
-import { DlmmPro } from "../idl/dlmm-pro/dlmm_pro";
-import { createDlmmProProgram } from "../helpers/create_program";
+import type { Program } from "@coral-xyz/anchor";
+import { PublicKey, type Commitment, type Connection } from "@solana/web3.js";
+import { PoolExtension } from "../constants";
+import type { DlmmProProvider } from "../dlmm_pro";
+import type { DlmmPro } from "../idl/dlmm-pro/dlmm_pro";
 import {
   decodeLimitOrderDataFromData,
   decodeObservationsFromData,
@@ -10,6 +11,7 @@ import {
   decodeTicksFromData,
   getBitmapSetIndicesFromPool,
   getExtensionBitmapSetIndicesFromState,
+  isSupportExtension,
 } from "../helpers/codec";
 import type {
   DecodePositionsOpts,
@@ -33,15 +35,14 @@ import type {
 } from "../types";
 
 export class StateService {
-  program: Program<DlmmPro>;
-  private commitment: Commitment;
-  private connection: Connection;
+  private readonly program: Program<DlmmPro>;
+  private readonly commitment: Commitment;
+  private readonly connection: Connection;
 
-  constructor(connection: Connection, commitment: Commitment) {
-    const { program } = createDlmmProProgram(connection, commitment);
-    this.program = program;
-    this.commitment = commitment;
-    this.connection = connection;
+  constructor(provider: DlmmProProvider) {
+    this.program = provider.program;
+    this.commitment = provider.commitment;
+    this.connection = provider.connection;
   }
 
   private async getAccountData(address: PublicKey): Promise<Buffer> {
@@ -49,113 +50,142 @@ export class StateService {
     if (!info) {
       throw new Error(`Account not found: ${address.toBase58()}`);
     }
+    if (!info.owner.equals(this.program.programId)) {
+      throw new Error(
+        `Account ${address.toBase58()} is not owned by the DLMM Pro program`,
+      );
+    }
     return Buffer.from(info.data);
   }
 
-  /**
-   * Fetch the pool account.
-   * @param poolAddress - The address of the pool account.
-   * @returns The pool account.
-   */
+  private async fetchAccount<T>(
+    address: PublicKey,
+    accountName: string,
+  ): Promise<T> {
+    const data = await this.getAccountData(address);
+    return this.program.coder.accounts.decode<T>(accountName, data);
+  }
+
   async fetchPool(poolAddress: PublicKey): Promise<Pool> {
-    return this.program.account.pool.fetch(poolAddress, this.commitment);
+    return this.fetchAccount(poolAddress, "pool");
   }
 
-  /**
-   * Fetch the static config account.
-   * @param configAddress - The address of the static config account.
-   * @returns The static config account.
-   */
+  async fetchPoolWithExtensions(poolAddress: PublicKey): Promise<{
+    pool: Pool;
+    extensions: DecodedPoolExtensions;
+  }> {
+    const data = await this.getAccountData(poolAddress);
+    const pool = this.program.coder.accounts.decode<Pool>("pool", data);
+    return {
+      pool,
+      extensions: decodePoolExtensionsFromData(
+        data,
+        this.program.account.pool.size,
+        pool.extensions,
+      ),
+    };
+  }
+
   async fetchStaticConfig(configAddress: PublicKey): Promise<StaticConfig> {
-    return this.program.account.staticConfig.fetch(
-      configAddress,
-      this.commitment,
-    );
+    return this.fetchAccount(configAddress, "staticConfig");
   }
 
-  /**
-   * Fetch the dynamic config account.
-   * @param configAddress - The address of the dynamic config account.
-   * @returns The dynamic config account.
-   */
   async fetchDynamicConfig(configAddress: PublicKey): Promise<DynamicConfig> {
-    return this.program.account.dynamicConfig.fetch(
-      configAddress,
-      this.commitment,
-    );
+    return this.fetchAccount(configAddress, "dynamicConfig");
   }
 
-  /**
-   * Fetch the position array account.
-   * @param positionArrayAddress - The address of the position array account.
-   * @returns The position array account.
-   */
   async fetchPositionArray(
     positionArrayAddress: PublicKey,
   ): Promise<PositionArray> {
-    return this.program.account.positionArray.fetch(
-      positionArrayAddress,
-      this.commitment,
-    );
+    return this.fetchAccount(positionArrayAddress, "positionArray");
   }
 
   /**
-   * Fetch the limit order account.
-   * @param limitOrderAddress - The address of the limit order account.
-   * @returns The limit order account.
+   * Position array header together with its decoded slots. `withReward` must
+   * match the pool's liquidity-mining extension bit.
    */
+  async fetchPositionArrayWithPositions(
+    positionArrayAddress: PublicKey,
+    opts: { withReward: boolean },
+  ): Promise<{
+    positionArray: PositionArray;
+    positions: DecodedPosition[] | DecodedPositionWithReward[];
+  }> {
+    const data = await this.getAccountData(positionArrayAddress);
+    return {
+      positionArray: this.program.coder.accounts.decode<PositionArray>(
+        "positionArray",
+        data,
+      ),
+      positions: decodePositionsFromData(
+        data,
+        this.program.account.positionArray.size,
+        opts.withReward,
+      ),
+    };
+  }
+
   async fetchLimitOrder(limitOrderAddress: PublicKey): Promise<LimitOrder> {
-    return this.program.account.limitOrder.fetch(
-      limitOrderAddress,
-      this.commitment,
-    );
+    return this.fetchAccount(limitOrderAddress, "limitOrder");
   }
 
-  /**
-   * Fetch the tick array account.
-   * @param tickArrayAddress - The address of the tick array account.
-   * @returns The tick array account.
-   */
   async fetchTickArray(tickArrayAddress: PublicKey): Promise<TickArray> {
-    return this.program.account.tickArray.fetch(
-      tickArrayAddress,
-      this.commitment,
-    );
+    return this.fetchAccount(tickArrayAddress, "tickArray");
   }
 
-  /**
-   * Fetch the tick array bitmap extension account.
-   * @param extensionAddress - The address of the tick array bitmap extension account.
-   * @returns The tick array bitmap extension account.
-   */
+  async fetchTickArraysWithTicks(
+    tickArrayAddresses: PublicKey[],
+    opts: DecodeTicksOpts,
+  ): Promise<
+    {
+      tickArray: TickArray;
+      ticks: DecodedTick[] | DecodedTickWithReward[];
+    }[]
+  > {
+    if (tickArrayAddresses.length === 0) {
+      return [];
+    }
+    const infos = await this.connection.getMultipleAccountsInfo(
+      tickArrayAddresses,
+      this.commitment,
+    );
+    return infos.map((info, index) => {
+      const address = tickArrayAddresses[index];
+      if (!info) {
+        throw new Error(`Account not found: ${address.toBase58()}`);
+      }
+      if (!info.owner.equals(this.program.programId)) {
+        throw new Error(
+          `Account ${address.toBase58()} is not owned by the DLMM Pro program`,
+        );
+      }
+      const data = Buffer.from(info.data);
+      return {
+        tickArray: this.program.coder.accounts.decode<TickArray>(
+          "tickArray",
+          data,
+        ),
+        ticks: decodeTicksFromData(
+          data,
+          this.program.account.tickArray.size,
+          opts.withReward,
+        ),
+      };
+    });
+  }
+
   async fetchTickArrayBitmapExtension(
     extensionAddress: PublicKey,
   ): Promise<TickArrayBitmapExtension> {
-    return this.program.account.tickArrayBitmapExtension.fetch(
-      extensionAddress,
-      this.commitment,
-    );
+    return this.fetchAccount(extensionAddress, "tickArrayBitmapExtension");
   }
 
-  /**
-   * Fetch the operator account.
-   * @param operatorAddress - The address of the operator account.
-   * @returns The operator account.
-   */
   async fetchOperator(operatorAddress: PublicKey): Promise<Operator> {
-    return this.program.account.operator.fetch(
-      operatorAddress,
-      this.commitment,
-    );
+    return this.fetchAccount(operatorAddress, "operator");
   }
 
-  /**
-   * Fetch the oracle account.
-   * @param oracleAddress - The address of the oracle account.
-   * @returns The oracle account.
-   */
   async fetchOracle(oracleAddress: PublicKey): Promise<Oracle> {
-    return this.program.account.oracle.fetch(oracleAddress, this.commitment);
+    return this.fetchAccount(oracleAddress, "oracle");
   }
 
   /**
@@ -165,13 +195,7 @@ export class StateService {
   async decodePoolExtensions(
     poolAddress: PublicKey,
   ): Promise<DecodedPoolExtensions> {
-    const data = await this.getAccountData(poolAddress);
-    const poolState = this.program.coder.accounts.decode<Pool>("pool", data);
-    return decodePoolExtensionsFromData(
-      data,
-      this.program.account.pool.size,
-      poolState.extensions,
-    );
+    return (await this.fetchPoolWithExtensions(poolAddress)).extensions;
   }
 
   /**
@@ -183,10 +207,22 @@ export class StateService {
     opts: DecodePositionsOpts = {},
   ): Promise<DecodedPosition[] | DecodedPositionWithReward[]> {
     const data = await this.getAccountData(positionArrayAddress);
+    let withReward = opts.withReward;
+    if (withReward === undefined) {
+      const positionArray = this.program.coder.accounts.decode<PositionArray>(
+        "positionArray",
+        data,
+      );
+      const pool = await this.fetchPool(positionArray.pool);
+      withReward = isSupportExtension(
+        pool.extensions,
+        PoolExtension.LiquidityMining,
+      );
+    }
     return decodePositionsFromData(
       data,
       this.program.account.positionArray.size,
-      opts.withReward ?? false,
+      withReward,
     );
   }
 

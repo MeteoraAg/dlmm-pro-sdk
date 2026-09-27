@@ -8,3 +8,6 @@ export * from "./token";
 export * from "./validation";
 export * from "./pool_fees";
 export * from "./tick_array";
+export * from "./initialize_pool";
+export * from "./position_fees";
+export * from "./remaining_accounts";
