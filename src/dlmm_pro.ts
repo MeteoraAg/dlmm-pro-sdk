@@ -3,7 +3,9 @@ import type { Commitment, Connection } from "@solana/web3.js";
 import { createDlmmProProgram } from "./helpers/create_program";
 import type { DlmmPro } from "./idl/dlmm-pro/dlmm_pro";
 import {
+  AccessRegistryService,
   LimitOrderService,
+  OperatorService,
   PoolService,
   PositionService,
   RewardService,
@@ -25,6 +27,8 @@ export class DlmmProClient implements DlmmProClientContext {
   readonly commitment: Commitment;
   readonly program: Program<DlmmPro>;
   readonly state: StateService;
+  readonly accessRegistry: AccessRegistryService;
+  readonly operator: OperatorService;
   readonly limitOrder: LimitOrderService;
   readonly pool: PoolService;
   readonly position: PositionService;
@@ -35,6 +39,8 @@ export class DlmmProClient implements DlmmProClientContext {
     this.commitment = commitment;
     this.program = createDlmmProProgram(connection);
     this.state = new StateService(this);
+    this.accessRegistry = new AccessRegistryService(connection, commitment);
+    this.operator = new OperatorService(this);
     this.limitOrder = new LimitOrderService(this);
     this.pool = new PoolService(this);
     this.position = new PositionService(this);

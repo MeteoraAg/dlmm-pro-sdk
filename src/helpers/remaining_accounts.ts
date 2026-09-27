@@ -1,10 +1,4 @@
-import type {
-  AccountMeta,
-  Commitment,
-  Connection,
-  PublicKey,
-} from "@solana/web3.js";
-import BN from "bn.js";
+import type { AccountMeta } from "@solana/web3.js";
 import { PoolError } from "../errors";
 import type { RemainingAccountsInfo } from "../types";
 
@@ -66,26 +60,4 @@ export function remainingAccountsFromHooks(
     remainingAccountsInfo: { slices },
     remainingAccounts,
   };
-}
-
-export type TransferHookLeg = {
-  mint: PublicKey;
-  source: PublicKey;
-  destination: PublicKey;
-  authority: PublicKey;
-  amount: BN;
-};
-
-/**
- * Caller-supplied hook metas only. Omitted arrays are not resolved from the
- * mint; that resolution is added with the transfer-hook helper.
- */
-export function resolveInstructionHooks(
-  _connection: Connection,
-  _commitment: Commitment | undefined,
-  allowed: readonly HookKey[],
-  provided: Partial<Record<HookKey, AccountMeta[] | undefined>>,
-  _legs?: Partial<Record<HookKey, TransferHookLeg | undefined>>,
-): ReturnType<typeof remainingAccountsFromHooks> {
-  return remainingAccountsFromHooks(provided, allowed);
 }
