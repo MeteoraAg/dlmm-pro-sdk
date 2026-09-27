@@ -17,9 +17,7 @@ import {
   StrategyType,
   toWeightCurve,
 } from "../src";
-import { big } from "./helpers/bn";
-
-function debugLiquidityChart(_caption: string, _input: unknown): void {}
+import { big, debugLiquidityChart } from "./helpers";
 
 describe("liquidity shapes", () => {
   const minTickId = -20;

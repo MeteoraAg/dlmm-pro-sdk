@@ -2,6 +2,7 @@ import { BN } from "@coral-xyz/anchor";
 import { describe, expect, it } from "vitest";
 import {
   calculateSharedAmounts,
+  getLiquidityFromAmounts,
   getLiquidityFromAmountX,
   getLiquidityFromAmountY,
   getSqrtPriceFromTickId,
@@ -13,8 +14,7 @@ import {
   splitFees,
   tickIdFromSqrtPrice,
 } from "../src";
-import { big } from "./helpers/bn";
-import { SQRT_PRICE_ONE } from "./helpers/constants";
+import { big, SQRT_PRICE_ONE } from "./helpers";
 
 // [tick, sqrtPrice(tick), sqrtPrice(-tick)].
 const EXACT_BIT_VALUES: [number, string, string][] = [
@@ -109,10 +109,19 @@ describe("liquidity math", () => {
       SQRT_PRICE_ONE,
       maxTokenY,
     );
+    const liquidity = getLiquidityFromAmounts({
+      maxTokenX,
+      maxTokenY,
+      tickLowerId,
+      tickUpperId,
+      tickCurrentId: 0,
+      currentSqrtPrice: SQRT_PRICE_ONE,
+    });
 
     expect(liquidityX).not.toBeNull();
     expect(liquidityY).not.toBeNull();
     expect(big(liquidityY!)).toBeLessThan(big(liquidityX!));
+    expect(liquidity.toString()).toBe(liquidityY!.toString());
   });
 });
 
