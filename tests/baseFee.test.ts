@@ -1,17 +1,27 @@
+import { Keypair, PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
 import { describe, expect, it } from "vitest";
 import {
+  ActivationBondingCurveHandler,
   BaseFeeMode,
+  decodePodAlignedActivationBondingCurve,
+  decodePodAlignedActivationOpen,
+  decodePodAlignedActivationTimeBased,
   decodePodAlignedFeeMarketCapScheduler,
   decodePodAlignedFeeTimeScheduler,
   decodePodAlignedFixedFee,
+  encodeBondingCurveActivationData,
   encodeFixedBaseFeeData,
   encodeMarketCapSchedulerBaseFeeData,
+  encodeTimeBasedActivationData,
   encodeTimeSchedulerBaseFeeData,
   getBaseFeeNumerator,
   getFeeInPeriod,
+  getSqrtPriceFromTickId,
+  MAX_TICK_ID,
   PoolError,
   U64_MAX,
+  bondingCurveActivationParameters,
   validateBaseFeeConfig,
   type BaseFeeConfig,
 } from "../src";
@@ -46,6 +56,9 @@ describe("pod encoders", () => {
         numberOfPeriod: 1,
       }),
     ).toThrow(PoolError);
+    expect(() =>
+      encodeBondingCurveActivationData({ targetIncreaseBps: new BN(-1) }),
+    ).toThrow(PoolError);
   });
 
   it("rejects values wider than the field", () => {
@@ -67,6 +80,12 @@ describe("pod encoders", () => {
         numberOfPeriod: 1,
       }),
     ).toThrow(PoolError);
+    expect(() =>
+      encodeBondingCurveActivationData({
+        targetIncreaseBps: 20000,
+        isReachTarget: 256,
+      }),
+    ).toThrow(PoolError);
   });
 
   it("accepts field maxima", () => {
@@ -79,6 +98,44 @@ describe("pod encoders", () => {
         numberOfPeriod: 0xffff,
       }),
     ).not.toThrow();
+  });
+
+  it("rejects time-based activation points wider than 40 bits", () => {
+    const inRange = new BN(1).shln(40).subn(1);
+    const params = {
+      swapPoint: inRange,
+      addLiquidityPoint: inRange,
+      removeLiquidityPoint: inRange,
+    };
+    const decoded = decodePodAlignedActivationTimeBased({
+      activationMode: 2,
+      data: encodeTimeBasedActivationData(params),
+    });
+    expect({
+      swapPoint: decoded.swapPoint.toString(),
+      addLiquidityPoint: decoded.addLiquidityPoint.toString(),
+      removeLiquidityPoint: decoded.removeLiquidityPoint.toString(),
+    }).toEqual({
+      swapPoint: inRange.toString(),
+      addLiquidityPoint: inRange.toString(),
+      removeLiquidityPoint: inRange.toString(),
+    });
+
+    expect(() =>
+      encodeTimeBasedActivationData({
+        ...params,
+        swapPoint: new BN(1).shln(40),
+      }),
+    ).toThrow(PoolError);
+    expect(() =>
+      encodeTimeBasedActivationData({
+        ...params,
+        swapPoint: new BN(1).shln(64),
+      }),
+    ).toThrow(PoolError);
+    expect(() =>
+      encodeTimeBasedActivationData({ ...params, swapPoint: new BN(-1) }),
+    ).toThrow(PoolError);
   });
 });
 
@@ -98,6 +155,24 @@ describe("pod decoders", () => {
       decodePodAlignedFeeMarketCapScheduler(
         baseFeeConfig(BaseFeeMode.MarketCapSchedulerLinear, []),
       ),
+    ).toThrow(PoolError);
+  });
+
+  it("rejects activation data that is not 15 bytes", () => {
+    expect(() =>
+      decodePodAlignedActivationOpen({
+        activationMode: 0,
+        data: Array(14).fill(0),
+      }),
+    ).toThrow(PoolError);
+    expect(() =>
+      decodePodAlignedActivationBondingCurve({
+        activationMode: 1,
+        data: Array(16).fill(0),
+      }),
+    ).toThrow(PoolError);
+    expect(() =>
+      decodePodAlignedActivationTimeBased({ activationMode: 2, data: [] }),
     ).toThrow(PoolError);
   });
 });
@@ -254,5 +329,66 @@ describe("market cap scheduler parity", () => {
     expect(fee(linearConfig, 999, initSqrtPrice)).toBe("100000000");
     expect(fee(linearConfig, 4601, initSqrtPrice)).toBe("100000000");
     expect(fee(exponentialConfig, 4601, initSqrtPrice)).toBe("1776158");
+  });
+});
+
+describe("bonding curve initialize validation", () => {
+  const zero = new BN(0);
+  const tickSpacing = 10;
+  const alignedMaxTickId = Math.floor(MAX_TICK_ID / tickSpacing) * tickSpacing;
+  const whitelistedAddLiquidity = Keypair.generate().publicKey;
+
+  function handler(targetIncreaseBps: number): ActivationBondingCurveHandler {
+    return ActivationBondingCurveHandler.fromPoolActivationInfo(
+      bondingCurveActivationParameters({ targetIncreaseBps }),
+    );
+  }
+
+  it("accepts a target below the spacing-aligned max tick price", () => {
+    expect(alignedMaxTickId).toBe(443630);
+    expect(() =>
+      handler(10_005).validateInitialize(
+        zero,
+        zero,
+        getSqrtPriceFromTickId(0),
+        tickSpacing,
+        whitelistedAddLiquidity,
+      ),
+    ).not.toThrow();
+  });
+
+  it("rejects a target above the spacing-aligned max tick price", () => {
+    // init at the aligned max tick: any increase > 1x overshoots
+    expect(() =>
+      handler(10_001).validateInitialize(
+        zero,
+        zero,
+        getSqrtPriceFromTickId(alignedMaxTickId),
+        tickSpacing,
+        whitelistedAddLiquidity,
+      ),
+    ).toThrow(PoolError);
+  });
+
+  it("rejects a default whitelisted depositor, which would strand the pool", () => {
+    expect(() =>
+      handler(10_005).validateInitialize(
+        zero,
+        zero,
+        getSqrtPriceFromTickId(0),
+        tickSpacing,
+        PublicKey.default,
+      ),
+    ).toThrow(PoolError);
+  });
+
+  it("sets isReachTarget when the price crosses the bonding-curve target", () => {
+    const curve = handler(20_000);
+    curve.updatePostSwap(new BN(100), new BN(199));
+    expect(curve.isReachTarget()).toBe(false);
+    curve.updatePostSwap(new BN(100), new BN(200));
+    expect(curve.isReachTarget()).toBe(true);
+    curve.updatePostSwap(new BN(100), new BN(50));
+    expect(curve.isReachTarget()).toBe(true);
   });
 });
