@@ -5,7 +5,9 @@ import {
   MIN_FEE_NUMERATOR,
 } from "../constants";
 import { PoolError } from "../errors";
+import { encodePodU64, toPodBuffer } from "../helpers/codec";
 import type { BaseFeeConfig } from "../types";
+import { validateFeeFraction } from "./fee_fraction";
 
 export type PodAlignedFixedFee = {
   baseFeeMode: number;
@@ -16,12 +18,20 @@ export type PodAlignedFixedFee = {
 export function decodePodAlignedFixedFee(
   baseFee: BaseFeeConfig,
 ): PodAlignedFixedFee {
-  const data = Buffer.from(baseFee.data);
+  const data = toPodBuffer(baseFee.data, 31);
   return {
     baseFeeMode: baseFee.baseFeeMode,
     cliffFeeNumerator: new BN(data.subarray(0, 8), "le"),
     padding: [...data.subarray(8, 31)],
   };
+}
+
+export function encodeFixedBaseFeeData(
+  cliffFeeNumerator: BN | number,
+): number[] {
+  const buf = Buffer.alloc(31, 0);
+  buf.set(encodePodU64(cliffFeeNumerator), 0);
+  return Array.from(buf);
 }
 
 export class FixedBaseFeeHandler {
@@ -36,7 +46,7 @@ export class FixedBaseFeeHandler {
   }
 
   validate(): void {
-    validateFixedFeeFraction(this.inner.cliffFeeNumerator);
+    validateFeeFraction(this.inner.cliffFeeNumerator, FEE_DENOMINATOR);
     if (
       this.inner.cliffFeeNumerator.lt(MIN_FEE_NUMERATOR) ||
       this.inner.cliffFeeNumerator.gt(MAX_FEE_NUMERATOR)
@@ -55,11 +65,5 @@ export class FixedBaseFeeHandler {
     _currentSqrtPrice: BN,
   ): BN {
     return this.inner.cliffFeeNumerator;
-  }
-}
-
-function validateFixedFeeFraction(numerator: BN): void {
-  if (FEE_DENOMINATOR.isZero() || numerator.gte(FEE_DENOMINATOR)) {
-    throw PoolError.invalidParameters();
   }
 }

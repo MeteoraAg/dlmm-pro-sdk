@@ -1,7 +1,5 @@
 import BN from "bn.js";
-import { FEE_DENOMINATOR } from "../constants";
 import { PoolError } from "../errors";
-import { tryCastBaseFeeMode } from "../math/safe_math";
 import { BaseFeeMode, type BaseFeeConfig } from "../types";
 import { FixedBaseFeeHandler } from "./fixed_base_fee";
 import {
@@ -16,6 +14,7 @@ import {
 export * from "./fixed_base_fee";
 export * from "./time_scheduler_base_fee";
 export * from "./market_cap_scheduler_base_fee";
+export { validateFeeFraction } from "./fee_fraction";
 
 export interface BaseFeeHandler {
   validate(): void;
@@ -28,9 +27,7 @@ export interface BaseFeeHandler {
 }
 
 export function getBaseFeeHandler(baseFee: BaseFeeConfig): BaseFeeHandler {
-  const baseFeeMode = tryCastBaseFeeMode(baseFee.baseFeeMode);
-
-  switch (baseFeeMode) {
+  switch (baseFee.baseFeeMode) {
     case BaseFeeMode.Fixed:
       return FixedBaseFeeHandler.fromBaseFeeConfig(baseFee);
     case BaseFeeMode.TimeSchedulerLinear:
@@ -41,6 +38,8 @@ export function getBaseFeeHandler(baseFee: BaseFeeConfig): BaseFeeHandler {
       return FeeMarketCapSchedulerLinear.fromBaseFeeConfig(baseFee);
     case BaseFeeMode.MarketCapSchedulerExponential:
       return FeeMarketCapSchedulerExponential.fromBaseFeeConfig(baseFee);
+    default:
+      throw PoolError.invalidBaseFeeMode();
   }
 }
 
@@ -61,10 +60,4 @@ export function getBaseFeeNumerator(
 
 export function validateBaseFeeConfig(baseFee: BaseFeeConfig): void {
   getBaseFeeHandler(baseFee).validate();
-}
-
-export function validateFeeFraction(numerator: BN, denominator: BN): void {
-  if (denominator.isZero() || numerator.gte(denominator)) {
-    throw PoolError.invalidParameters();
-  }
 }

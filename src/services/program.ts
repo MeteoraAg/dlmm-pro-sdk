@@ -1,26 +1,19 @@
-import { Program } from "@coral-xyz/anchor";
-import { DlmmPro } from "../idl/dlmm_pro";
-import { Commitment, Connection, PublicKey } from "@solana/web3.js";
-import { StateService } from "./state";
-import { createDlmmProProgram, derivePoolAuthority } from "../helpers";
+import type { Program } from "@coral-xyz/anchor";
+import type { Commitment, Connection } from "@solana/web3.js";
+import type { DlmmProClientContext } from "../dlmm_pro";
+import type { DlmmPro } from "../idl/dlmm-pro/dlmm_pro";
+import type { StateService } from "./state";
 
 export class DlmmProProgram {
-  program: Program<DlmmPro>;
-  protected connection: Connection;
-  protected poolAuthority: PublicKey;
-  protected commitment: Commitment;
-  protected state: StateService;
+  protected readonly program: Program<DlmmPro>;
+  protected readonly connection: Connection;
+  protected readonly commitment: Commitment;
+  protected readonly state: StateService;
 
-  constructor(connection: Connection, commitment: Commitment) {
-    const { program } = createDlmmProProgram(connection, commitment);
-    this.program = program;
-    this.connection = connection;
-    this.poolAuthority = derivePoolAuthority();
-    this.commitment = commitment;
-    this.state = new StateService(connection, commitment);
-  }
-
-  getProgram(): Program<DlmmPro> {
-    return this.program;
+  constructor(client: DlmmProClientContext) {
+    this.program = client.program;
+    this.connection = client.connection;
+    this.commitment = client.commitment;
+    this.state = client.state;
   }
 }

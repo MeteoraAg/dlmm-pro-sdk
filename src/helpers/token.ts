@@ -1,4 +1,5 @@
 import {
+  type Commitment,
   Connection,
   PublicKey,
   SystemProgram,
@@ -11,18 +12,16 @@ import {
   createSyncNativeInstruction,
   getAccount,
   getAssociatedTokenAddressSync,
-  getMint,
   NATIVE_MINT,
   TOKEN_2022_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
   TokenAccountNotFoundError,
   TokenInvalidAccountOwnerError,
+  unpackMint,
 } from "@solana/spl-token";
+import { PoolError } from "../errors";
 import { TokenProgramFlags } from "../types";
 
-/**
- * Return an ATA address and an idempotent create instruction when the account is missing.
- */
 export async function getOrCreateATAInstruction(
   connection: Connection,
   tokenMint: PublicKey,
@@ -120,61 +119,87 @@ export function findAssociatedTokenAddress(
   );
 }
 
-/**
- * Fetch a mint account and return its token decimals.
- */
+export function findNftAccount(
+  nftMint: PublicKey,
+  owner: PublicKey,
+): PublicKey {
+  return getAssociatedTokenAddressSync(
+    nftMint,
+    owner,
+    true,
+    TOKEN_2022_PROGRAM_ID,
+  );
+}
+
 export async function getTokenDecimals(
   connection: Connection,
   mintAddress: PublicKey | string,
+  commitment?: Commitment,
 ): Promise<number> {
   const mintPubkey =
     mintAddress instanceof PublicKey ? mintAddress : new PublicKey(mintAddress);
 
-  const accountInfo = await connection.getAccountInfo(mintPubkey);
+  const accountInfo = await connection.getAccountInfo(mintPubkey, commitment);
   if (!accountInfo) {
     throw new Error(`Mint account not found: ${mintPubkey.toBase58()}`);
   }
+  if (
+    !accountInfo.owner.equals(TOKEN_PROGRAM_ID) &&
+    !accountInfo.owner.equals(TOKEN_2022_PROGRAM_ID)
+  ) {
+    throw new Error(
+      `Mint ${mintPubkey.toBase58()} is not owned by a supported token program`,
+    );
+  }
 
-  const mintInfo = await getMint(
-    connection,
-    mintPubkey,
-    "confirmed",
-    accountInfo.owner,
-  );
-  return mintInfo.decimals;
+  return unpackMint(mintPubkey, accountInfo, accountInfo.owner).decimals;
 }
 
 /**
  * Return the SPL Token program ID for a token program flag.
  */
-export function getTokenProgram(
-  tokenProgramFlag: TokenProgramFlags,
-): PublicKey {
-  return tokenProgramFlag === TokenProgramFlags.TokenProgram
-    ? TOKEN_PROGRAM_ID
-    : TOKEN_2022_PROGRAM_ID;
+export function getTokenProgram(tokenProgramFlag: number): PublicKey {
+  switch (tokenProgramFlag) {
+    case TokenProgramFlags.TokenProgram:
+      return TOKEN_PROGRAM_ID;
+    case TokenProgramFlags.TokenProgram2022:
+      return TOKEN_2022_PROGRAM_ID;
+    default:
+      throw PoolError.typeCastFailed();
+  }
 }
 
-/**
- * Return the token program flag from the mint account owner, or `null` if unknown.
- */
-export async function getTokenType(
+/** Mint stored in the first 32 bytes of an SPL or Token-2022 token account. */
+export async function readTokenAccountMint(
+  connection: Connection,
+  address: PublicKey,
+  commitment: Commitment,
+): Promise<PublicKey> {
+  const info = await connection.getAccountInfo(address, commitment);
+  if (!info || info.data.length < 32) {
+    throw PoolError.invalidAccount();
+  }
+  return new PublicKey(info.data.subarray(0, 32));
+}
+
+export async function resolveTokenProgram(
   connection: Connection,
   tokenMint: PublicKey,
-): Promise<TokenProgramFlags | null> {
-  const accountInfo = await connection.getAccountInfo(tokenMint);
+  commitment?: Commitment,
+): Promise<PublicKey> {
+  const accountInfo = await connection.getAccountInfo(tokenMint, commitment);
   if (!accountInfo) {
-    return null;
+    throw new Error(`Mint account not found: ${tokenMint.toBase58()}`);
   }
-
-  if (accountInfo.owner.equals(TOKEN_PROGRAM_ID)) {
-    return TokenProgramFlags.TokenProgram;
+  if (
+    accountInfo.owner.equals(TOKEN_PROGRAM_ID) ||
+    accountInfo.owner.equals(TOKEN_2022_PROGRAM_ID)
+  ) {
+    return accountInfo.owner;
   }
-  if (accountInfo.owner.equals(TOKEN_2022_PROGRAM_ID)) {
-    return TokenProgramFlags.TokenProgram2022;
-  }
-
-  return null;
+  throw new Error(
+    `Mint ${tokenMint.toBase58()} is not owned by a supported token program`,
+  );
 }
 
 /**

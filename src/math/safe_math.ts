@@ -1,6 +1,11 @@
 import BN from "bn.js";
 import { PoolError } from "../errors";
-import { BaseFeeMode, CollectFeeMode } from "../types";
+import {
+  ActivationMode,
+  ActivationType,
+  BaseFeeMode,
+  CollectFeeMode,
+} from "../types";
 
 export const U16_MAX = new BN("65535");
 export const U32_MAX = new BN("4294967295");
@@ -9,12 +14,9 @@ export const U128_MAX = new BN("340282366920938463463374607431768211455");
 export const U192_MAX = new BN(1).shln(192).subn(1);
 export const U256_MAX = new BN(1).shln(256).subn(1);
 export const U320_MAX = new BN(1).shln(320).subn(1);
-export const U512_MAX = new BN(1).shln(512).subn(1);
 
-export const I32_MIN = -2147483648;
-export const I32_MAX = 2147483647;
-export const I32_MIN_BN = new BN(I32_MIN);
-export const I128_MIN = new BN(1).shln(127).neg();
+const I32_MIN = -2147483648;
+const I32_MAX = 2147483647;
 export const I128_MAX = new BN(1).shln(127).subn(1);
 
 function assertUnsigned(value: BN, max: BN): BN {
@@ -43,13 +45,6 @@ export function safeDiv(lhs: BN, rhs: BN, max: BN): BN {
   return assertUnsigned(lhs.div(rhs), max);
 }
 
-export function safeRem(lhs: BN, rhs: BN, max: BN): BN {
-  if (rhs.isZero()) {
-    throw PoolError.mathOverflow();
-  }
-  return assertUnsigned(lhs.mod(rhs), max);
-}
-
 export function safeShl(lhs: BN, offset: number, max: BN): BN {
   const width = max.bitLength();
   if (offset < 0 || offset >= width) {
@@ -70,10 +65,6 @@ export function wrappingAdd(lhs: BN, rhs: BN, max: BN): BN {
   return lhs.add(rhs).and(max);
 }
 
-export function wrappingMul(lhs: BN, rhs: BN, max: BN): BN {
-  return lhs.mul(rhs).and(max);
-}
-
 export function overflowingAdd(
   lhs: BN,
   rhs: BN,
@@ -84,6 +75,15 @@ export function overflowingAdd(
     return { result: sum.and(max), overflow: true };
   }
   return { result: sum, overflow: false };
+}
+
+export function downScaleCeil(value: BN, shift: number): BN {
+  const quotient = value.shrn(shift);
+  // Any set bit below shift means a non zero remainder.
+  if (value.zeroBits() < shift && !value.isZero()) {
+    return quotient.addn(1);
+  }
+  return quotient;
 }
 
 export function divCeil(lhs: BN, rhs: BN): BN {
@@ -123,6 +123,13 @@ export function tryCastU16(value: BN): number {
   return value.toNumber();
 }
 
+export function tryCastU32(value: BN): number {
+  if (value.isNeg() || value.gt(U32_MAX)) {
+    throw PoolError.typeCastFailed();
+  }
+  return value.toNumber();
+}
+
 export function tryCastU64(value: BN): BN {
   if (value.isNeg() || value.gt(U64_MAX)) {
     throw PoolError.typeCastFailed();
@@ -132,27 +139,6 @@ export function tryCastU64(value: BN): BN {
 
 export function tryCastU128(value: BN): BN {
   if (value.isNeg() || value.gt(U128_MAX)) {
-    throw PoolError.typeCastFailed();
-  }
-  return value;
-}
-
-export function tryCastUsize(value: BN): number {
-  if (value.isNeg() || value.bitLength() > 53) {
-    throw PoolError.typeCastFailed();
-  }
-  return value.toNumber();
-}
-
-export function tryCastI128ToU128(value: BN): BN {
-  if (value.isNeg() || value.gt(U128_MAX)) {
-    throw PoolError.typeCastFailed();
-  }
-  return value;
-}
-
-export function tryCastI64ToU64(value: BN): BN {
-  if (value.isNeg() || value.gt(U64_MAX)) {
     throw PoolError.typeCastFailed();
   }
   return value;
@@ -172,6 +158,24 @@ export function tryCastCollectFeeMode(value: number): CollectFeeMode {
   throw PoolError.typeCastFailed();
 }
 
+export function tryCastActivationType(value: number): ActivationType {
+  if (value === ActivationType.Slot || value === ActivationType.Timestamp) {
+    return value;
+  }
+  throw PoolError.typeCastFailed();
+}
+
+export function tryCastActivationMode(value: number): ActivationMode {
+  switch (value) {
+    case ActivationMode.Open:
+    case ActivationMode.BondingCurve:
+    case ActivationMode.TimeBased:
+      return value;
+    default:
+      throw PoolError.invalidActivationAccess();
+  }
+}
+
 export function tryCastBaseFeeMode(value: number): BaseFeeMode {
   switch (value) {
     case BaseFeeMode.Fixed:
@@ -183,17 +187,6 @@ export function tryCastBaseFeeMode(value: number): BaseFeeMode {
     default:
       throw PoolError.typeCastFailed();
   }
-}
-
-export function tryCast<D>(
-  value: unknown,
-  cast: (value: unknown) => D | null,
-): D {
-  const result = cast(value);
-  if (result === null) {
-    throw PoolError.typeCastFailed();
-  }
-  return result;
 }
 
 export function leadingZerosU128(value: BN): number {
@@ -213,8 +206,4 @@ export function highU64(value: BN): BN {
 
 export function toBigInt(value: BN): bigint {
   return BigInt(value.toString(10));
-}
-
-export function fromBigInt(value: bigint): BN {
-  return new BN(value.toString(10));
 }

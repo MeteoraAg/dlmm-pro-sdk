@@ -5,7 +5,6 @@ import {
   highU64,
   leadingZerosU128,
   lowU64,
-  overflowingAdd,
   safeMul,
   toBigInt,
   tryCastI32,
@@ -53,12 +52,8 @@ export function tickIdFromSqrtPrice(sqrtPrice: BN): number {
   const log2pX32 = log2pIntegerX32 + log2pFractionX32;
   const logbpX64 = log2pX32 * LOG_B_2_X32;
 
-  const tickLow = tryCastI32(
-    (logbpX64 - LOG_B_P_ERR_MARGIN_LOWER_X64) >> 64n,
-  );
-  const tickHigh = tryCastI32(
-    (logbpX64 + LOG_B_P_ERR_MARGIN_UPPER_X64) >> 64n,
-  );
+  const tickLow = tryCastI32((logbpX64 - LOG_B_P_ERR_MARGIN_LOWER_X64) >> 64n);
+  const tickHigh = tryCastI32((logbpX64 + LOG_B_P_ERR_MARGIN_UPPER_X64) >> 64n);
 
   if (tickLow === tickHigh) {
     return tickLow;
@@ -71,11 +66,9 @@ export function tickIdFromSqrtPrice(sqrtPrice: BN): number {
   return tickLow;
 }
 
-// No one benefit from price rounding thus we remain default round down for code simplicity
-/// Compute price = (sqrt_price)² >> 64, where sqrt_price is in Q64.64.
-/// sqrt_price = a·2^64 + b
-/// price = a²·2^64 + 2ab + (b² >> 64)
-/// Caller must ensure result fits in u128, which holds for any valid sqrt_price < 2^128.
+/**
+ * Compute `(sqrtPrice²) >> 64` with the program's downward rounding.
+ */
 export function getPriceFromSqrtPrice(sqrtPrice: BN): BN {
   const a = highU64(sqrtPrice);
   const b = lowU64(sqrtPrice);
@@ -85,7 +78,11 @@ export function getPriceFromSqrtPrice(sqrtPrice: BN): BN {
   const a2 = a.mul(a);
 
   return wrappingAdd(
-    wrappingAdd(wrappingShl(a2, 64, U128_MAX), wrappingShl(ab, 1, U128_MAX), U128_MAX),
+    wrappingAdd(
+      wrappingShl(a2, 64, U128_MAX),
+      wrappingShl(ab, 1, U128_MAX),
+      U128_MAX,
+    ),
     b2.shrn(64),
     U128_MAX,
   );
@@ -100,9 +97,10 @@ export function getSqrtPriceFromTickId(tickId: number): BN {
 
 // Performs the exponential conversion with Q64.64 precision
 function getSqrtPricePositiveTick(tick: number): BN {
-  let ratio = tick & 1
-    ? new BN("79232123823359799118286999567")
-    : new BN("79228162514264337593543950336");
+  let ratio =
+    tick & 1
+      ? new BN("79232123823359799118286999567")
+      : new BN("79228162514264337593543950336");
 
   if (tick & 0x2) {
     ratio = mulShift96(ratio, new BN("79236085330515764027303304731"));
@@ -207,10 +205,7 @@ function getSqrtPricePositiveTick(tick: number): BN {
     return ratio.shrn(32);
   }
   if (tick & 0x40000) {
-    ratio = mulShift96(
-      ratio,
-      new BN("38992368544603139932233054999993551"),
-    );
+    ratio = mulShift96(ratio, new BN("38992368544603139932233054999993551"));
   }
 
   return ratio.shrn(32);
@@ -219,9 +214,10 @@ function getSqrtPricePositiveTick(tick: number): BN {
 function getSqrtPriceNegativeTick(tick: number): BN {
   const absTick = Math.abs(tick);
 
-  let ratio = absTick & 1
-    ? new BN("18445821805675392311")
-    : new BN("18446744073709551616");
+  let ratio =
+    absTick & 1
+      ? new BN("18445821805675392311")
+      : new BN("18446744073709551616");
 
   if (absTick & 0x2) {
     ratio = safeMul(ratio, new BN("18444899583751176498"), U128_MAX).shrn(64);
@@ -334,12 +330,17 @@ function getSqrtPriceNegativeTick(tick: number): BN {
 
 /// Computes (n0 × n1) >> 96.
 ///
-/// Caller must ensure result fits in u128, i.e. n0 × n1 < 2^224.
+/// Caller must ensure result fits in u128, i.e. n0 × n1 < 2^224. And no mid carry bit.
+///
+/// The carry out of the middle sum is not tracked, because the current system
+/// boundary 0..=MAX_TICK_ID never produces one. Do not use this helper for any
+/// value outside that boundary.
+///
 /// In sqrt-price computation, this invariant holds because:
-/// - n0 (ratio in Q96) < 2^160
-/// - n1 (precomputed constants) < 2^105
-/// - product < 2^265, but with input range MIN_TICK..MAX_TICK,
-///   product < 2^210, so result fits in u128.
+/// - n0 (ratio in Q96) < 2^110
+/// - n1 (precomputed constants) < 2^115
+/// - product < 2^(110 + 115) = 2^225, but with input range 0..=MAX_TICK_ID
+///   product < 2^224, so result fits in u128.
 function mulShift96(n0: BN, n1: BN): BN {
   const a = highU64(n0);
   const b = lowU64(n0);
@@ -352,12 +353,10 @@ function mulShift96(n0: BN, n1: BN): BN {
   const ac = a.mul(c);
 
   const bdHi = bd.shrn(64);
-  const adBc = overflowingAdd(ad, bc, U128_MAX);
-  const mid = overflowingAdd(adBc.result, bdHi, U128_MAX);
-  const midCarry = new BN(Number(adBc.overflow) + Number(mid.overflow));
+  const mid = wrappingAdd(wrappingAdd(ad, bc, U128_MAX), bdHi, U128_MAX);
 
-  const high = wrappingShl(wrappingAdd(ac, midCarry, U128_MAX), 32, U128_MAX);
-  const low = mid.result.shrn(32);
+  const high = wrappingShl(ac, 32, U128_MAX);
+  const low = mid.shrn(32);
 
   return wrappingAdd(high, low, U128_MAX);
 }
