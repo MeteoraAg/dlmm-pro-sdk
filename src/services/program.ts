@@ -1,5 +1,5 @@
 import { Program } from "@coral-xyz/anchor";
-import { DlmmPro } from "../idl/dlmm_pro";
+import { DlmmPro } from "../idl/dlmm-pro/dlmm_pro";
 import { Commitment, Connection, PublicKey } from "@solana/web3.js";
 import { StateService } from "./state";
 import { createDlmmProProgram, derivePoolAuthority } from "../helpers";

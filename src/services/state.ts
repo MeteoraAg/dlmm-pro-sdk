@@ -1,6 +1,6 @@
 import { Program } from "@coral-xyz/anchor";
 import { Commitment, Connection, PublicKey } from "@solana/web3.js";
-import { DlmmPro } from "../idl/dlmm_pro";
+import { DlmmPro } from "../idl/dlmm-pro/dlmm_pro";
 import { createDlmmProProgram } from "../helpers/create_program";
 import {
   decodeLimitOrderDataFromData,
@@ -30,7 +30,6 @@ import type {
   StaticConfig,
   TickArray,
   TickArrayBitmapExtension,
-  TokenBadge,
 } from "../types";
 
 export class StateService {
@@ -146,18 +145,6 @@ export class StateService {
   async fetchOperator(operatorAddress: PublicKey): Promise<Operator> {
     return this.program.account.operator.fetch(
       operatorAddress,
-      this.commitment,
-    );
-  }
-
-  /**
-   * Fetch the token badge account.
-   * @param tokenBadgeAddress - The address of the token badge account.
-   * @returns The token badge account.
-   */
-  async fetchTokenBadge(tokenBadgeAddress: PublicKey): Promise<TokenBadge> {
-    return this.program.account.tokenBadge.fetch(
-      tokenBadgeAddress,
       this.commitment,
     );
   }
