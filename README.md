@@ -102,7 +102,7 @@ from `dlmm_pro::client` after fetching accounts and verifying their owners.
 
 ## Develop
 
-Node 24, pnpm, Rust 1.94.0 (`rust-toolchain.toml`, rustfmt + clippy).
+Node 22, pnpm, Rust 1.94.0 (`rust-toolchain.toml`, rustfmt + clippy).
 
 ```bash
 pnpm install
@@ -116,7 +116,7 @@ CI runs those same `make` targets. With `CI=true`, Cargo also gets `--locked`.
 
 LiteSVM tests (TS and Rust) need `tests/fixtures/dlmm_pro.so`, built from the
 program with `--features local` (that flag stubs the admin check). Override
-the path with `DLMM_PRO_SO_PATH`. The TypeScript suite uses LiteSVM 0.8.0
-and Node 24. LiteSVM 0.3.3's linux-x64 addon aborts on Node 22.
+the path with `DLMM_PRO_SO_PATH`. The TypeScript suite uses LiteSVM 0.8.0.
+CI runs those tests on Ubuntu 22.04, the image that addon was built on.
 
 Test tokens: https://faucet.raccoons.dev/
