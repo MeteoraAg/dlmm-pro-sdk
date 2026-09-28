@@ -117,6 +117,6 @@ CI runs those same `make` targets. With `CI=true`, Cargo also gets `--locked`.
 LiteSVM tests (TS and Rust) need `tests/fixtures/dlmm_pro.so`, built from the
 program with `--features local` (that flag stubs the admin check). Override
 the path with `DLMM_PRO_SO_PATH`. The TypeScript suite uses LiteSVM 0.8.0.
-CI runs those tests on Ubuntu 22.04, the image that addon was built on.
+CI runs those tests on Ubuntu 22.04 with Node 24. Node 22 aborts inside that addon.
 
 Test tokens: https://faucet.raccoons.dev/

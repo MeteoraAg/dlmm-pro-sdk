@@ -101,7 +101,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # Node 22 aborts inside the linux LiteSVM addon (std::bad_alloc).
+          node-version: 24
           cache: pnpm
 
       - name: Install dependencies
