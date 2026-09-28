@@ -116,6 +116,6 @@ CI runs those same `make` targets. With `CI=true`, Cargo also gets `--locked`.
 
 LiteSVM tests (TS and Rust) need `tests/fixtures/dlmm_pro.so`, built from the
 program with `--features local` (that flag stubs the admin check). Override
-the path with `DLMM_PRO_SO_PATH`.
+the path with `DLMM_PRO_SO_PATH`. On Linux, run the TypeScript suite with Node 24. LiteSVM 0.3.3's linux-x64 addon aborts with `std::bad_alloc` on Node 22.
 
 Test tokens: https://faucet.raccoons.dev/
