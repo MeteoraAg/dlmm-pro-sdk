@@ -116,7 +116,6 @@ CI runs those same `make` targets. With `CI=true`, Cargo also gets `--locked`.
 
 LiteSVM tests (TS and Rust) need `tests/fixtures/dlmm_pro.so`, built from the
 program with `--features local` (that flag stubs the admin check). Override
-the path with `DLMM_PRO_SO_PATH`. The TypeScript suite uses LiteSVM 0.8.0.
-CI runs those tests on an ARM runner. The x86_64 addon JIT-compiles SBF and corrupts the Node process.
+the path with `DLMM_PRO_SO_PATH`.
 
 Test tokens: https://faucet.raccoons.dev/

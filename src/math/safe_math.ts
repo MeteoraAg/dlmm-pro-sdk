@@ -209,11 +209,5 @@ export function highU64(value: BN): BN {
 }
 
 export function toBigInt(value: BN): bigint {
-  // Byte conversion avoids bn.js base-10 `toString`, which can append `NaN`
-  // on the linux-x64 build used in CI.
-  let result = 0n;
-  for (const byte of value.toArray("be")) {
-    result = (result << 8n) + BigInt(byte);
-  }
-  return value.isNeg() ? -result : result;
+  return BigInt(value.toString(10));
 }

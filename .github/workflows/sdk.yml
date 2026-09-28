@@ -87,9 +87,7 @@ jobs:
 
   test:
     name: Test
-    # The x86_64 LiteSVM addon JIT-compiles SBF and corrupts the Node heap
-    # (decimal bn.js conversion returns NaN; Node 22 aborts with std::bad_alloc).
-    # The ARM addon has no JIT and runs SBF in the interpreter.
+    # x86_64 LiteSVM's SBF JIT corrupts Node. The ARM build interprets SBF.
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 15
     steps:
