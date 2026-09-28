@@ -3,7 +3,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     isolate: false,
-    // One worker. Parallel LiteSVM processes abort on the linux CI runner.
+    // One worker. The linux x64 LiteSVM addon is unsafe to run in parallel.
     fileParallelism: false,
     maxWorkers: 1,
     maxConcurrency: 1,

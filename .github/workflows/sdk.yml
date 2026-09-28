@@ -87,9 +87,10 @@ jobs:
 
   test:
     name: Test
-    # LiteSVM's linux-x64 addon is built on Ubuntu 22.04. ubuntu-latest (24.04)
-    # loads it with a libstdc++ mismatch that aborts or corrupts the JS heap.
-    runs-on: ubuntu-22.04
+    # The x86_64 LiteSVM addon JIT-compiles SBF and corrupts the Node heap
+    # (decimal bn.js conversion returns NaN; Node 22 aborts with std::bad_alloc).
+    # The ARM addon has no JIT and runs SBF in the interpreter.
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 15
     steps:
       - name: Checkout repository
@@ -101,8 +102,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          # Node 22 aborts inside the linux LiteSVM addon (std::bad_alloc).
-          node-version: 24
+          node-version: 22
           cache: pnpm
 
       - name: Install dependencies
