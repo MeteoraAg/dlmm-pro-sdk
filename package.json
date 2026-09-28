@@ -55,7 +55,7 @@
     "@types/bn.js": "^5.2.0",
     "@types/node": "^24.13.3",
     "babar": "^0.2.3",
-    "litesvm": "0.3.3",
+    "litesvm": "0.8.0",
     "prettier": "^3.9.6",
     "tsup": "^8.5.1",
     "tsx": "^4.23.12",
