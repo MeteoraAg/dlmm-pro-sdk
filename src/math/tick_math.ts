@@ -95,7 +95,6 @@ export function getSqrtPriceFromTickId(tickId: number): BN {
   return getSqrtPriceNegativeTick(tickId);
 }
 
-// Performs the exponential conversion with Q64.64 precision
 function getSqrtPricePositiveTick(tick: number): BN {
   let ratio =
     tick & 1
