@@ -63,7 +63,6 @@ function calculatePreFeeAmount(
 ): bigint | null {
   const maximumFee = transferFee.maximumFee;
   const transferFeeBasisPoints = BigInt(transferFee.transferFeeBasisPoints);
-  // no fee, same amount
   if (transferFeeBasisPoints === 0n) {
     return postFeeAmount;
   }

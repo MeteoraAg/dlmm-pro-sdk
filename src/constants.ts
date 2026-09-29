@@ -24,7 +24,6 @@ export const WHITELISTED_QUOTE_MINTS: readonly PublicKey[] = [
   USDC_MINT,
 ];
 
-// PDA seed prefixes
 export const OPERATOR_PREFIX = "operator";
 export const STATIC_CONFIG_PREFIX = "s_config";
 export const DYNAMIC_CONFIG_PREFIX = "d_config";

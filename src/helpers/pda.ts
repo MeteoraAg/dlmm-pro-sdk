@@ -46,7 +46,6 @@ function toI32Buffer(index: number): Buffer {
   return buf;
 }
 
-// Lexicographic max/min of two pubkeys
 function sortMints(a: PublicKey, b: PublicKey): [PublicKey, PublicKey] {
   return a.toBuffer().compare(b.toBuffer()) > 0 ? [a, b] : [b, a];
 }

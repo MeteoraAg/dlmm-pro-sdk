@@ -171,7 +171,6 @@ export function getFeeSetting(
   let feesOnInput: boolean;
   let feesOnTokenX: boolean;
   if (collectFeeMode === CollectFeeMode.OutputToken) {
-    // Fees are collected from the swap output.
     [feesOnInput, feesOnTokenX] = swapForY ? [false, false] : [false, true];
   } else {
     // Fees are always collected in token Y.
@@ -406,7 +405,6 @@ export function quoteExactIn(params: QuoteExactInParams): QuoteExactInResult {
     inputAmount,
   ).amount;
 
-  // load all tick arrays from current active id
   let currentTickIndex = tickIndexFromId(pool.tickCurrentId, pool.tickSpacing);
   const firstIndex = getNonZeroLiquidityNextIndex(
     pool,
@@ -447,7 +445,6 @@ export function quoteExactIn(params: QuoteExactInParams): QuoteExactInResult {
       bitmapExtension,
     );
     if (nextIndex === null) {
-      // no more liquidity
       break;
     }
     currentTickIndex = nextIndex;
@@ -463,7 +460,6 @@ export function quoteExactIn(params: QuoteExactInParams): QuoteExactInResult {
     protocolFeeOnLimitOrderFee: new BN(0),
   };
 
-  // loop to swap
   let currentSqrtPrice = pool.sqrtPrice.clone();
   let currentTickId = pool.tickCurrentId;
   let currentLiquidity = tryCastU128(pool.liquidity.clone());
@@ -560,7 +556,6 @@ export function quoteExactIn(params: QuoteExactInParams): QuoteExactInResult {
       if (!isNextTickId(swapForY, tick.tickId, cachedTickCurrentId)) {
         continue;
       }
-      // skip if tick is zero liquidity
       if (!isNonZeroLiquidity(tick)) {
         continue;
       }

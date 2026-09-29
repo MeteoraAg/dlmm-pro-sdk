@@ -120,7 +120,6 @@ export function tickGetAmountOut(
   return tryCastU64(safeDiv(prod, price, U256_MAX));
 }
 
-// return open_order_amount and processed_order_amount
 function getCurrentLimitOrderAmounts(
   tick: DecodedTick,
   swapForY: boolean,
@@ -241,7 +240,6 @@ export function getFilledAmountResultExactIn(
   currentSqrtPrice: BN,
   currentLiquidity: BN,
 ): FilledAmountResult {
-  // calculate mm liquidity firstly
   const mmResult = calculateFilledMarketMakingAmountExactIn(
     amountIn,
     swapForY,
@@ -265,7 +263,6 @@ export function getFilledAmountResultExactIn(
     );
 
     if (!openOrderAmount.isZero() || !processOrderAmount.isZero()) {
-      // try to fill with process order amount firstly
       const result = calculateFilledLimitOrderAmountExactIn(
         tick,
         mmResult.amountLeft,
@@ -275,7 +272,6 @@ export function getFilledAmountResultExactIn(
 
       processedOrderAmountIn = result.amountIn;
       processedOrderAmountOut = result.outAmount;
-      // try to fill with open_order_amount
       if (result.amountLeft.gtn(0)) {
         const openResult = calculateFilledLimitOrderAmountExactIn(
           tick,
@@ -346,7 +342,6 @@ export function getSwapResultExactIn(
   const amountLeft = filledAmountResult.amountLeft;
   const outAmount = filledAmountResult.outAmount;
 
-  // if amount_left > 0 => re-calculate actual amount in, and actual fee
   let includedFeeAmountIn: BN;
   if (amountLeft.gtn(0)) {
     excludedFeeInputAmount = safeSub(
@@ -425,7 +420,6 @@ export function applySwapResultToTick(
     tick.openOrderAmount = new BN(0);
     tick.orderAge = safeAdd(tick.orderAge, new BN(1), U64_MAX);
   } else if (swapResult.processedOrderAmountOut.gtn(0)) {
-    // update limit order liquidity
     tick.processedOrderRemainingAmount = safeSub(
       tick.processedOrderRemainingAmount,
       swapResult.processedOrderAmountOut,

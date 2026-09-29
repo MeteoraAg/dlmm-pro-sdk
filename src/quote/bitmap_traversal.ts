@@ -120,7 +120,6 @@ function extensionIterBitmap(
   const offset = extensionBitmapOffset(startIndex);
   const tickArrayOffset = extensionOffsetInBitmap(startIndex);
   if (startIndex < 0) {
-    // Scan the negative bitmap in index order.
     if (startIndex < endIndex) {
       for (let i = offset; i >= 0; i--) {
         let bitmap = fromLimbs(extension.negativeBitmap[i]);
@@ -162,7 +161,6 @@ function extensionIterBitmap(
       }
     }
   } else {
-    // Scan the positive bitmap in index order.
     if (startIndex < endIndex) {
       for (let i = offset; i < EXTENSION_BITMAP_SIZE; i++) {
         let bitmap = fromLimbs(extension.positiveBitmap[i]);
@@ -257,9 +255,6 @@ function internalToExtension(
   return null;
 }
 
-/**
- * The next initialized tick-array index in the swap direction.
- */
 export function getNonZeroLiquidityNextIndex(
   pool: PoolBitmapState,
   swapForY: boolean,

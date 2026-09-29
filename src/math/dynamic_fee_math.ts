@@ -9,7 +9,6 @@ const DOUBLE_MAX_BASIS_POINT = new BN(MAX_BASIS_POINT * 2);
 const V_FEE_ROUNDING = new BN("99999999999");
 const V_FEE_SCALE = new BN("100000000000");
 
-/** Mutable copy of the pool's `variableFee` state used while quoting. */
 export type WorkingVariableFee = {
   sqrtPriceReference: BN;
   lastUpdateTimestamp: BN;
