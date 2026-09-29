@@ -67,7 +67,6 @@ function calculatePreFeeAmount(
   if (transferFeeBasisPoints === 0n) {
     return postFeeAmount;
   }
-  // 0 zero out, 0 in
   if (postFeeAmount === 0n) {
     return 0n;
   }
