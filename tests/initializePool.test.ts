@@ -29,6 +29,7 @@ import {
 import {
   addLiquidity,
   bitmask,
+  closeTokenBadge,
   createAccessRegistryOperator,
   createAndFundWallet,
   createDynamicConfig,
@@ -258,12 +259,11 @@ describe("initialize pool", () => {
       expect(poolState.tokenXMint.toBase58()).toBe(badgeMint.toBase58());
       expect(poolState.tokenXFlag).toBe(TokenProgramFlags.TokenProgram2022);
 
-      const { tx: closeBadgeTx } = await client.accessRegistry.closeTokenBadge({
+      await closeTokenBadge(svm, connection, {
         tokenBadge: tokenBadgeX,
-        signer: registryOperator.publicKey,
+        signer: registryOperator,
         rentReceiver: payer.publicKey,
       });
-      sendTransaction(svm, closeBadgeTx, [registryOperator]);
       expect(svm.getAccount(tokenBadgeX)).toBeNull();
     });
 

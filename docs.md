@@ -20,7 +20,7 @@ The Rust crate `dlmm-pro-commons` is `publish = false`. Depend on it from git.
 | `limitOrder`     | Open, cancel, close                                                                             |
 | `reward`         | Initialize, update authority, fund, claim, withdraw ineligible                                  |
 | `operator`       | Create and close operators and configs, set pool status, update partner fee, claim protocol fee |
-| `accessRegistry` | Fetch, create, and close registry operators and token badges                                    |
+| `accessRegistry` | Fetch token badges                                                                              |
 | `state`          | Decode pool, position, tick array, oracle, and limit-order accounts                             |
 
 Creator `initializeReward` leaves `operator` null. A signer other than the pool

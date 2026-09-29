@@ -43,7 +43,8 @@ const { quote, tickArrays, tickArrayBitmapExtension } =
 `DlmmProClient` is a thin wrapper over instruction builders and account
 decoders: `pool`, `position`, `limitOrder`, `reward`, `state`, `operator`, and
 `accessRegistry`. `operator` covers config, pool-status, partner-fee, and
-protocol-fee instructions. `accessRegistry` reads and writes token badges.
+protocol-fee instructions. `accessRegistry` fetches token badges. Creating
+and closing badges stays with the access-registry admin.
 Math, PDAs, activation, base-fee encoding, and deposit weights are also
 exported from the package root. Package version `0.1.0` tracks program IDL
 `0.1.0`. See `docs.md` for instruction coverage, quotes, and transfer hooks.

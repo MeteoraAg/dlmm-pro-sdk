@@ -1,7 +1,7 @@
 /**
- * Builders for the external access-registry program, which owns TokenBadge.
- * They go through `DlmmProClient.accessRegistry` so the LiteSVM suite covers
- * badge and registry-operator writes.
+ * Test-only builders for the external access-registry program, which owns
+ * TokenBadge. Creating and closing registry operators and badges is not part
+ * of the published client, so the LiteSVM suite builds those transactions here.
  *
  * `tests/fixtures/access_registry.so` is built from
  * https://github.com/MeteoraAg/access-registry with:
@@ -11,14 +11,18 @@
  * The `local` feature drops the hardcoded admin check so tests can create
  * operators, mirroring how dlmm-pro is built for tests.
  */
-import type { Connection, Keypair, PublicKey } from "@solana/web3.js";
+import { PublicKey, type Connection, type Keypair } from "@solana/web3.js";
 import type { LiteSVM } from "litesvm";
+import { ACCESS_REGISTRY_OPERATOR_PERMISSION_COUNT } from "../../src/constants";
+import { PoolError } from "../../src/errors";
+import { createAccessRegistryProgram } from "../../src/helpers/create_program";
 import {
   deriveAccessRegistryOperator,
   deriveTokenBadge,
-  DlmmProClient,
-  type AccessRegistryOperatorPermission,
-} from "../../src";
+  permissionBitmask,
+} from "../../src/helpers";
+import { assertU8 } from "../../src/helpers/validation";
+import type { AccessRegistryOperatorPermission } from "../../src/types";
 import { sendTransaction } from "./svm";
 
 export { deriveAccessRegistryOperator, deriveTokenBadge };
@@ -30,13 +34,24 @@ export async function createAccessRegistryOperator(
   whitelistedAddress: PublicKey,
   permissions: AccessRegistryOperatorPermission[],
 ): Promise<PublicKey> {
-  const client = DlmmProClient.create(connection);
-  const { tx, operator } = await client.accessRegistry.createOperatorAccount({
-    whitelistedAddress,
-    signer: admin.publicKey,
-    payer: admin.publicKey,
+  const permission = permissionBitmask(
     permissions,
-  });
+    ACCESS_REGISTRY_OPERATOR_PERMISSION_COUNT,
+  );
+  if (permission.isZero()) {
+    throw PoolError.invalidPermission();
+  }
+  const operator = deriveAccessRegistryOperator(whitelistedAddress);
+  const tx = await createAccessRegistryProgram(connection)
+    .methods.createOperatorAccount(permission)
+    .accountsPartial({
+      operator,
+      whitelistedAddress,
+      signer: admin.publicKey,
+      payer: admin.publicKey,
+    })
+    .transaction();
+  tx.feePayer = admin.publicKey;
   sendTransaction(svm, tx, [admin]);
   return operator;
 }
@@ -52,16 +67,48 @@ export async function createTokenBadge(
     mintScore?: number;
   },
 ): Promise<PublicKey> {
-  const client = DlmmProClient.create(connection);
-  const { tx, tokenBadge } = await client.accessRegistry.createTokenBadge({
-    tokenMint: args.tokenMint,
-    signer: args.signer.publicKey,
-    payer: args.payer.publicKey,
-    mintScore: args.mintScore,
-  });
+  const mintScore = args.mintScore ?? 0;
+  assertU8(mintScore);
+  const tokenBadge = deriveTokenBadge(args.tokenMint);
+  const tx = await createAccessRegistryProgram(connection)
+    .methods.createTokenBadge(mintScore)
+    .accountsPartial({
+      tokenBadge,
+      tokenMint: args.tokenMint,
+      operator: deriveAccessRegistryOperator(args.signer.publicKey),
+      signer: args.signer.publicKey,
+      payer: args.payer.publicKey,
+    })
+    .transaction();
+  tx.feePayer = args.payer.publicKey;
   const signers = args.signer.publicKey.equals(args.payer.publicKey)
     ? [args.signer]
     : [args.payer, args.signer];
   sendTransaction(svm, tx, signers);
   return tokenBadge;
+}
+
+export async function closeTokenBadge(
+  svm: LiteSVM,
+  connection: Connection,
+  args: {
+    tokenBadge: PublicKey;
+    signer: Keypair;
+    rentReceiver: PublicKey;
+  },
+): Promise<void> {
+  if (args.tokenBadge.equals(PublicKey.default)) {
+    throw PoolError.invalidAccount();
+  }
+  const tx = await createAccessRegistryProgram(connection)
+    .methods.closeTokenBadge()
+    .accountsPartial({
+      tokenBadge: args.tokenBadge,
+      operator: deriveAccessRegistryOperator(args.signer.publicKey),
+      signer: args.signer.publicKey,
+      rentReceiver: args.rentReceiver,
+    })
+    .transaction();
+  tx.feePayer = args.signer.publicKey;
+  sendTransaction(svm, tx, [args.signer]);
 }
