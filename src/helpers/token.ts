@@ -61,9 +61,6 @@ export async function getOrCreateATAInstruction(
   }
 }
 
-/**
- * Build an instruction that closes the owner's wrapped SOL ATA into a receiver.
- */
 export function unwrapSOLInstruction(
   owner: PublicKey,
   receiver: PublicKey = owner,
@@ -84,9 +81,6 @@ export function unwrapSOLInstruction(
   );
 }
 
-/**
- * Build transfer and sync instructions that wrap SOL into an existing wrapped SOL account.
- */
 export function wrapSOLInstruction(
   from: PublicKey,
   to: PublicKey,
@@ -102,9 +96,6 @@ export function wrapSOLInstruction(
   ];
 }
 
-/**
- * Derive the associated token address for a wallet, mint, and token program.
- */
 export function findAssociatedTokenAddress(
   walletAddress: PublicKey,
   tokenMintAddress: PublicKey,
@@ -155,9 +146,6 @@ export async function getTokenDecimals(
   return unpackMint(mintPubkey, accountInfo, accountInfo.owner).decimals;
 }
 
-/**
- * Return the SPL Token program ID for a token program flag.
- */
 export function getTokenProgram(tokenProgramFlag: number): PublicKey {
   switch (tokenProgramFlag) {
     case TokenProgramFlags.TokenProgram:
