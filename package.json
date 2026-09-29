@@ -36,7 +36,7 @@
     "format:fix": "prettier --write .",
     "test": "vitest run",
     "test:charts": "DLMM_CHARTS=1 vitest run",
-    "test:rust": "cargo test --workspace",
+    "test:rust": "cargo test --workspace --locked",
     "test:all": "pnpm test && pnpm test:rust",
     "test:watch": "vitest"
   },

@@ -106,16 +106,28 @@ Node 22, pnpm, Rust 1.94.0 (`rust-toolchain.toml`, rustfmt + clippy).
 
 ```bash
 pnpm install
-make check      # prettier, tsc, rustfmt, clippy -D warnings, IDL copies
-make test       # vitest + cargo test --workspace
-make build      # TypeScript package
-make help
+make fmt-check-ts
+make typecheck
+make test-ts
+make build
 ```
 
-CI runs those same `make` targets. With `CI=true`, Cargo also gets `--locked`.
+`make check`, `make test`, `make idl`, `make clippy`, and `make test-rs` also
+run the Rust crate. They need `commons/` in the tree. `make idl` diffs
+`src/idl/dlmm-pro/dlmm_pro.json` with `commons/idls/dlmm_pro.json`. Cargo
+targets pass `--locked`. `pnpm test:rust` is the same `cargo test --workspace
+--locked`.
 
-LiteSVM tests (TS and Rust) need `tests/fixtures/dlmm_pro.so`, built from the
-program with `--features local` (that flag stubs the admin check). Override
-the path with `DLMM_PRO_SO_PATH`.
+CI is split the same way:
+
+- `.github/workflows/sdk.yml` runs the TypeScript checks on `ubuntu-24.04-arm`.
+  x86_64 LiteSVM's SBF JIT corrupts Node, so the TypeScript job stays on ARM.
+- `.github/workflows/commons.yml` runs `cargo fmt`, `clippy --locked`, and
+  `cargo test --locked` on `ubuntu-latest`.
+
+LiteSVM loads a program binary built with `--features local` (that flag stubs
+the admin check). TypeScript tests use `tests/fixtures/dlmm_pro.so` and
+`tests/fixtures/access_registry.so`. Rust tests use
+`commons/fixtures/dlmm_pro.so`. Both sides honor `DLMM_PRO_SO_PATH`.
 
 Test tokens: https://faucet.raccoons.dev/

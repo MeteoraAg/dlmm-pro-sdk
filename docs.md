@@ -65,8 +65,14 @@ accepted and the host fee is paid into that account.
 
 ## Transfer hooks
 
-Builders resolve Token-2022 transfer-hook metas when the corresponding array is
-`undefined`. Pass an array, including `[]`, to override that resolution.
+Builders resolve Token-2022 transfer-hook metas when the corresponding array
+is omitted. Pass an array, including `[]`, to skip that resolution.
+
+The amount given to the hook is the amount the program transfers. The builder
+reads it only after the mint has a transfer hook, and it omits the slice when
+that amount is zero because the program skips the transfer. Resolution throws
+when the amount cannot be determined. It does not substitute a slippage bound
+or the swap input.
 
 Allowed slices follow the program:
 
@@ -77,10 +83,15 @@ Allowed slices follow the program:
 
 Deposit legs move tokens from the user to the reserve with the user as
 authority. Withdraw legs move tokens from the reserve to the user with the
-pool authority. Swap output and some claim amounts are not known until
-execution. Pass `quotedOutAmount` on `swap` when a hook seeds on the transfer
-amount. Otherwise the builder uses the input amount for the output mint, and
-the minimum amount for claims.
+pool authority.
+
+`swap` uses `parameters.inputAmount` on the input leg. The output leg uses
+`quotedOutAmount` when set, otherwise `quoteExactIn` over that swap's tick
+arrays (`outAmount`, pool-side, before the output transfer fee). The referral
+leg uses `quotedHostFee` when set, otherwise that quote's `hostFee`, and only
+when the referral token account is the fee mint. Deposits use the fee-included
+token deltas, capped by `maxAmount`. Withdrawals use the pool-side deltas.
+Claims use the post-refresh amounts the program transfers.
 
 ## Versioning
 
