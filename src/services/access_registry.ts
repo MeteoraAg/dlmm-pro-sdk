@@ -1,32 +1,15 @@
 import type { Program } from "@coral-xyz/anchor";
-import {
-  PublicKey,
-  Transaction,
-  type Commitment,
-  type Connection,
-} from "@solana/web3.js";
-import { ACCESS_REGISTRY_OPERATOR_PERMISSION_COUNT } from "../constants";
-import { PoolError } from "../errors";
+import { PublicKey, type Commitment, type Connection } from "@solana/web3.js";
 import { createAccessRegistryProgram } from "../helpers/create_program";
-import {
-  deriveAccessRegistryOperator,
-  deriveTokenBadge,
-  permissionBitmask,
-} from "../helpers";
-import { assertU8 } from "../helpers/validation";
 import type { AccessRegistry } from "../idl/access-registry/access_registry";
-import type {
-  AccessRegistryOperator,
-  AccessRegistryOperatorPermission,
-  TokenBadge,
-} from "../types";
+import type { TokenBadge } from "../types";
 
 /**
- * Read access to the access-registry program
- * (`regUFehW9oycnaV2auYyfqyYjKG1W1uLNT7rtUeemQr`), which owns the TokenBadge
- * accounts dlmm-pro reads to authorize unsupported mints. The native-SOL and
- * USDC whitelist is a separate requirement for pools using the OnlyY rule.
- * Badge and operator accounts are created by the registry admin and operators.
+ * Read access to token badges in the access-registry program
+ * (`regUFehW9oycnaV2auYyfqyYjKG1W1uLNT7rtUeemQr`). dlmm-pro reads those
+ * accounts to authorize unsupported mints. The native-SOL and USDC whitelist
+ * is a separate requirement for pools using the OnlyY rule. Creating and
+ * closing badges and registry operators is not part of this client.
  */
 export class AccessRegistryService {
   private readonly program: Program<AccessRegistry>;
@@ -41,98 +24,6 @@ export class AccessRegistryService {
 
   async fetchTokenBadge(tokenBadge: PublicKey): Promise<TokenBadge> {
     return this.fetchAccount(tokenBadge, "tokenBadge");
-  }
-
-  async fetchOperator(operator: PublicKey): Promise<AccessRegistryOperator> {
-    return this.fetchAccount(operator, "operator");
-  }
-
-  async createOperatorAccount(params: {
-    whitelistedAddress: PublicKey;
-    signer: PublicKey;
-    payer: PublicKey;
-    permissions: readonly AccessRegistryOperatorPermission[];
-  }): Promise<{ tx: Transaction; operator: PublicKey }> {
-    const permission = permissionBitmask(
-      params.permissions,
-      ACCESS_REGISTRY_OPERATOR_PERMISSION_COUNT,
-    );
-    if (permission.isZero()) {
-      throw PoolError.invalidPermission();
-    }
-    const operator = deriveAccessRegistryOperator(params.whitelistedAddress);
-    const tx = await this.program.methods
-      .createOperatorAccount(permission)
-      .accountsPartial({
-        operator,
-        whitelistedAddress: params.whitelistedAddress,
-        signer: params.signer,
-        payer: params.payer,
-      })
-      .transaction();
-    tx.feePayer = params.payer;
-    return { tx, operator };
-  }
-
-  async closeOperatorAccount(params: {
-    operator: PublicKey;
-    signer: PublicKey;
-    rentReceiver: PublicKey;
-  }): Promise<{ tx: Transaction }> {
-    const tx = await this.program.methods
-      .closeOperatorAccount()
-      .accountsPartial({
-        operator: params.operator,
-        signer: params.signer,
-        rentReceiver: params.rentReceiver,
-      })
-      .transaction();
-    tx.feePayer = params.signer;
-    return { tx };
-  }
-
-  async createTokenBadge(params: {
-    tokenMint: PublicKey;
-    signer: PublicKey;
-    payer: PublicKey;
-    mintScore?: number;
-  }): Promise<{ tx: Transaction; tokenBadge: PublicKey }> {
-    const mintScore = params.mintScore ?? 0;
-    assertU8(mintScore);
-    const tokenBadge = deriveTokenBadge(params.tokenMint);
-    const tx = await this.program.methods
-      .createTokenBadge(mintScore)
-      .accountsPartial({
-        tokenBadge,
-        tokenMint: params.tokenMint,
-        operator: deriveAccessRegistryOperator(params.signer),
-        signer: params.signer,
-        payer: params.payer,
-      })
-      .transaction();
-    tx.feePayer = params.payer;
-    return { tx, tokenBadge };
-  }
-
-  async closeTokenBadge(params: {
-    tokenBadge: PublicKey;
-    signer: PublicKey;
-    rentReceiver: PublicKey;
-  }): Promise<{ tx: Transaction }> {
-    if (params.tokenBadge.equals(PublicKey.default)) {
-      throw PoolError.invalidAccount();
-    }
-    const tx = await this.program.methods
-      .closeTokenBadge()
-      .accountsPartial({
-        tokenBadge: params.tokenBadge,
-        operator: deriveAccessRegistryOperator(params.signer),
-        signer: params.signer,
-        rentReceiver: params.rentReceiver,
-      })
-      .transaction();
-    tx.feePayer = params.signer;
-    return { tx };
   }
 
   private async fetchAccount<T>(
