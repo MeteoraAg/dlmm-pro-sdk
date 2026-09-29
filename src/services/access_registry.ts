@@ -4,13 +4,6 @@ import { createAccessRegistryProgram } from "../helpers/create_program";
 import type { AccessRegistry } from "../idl/access-registry/access_registry";
 import type { TokenBadge } from "../types";
 
-/**
- * Read access to token badges in the access-registry program
- * (`regUFehW9oycnaV2auYyfqyYjKG1W1uLNT7rtUeemQr`). dlmm-pro reads those
- * accounts to authorize unsupported mints. The native-SOL and USDC whitelist
- * is a separate requirement for pools using the OnlyY rule. Creating and
- * closing badges and registry operators is not part of this client.
- */
 export class AccessRegistryService {
   private readonly program: Program<AccessRegistry>;
   private readonly commitment: Commitment;
