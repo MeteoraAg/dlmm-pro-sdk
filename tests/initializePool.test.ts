@@ -29,6 +29,7 @@ import {
 import {
   addLiquidity,
   bitmask,
+  closeConfig,
   closeTokenBadge,
   createAccessRegistryOperator,
   createAndFundWallet,
@@ -275,12 +276,11 @@ describe("initialize pool", () => {
         payer,
         randomID(),
       );
-      const { tx } = await client.operator.closeConfig({
-        signer: operator.publicKey,
+      await closeConfig(svm, connection, {
+        signer: operator,
         rentReceiver: payer.publicKey,
         staticConfig: config,
       });
-      sendTransaction(svm, tx, [operator]);
       expect(svm.getAccount(config)).toBeNull();
     });
   });

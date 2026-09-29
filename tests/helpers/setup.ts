@@ -1,6 +1,5 @@
 /**
- * Fixture builders for admin and operator instructions. They go through
- * `DlmmProClient.operator` so the LiteSVM suite covers those wrappers.
+ * Fixture builders. Operator and admin transactions live in `./operator`.
  *
  * `tests/fixtures/dlmm_pro.so` is built with the `local` feature, which drops
  * the hardcoded admin check so any wallet can create operators.
@@ -13,12 +12,21 @@ import {
   BaseFeeMode,
   CollectFeeMode,
   defaultDynamicPoolParameters,
-  DlmmProClient,
   encodeFixedBaseFeeData,
   OperatorPermission,
 } from "../../src";
 import type { DlmmPro } from "../../src/idl/dlmm-pro/dlmm_pro";
-import { sendTransaction } from "./svm";
+import {
+  createDynamicConfig as createDynamicConfigTx,
+  createStaticConfig as createStaticConfigTx,
+} from "./operator";
+
+export {
+  closeConfig,
+  createWhitelistOperator,
+  setPoolStatus,
+  updatePartnerFee,
+} from "./operator";
 
 type StaticConfigParameters = IdlTypes<DlmmPro>["staticConfigParameters"];
 type DynamicConfigParameters = IdlTypes<DlmmPro>["dynamicConfigParameters"];
@@ -62,30 +70,6 @@ export function defaultStaticConfigArgs(
   };
 }
 
-function operatorSigners(operator: Keypair, payer: Keypair): Keypair[] {
-  return operator.publicKey.equals(payer.publicKey)
-    ? [operator]
-    : [payer, operator];
-}
-
-export async function createWhitelistOperator(
-  svm: LiteSVM,
-  connection: Connection,
-  admin: Keypair,
-  whitelistedAddress: PublicKey,
-  permissions: OperatorPermission[],
-): Promise<PublicKey> {
-  const client = DlmmProClient.create(connection);
-  const { tx, operator } = await client.operator.createOperatorAccount({
-    whitelistedAddress,
-    signer: admin.publicKey,
-    payer: admin.publicKey,
-    permissions,
-  });
-  sendTransaction(svm, tx, [admin]);
-  return operator;
-}
-
 export async function createStaticConfig(
   svm: LiteSVM,
   connection: Connection,
@@ -94,15 +78,7 @@ export async function createStaticConfig(
   index: BN,
   args: StaticConfigParameters = defaultStaticConfigArgs(),
 ): Promise<PublicKey> {
-  const client = DlmmProClient.create(connection);
-  const { tx, config } = await client.operator.createStaticConfig({
-    index,
-    parameters: args,
-    signer: operator.publicKey,
-    payer: payer.publicKey,
-  });
-  sendTransaction(svm, tx, operatorSigners(operator, payer));
-  return config;
+  return createStaticConfigTx(svm, connection, operator, payer, index, args);
 }
 
 export async function createDynamicConfig(
@@ -117,52 +93,15 @@ export async function createDynamicConfig(
     partnerFeeBps: 0,
   },
 ): Promise<PublicKey> {
-  const client = DlmmProClient.create(connection);
-  const { tx, config } = await client.operator.createDynamicConfig({
+  return createDynamicConfigTx(
+    svm,
+    connection,
+    operator,
+    payer,
     index,
     poolCreatorAuthority,
-    parameters: args,
-    signer: operator.publicKey,
-    payer: payer.publicKey,
-  });
-  sendTransaction(svm, tx, operatorSigners(operator, payer));
-  return config;
-}
-
-export async function setPoolStatus(
-  svm: LiteSVM,
-  connection: Connection,
-  args: {
-    pool: PublicKey;
-    signer: Keypair;
-    status: number;
-  },
-): Promise<void> {
-  const client = DlmmProClient.create(connection);
-  const { tx } = await client.operator.setPoolStatus({
-    pool: args.pool,
-    signer: args.signer.publicKey,
-    status: args.status,
-  });
-  sendTransaction(svm, tx, [args.signer]);
-}
-
-export async function updatePartnerFee(
-  svm: LiteSVM,
-  connection: Connection,
-  args: {
-    pool: PublicKey;
-    signer: Keypair;
-    partnerFeeBps: number;
-  },
-): Promise<void> {
-  const client = DlmmProClient.create(connection);
-  const { tx } = await client.operator.updatePartnerFee({
-    pool: args.pool,
-    signer: args.signer.publicKey,
-    partnerFeeBps: args.partnerFeeBps,
-  });
-  sendTransaction(svm, tx, [args.signer]);
+    args,
+  );
 }
 
 export { defaultDynamicPoolParameters };
