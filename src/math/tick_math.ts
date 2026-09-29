@@ -328,19 +328,8 @@ function getSqrtPriceNegativeTick(tick: number): BN {
   return ratio;
 }
 
-/// Computes (n0 × n1) >> 96.
-///
-/// Caller must ensure result fits in u128, i.e. n0 × n1 < 2^224. And no mid carry bit.
-///
-/// The carry out of the middle sum is not tracked, because the current system
-/// boundary 0..=MAX_TICK_ID never produces one. Do not use this helper for any
-/// value outside that boundary.
-///
-/// In sqrt-price computation, this invariant holds because:
-/// - n0 (ratio in Q96) < 2^110
-/// - n1 (precomputed constants) < 2^115
-/// - product < 2^(110 + 115) = 2^225, but with input range 0..=MAX_TICK_ID
-///   product < 2^224, so result fits in u128.
+// (n0 * n1) >> 96. The middle sum's carry is not tracked; ticks in
+// 0..=MAX_TICK_ID never set it. Do not use this outside that range.
 function mulShift96(n0: BN, n1: BN): BN {
   const a = highU64(n0);
   const b = lowU64(n0);

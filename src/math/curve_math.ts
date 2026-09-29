@@ -16,12 +16,7 @@ import {
   U320_MAX,
 } from "./safe_math";
 
-/// Gets the delta amount_x for given liquidity and price range
-///
-/// # Formula
-///
-/// * `Δx = L * (1 / √P_lower - 1 / √P_upper)`
-/// * i.e. `L * (√P_upper - √P_lower) / (√P_upper * √P_lower)`
+// Δx = L * (√P_upper - √P_lower) / (√P_upper * √P_lower)
 export function getDeltaAmountXUnchecked(
   lowerSqrtPrice: BN,
   upperSqrtPrice: BN,
@@ -57,8 +52,7 @@ export function getDeltaAmountX(
   );
 }
 
-/// Gets the delta amount_y for given liquidity and price range
-/// Δy = L * (√P_upper - √P_lower)
+// Δy = L * (√P_upper - √P_lower)
 export function getDeltaAmountYUnchecked(
   lowerSqrtPrice: BN,
   upperSqrtPrice: BN,
@@ -89,8 +83,6 @@ export function getDeltaAmountY(
   );
 }
 
-/// Gets the next sqrt price given an input amount of token X or token Y
-/// Throws if price or liquidity are 0, or if the next price overflow q64.64
 export function getNextSqrtPriceFromInput(
   sqrtPrice: BN,
   liquidity: BN,
@@ -149,16 +141,7 @@ function getNextSqrtPriceFromAmountInYRoundingDown(
   return result;
 }
 
-/// Gets the liquidity for a given amount_x and price range.
-///
-/// Inverse of [`getDeltaAmountX`].
-///
-/// # Formula
-///
-/// From `Δx = L * (√P_upper - √P_lower) / (√P_lower * √P_upper)`:
-///
-/// * `L = Δx * (√P_lower * √P_upper) / (√P_upper - √P_lower)`
-/// return null if √P_upper <= √P_lower, indicate no X side
+// L = Δx * √P_lower * √P_upper / (√P_upper - √P_lower); null when there is no X side.
 export function getLiquidityFromAmountX(
   lowerSqrtPrice: BN,
   upperSqrtPrice: BN,
@@ -180,16 +163,7 @@ export function getLiquidityFromAmountX(
   return safeDiv(prod, denominator, U320_MAX).shrn(64);
 }
 
-/// Gets the liquidity for a given amount_y and price range.
-///
-/// Inverse of [`getDeltaAmountY`].
-///
-/// # Formula
-///
-/// From `Δy = L * (√P_upper - √P_lower) / 2^64`:
-///
-/// * `L = (Δy << 64) / (√P_upper - √P_lower)`
-/// return null if √P_upper <= √P_lower, indicate no Y side
+// L = (Δy << 64) / (√P_upper - √P_lower); null when there is no Y side.
 export function getLiquidityFromAmountY(
   lowerSqrtPrice: BN,
   upperSqrtPrice: BN,
