@@ -317,7 +317,13 @@ export class OperatorService extends DlmmProProgram {
               source: reserve,
               destination: params.receiverTokenAccount,
               authority: poolAuthority,
-              amount: params.maxAmount,
+              amount: async () => {
+                const pool = await this.state.fetchPool(params.pool);
+                const pending = pool.protocolFeeX;
+                return pending.lt(params.maxAmount)
+                  ? pending
+                  : params.maxAmount;
+              },
             },
           }
         : {
@@ -326,7 +332,13 @@ export class OperatorService extends DlmmProProgram {
               source: reserve,
               destination: params.receiverTokenAccount,
               authority: poolAuthority,
-              amount: params.maxAmount,
+              amount: async () => {
+                const pool = await this.state.fetchPool(params.pool);
+                const pending = pool.protocolFeeY;
+                return pending.lt(params.maxAmount)
+                  ? pending
+                  : params.maxAmount;
+              },
             },
           },
     );

@@ -22,6 +22,7 @@ import {
   overflowsDefaultTickArrayBitmap,
   resolveInstructionHooks,
   SWAP_HOOKS,
+  type TransferHookAmount,
   type TransferHookLeg,
   tickArraysForSwap,
   tickIndexFromId,
@@ -33,6 +34,7 @@ import {
 import { tickIdFromSqrtPrice } from "../math";
 import { assertU64 } from "../helpers/validation";
 import {
+  getFeeSetting,
   quoteExactIn,
   type QuoteExactInParams,
   type QuoteExactInResult,
@@ -103,11 +105,17 @@ export type SwapParams = {
   transferHookY?: AccountMeta[];
   transferHookReferral?: AccountMeta[];
   /**
-   * Pool-side output from the quote (`quote.outAmount`). Hook accounts whose
-   * seeds include the transfer amount need this for the output mint. When
-   * omitted, the input amount is used for that side.
+   * Pool-side output (`quote.outAmount`) for an output-mint transfer hook.
+   * Omit it and the builder quotes the swap's tick arrays when that mint has
+   * a hook.
    */
   quotedOutAmount?: BN;
+  /**
+   * Host fee (`quote.hostFee`) for a referral transfer hook. Omit it and the
+   * builder uses the same quote as `quotedOutAmount` when the referral mint
+   * has a hook.
+   */
+  quotedHostFee?: BN;
 };
 
 type InitializePoolAccountParams = {
@@ -445,12 +453,40 @@ export class PoolService extends DlmmProProgram {
     if (!swapForY && !outputMint.equals(params.tokenXMint)) {
       throw PoolError.invalidAccount();
     }
+    let quote: Promise<QuoteExactInResult> | undefined;
+    const quoted = () => (quote ??= this.quoteSwapTickArrays(params, swapForY));
     const outputAmount =
-      params.quotedOutAmount ?? params.parameters.inputAmount;
+      params.quotedOutAmount ?? (async () => (await quoted()).outAmount);
     const poolAuthority = derivePoolAuthority();
     const reserveX = deriveReserve(params.tokenXMint, params.pool);
     const reserveY = deriveReserve(params.tokenYMint, params.pool);
     const xIsInput = swapForY;
+    const referral = params.referral;
+    const referralLeg = referral
+      ? await referralHookLeg(
+          this.connection,
+          this.commitment,
+          referral,
+          params.tokenXMint,
+          params.tokenYMint,
+          params.pool,
+          poolAuthority,
+          (referralMint) => async () => {
+            const hostFee = params.quotedHostFee ?? (await quoted()).hostFee;
+            if (hostFee.isZero()) {
+              return hostFee;
+            }
+            const pool = await this.state.fetchPool(params.pool);
+            const feeMint = getFeeSetting(pool, swapForY, true).feesOnTokenX
+              ? params.tokenXMint
+              : params.tokenYMint;
+            if (!feeMint.equals(referralMint)) {
+              throw PoolError.invalidAccount();
+            }
+            return hostFee;
+          },
+        )
+      : undefined;
     const hooks = await resolveInstructionHooks(
       this.connection,
       this.commitment,
@@ -475,18 +511,7 @@ export class PoolService extends DlmmProProgram {
           authority: xIsInput ? poolAuthority : params.user,
           amount: xIsInput ? outputAmount : params.parameters.inputAmount,
         },
-        transferHookReferral: params.referral
-          ? await referralHookLeg(
-              this.connection,
-              this.commitment,
-              params.referral,
-              params.tokenXMint,
-              params.tokenYMint,
-              params.pool,
-              poolAuthority,
-              params.parameters.inputAmount,
-            )
-          : undefined,
+        transferHookReferral: referralLeg,
       },
     );
     const [tokenXProgram, tokenYProgram] = await Promise.all([
@@ -595,14 +620,22 @@ export class PoolService extends DlmmProProgram {
           source: deriveReserve(params.tokenXMint, params.pool),
           destination: params.receiverTokenX,
           authority: poolAuthority,
-          amount: params.maxAmountX,
+          amount: async () => {
+            const pool = await this.state.fetchPool(params.pool);
+            const pending = pool.poolPartner.pendingFeeX;
+            return pending.lt(params.maxAmountX) ? pending : params.maxAmountX;
+          },
         },
         transferHookY: {
           mint: params.tokenYMint,
           source: deriveReserve(params.tokenYMint, params.pool),
           destination: params.receiverTokenY,
           authority: poolAuthority,
-          amount: params.maxAmountY,
+          amount: async () => {
+            const pool = await this.state.fetchPool(params.pool);
+            const pending = pool.poolPartner.pendingFeeY;
+            return pending.lt(params.maxAmountY) ? pending : params.maxAmountY;
+          },
         },
       },
     );
@@ -648,6 +681,85 @@ export class PoolService extends DlmmProProgram {
 
     tx.feePayer = params.signer;
     return { tx };
+  }
+
+  private async quoteSwapTickArrays(
+    params: SwapParams,
+    swapForY: boolean,
+  ): Promise<QuoteExactInResult> {
+    const { pool: poolState, extensions } =
+      await this.state.fetchPoolWithExtensions(params.pool);
+    let bitmapExtension = null;
+    if (poolState.isBitmapExtensionInitialized === 1) {
+      if (!params.tickArrayBitmapExtension) {
+        throw PoolError.tickArrayBitmapExtensionAccountIsNotProvided();
+      }
+      bitmapExtension = await this.state.fetchTickArrayBitmapExtension(
+        params.tickArrayBitmapExtension,
+      );
+    }
+    const tickArrays: QuoteTickArray[] = (
+      await this.state.fetchTickArraysWithTicks(params.tickArrays, {
+        withReward: extensions.hasLiquidityMining,
+      })
+    ).map(({ tickArray, ticks }) => ({
+      pool: tickArray.pool,
+      tickIndex: tickArray.tickIndex,
+      ticks: ticks as DecodedTick[],
+    }));
+    const [inputMintAddress, outputMintAddress] = swapForY
+      ? [poolState.tokenXMint, poolState.tokenYMint]
+      : [poolState.tokenYMint, poolState.tokenXMint];
+    const unpack = async (
+      address: PublicKey,
+      tokenProgramFlag: number,
+    ): Promise<Mint> => {
+      const info = await this.connection.getAccountInfo(
+        address,
+        this.commitment,
+      );
+      if (!info) {
+        throw new Error(`Mint account not found: ${address.toBase58()}`);
+      }
+      return unpackMint(address, info, getTokenProgram(tokenProgramFlag));
+    };
+    const [inputMint, outputMint] = await Promise.all([
+      unpack(
+        inputMintAddress,
+        swapForY ? poolState.tokenXFlag : poolState.tokenYFlag,
+      ),
+      unpack(
+        outputMintAddress,
+        swapForY ? poolState.tokenYFlag : poolState.tokenXFlag,
+      ),
+    ]);
+    const epochInfo = await this.connection.getEpochInfo(this.commitment);
+    const blockTime = await this.connection.getBlockTime(
+      epochInfo.absoluteSlot,
+    );
+    if (blockTime === null) {
+      throw PoolError.undeterminedError();
+    }
+    const quote = quoteExactIn({
+      poolAddress: params.pool,
+      pool: poolState,
+      poolActivation: extensions.activation ?? null,
+      tickArrays,
+      bitmapExtension,
+      inputAmount: params.parameters.inputAmount,
+      swapForY,
+      hasReferral: params.referral != null,
+      swapper: params.user,
+      currentSlot: new BN(epochInfo.absoluteSlot),
+      currentTimestamp: new BN(blockTime),
+      epoch: BigInt(epochInfo.epoch),
+      inputMint,
+      outputMint,
+    });
+    if (!quote.amountLeft.isZero()) {
+      throw PoolError.notConsumingFullAmountIn();
+    }
+    return quote;
   }
 
   private assertDistinctMints(tokenXMint: PublicKey, tokenYMint: PublicKey) {
@@ -798,7 +910,7 @@ async function referralHookLeg(
   tokenYMint: PublicKey,
   pool: PublicKey,
   authority: PublicKey,
-  amount: BN,
+  amountFor: (mint: PublicKey) => TransferHookAmount,
 ): Promise<TransferHookLeg> {
   const mint = await readTokenAccountMint(connection, referral, commitment);
   if (!mint.equals(tokenXMint) && !mint.equals(tokenYMint)) {
@@ -809,6 +921,6 @@ async function referralHookLeg(
     source: deriveReserve(mint, pool),
     destination: referral,
     authority,
-    amount,
+    amount: amountFor(mint),
   };
 }

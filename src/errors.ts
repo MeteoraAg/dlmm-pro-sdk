@@ -130,6 +130,34 @@ export class PoolError extends Error {
     );
   }
 
+  static cannotFindLimitOrderByTickId(): PoolError {
+    return new PoolError(
+      PoolErrorCode.CannotFindLimitOrderByTickId,
+      "Cannot find limit order by tick id",
+    );
+  }
+
+  static cancelNonEmptyLimitOrder(): PoolError {
+    return new PoolError(
+      PoolErrorCode.CancelNonEmptyLimitOrder,
+      "Cancel non-empty limit order",
+    );
+  }
+
+  static notConsumingFullAmountIn(): PoolError {
+    return new PoolError(
+      PoolErrorCode.NotConsumingFullAmountIn,
+      "Not consuming full amount in",
+    );
+  }
+
+  static tickArrayBitmapExtensionAccountIsNotProvided(): PoolError {
+    return new PoolError(
+      PoolErrorCode.TickArrayBitmapExtensionAccountIsNotProvided,
+      "Tick array bitmap extension account is not provided",
+    );
+  }
+
   static invalidRewardIndex(): PoolError {
     return new PoolError(
       PoolErrorCode.InvalidRewardIndex,

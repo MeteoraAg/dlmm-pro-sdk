@@ -4,22 +4,35 @@ import BN from "bn.js";
 import { CREATOR_REWARD_INDEX, WHITELISTED_QUOTE_MINTS } from "../constants";
 import { PoolError } from "../errors";
 import {
+  calculateRewardAmount,
+  cappedTransferFeeIncludedAmount,
+  claimableRewardAmount,
   derivePoolAuthority,
   derivePosition,
   deriveRewardVault,
+  deriveTickArray,
   findNftAccount,
+  ineligibleRewardAmount,
+  nextRewardUpdates,
   positionIndexesFromBitmap,
+  positionTotalLiquidity,
+  readClock,
+  readTransferFeeMint,
   REWARD_HOOKS,
   resolveInstructionHooks,
   resolveTokenProgram,
   tickArrayRemainingAccounts,
+  tickIndexFromId,
+  ticksById,
 } from "../helpers";
 import { assertU64, assertU128 } from "../helpers/validation";
+import { safeSub, U64_MAX } from "../math";
 import type {
   DecodedPoolRewardInfo,
   SetRewardEmissionParameters,
   TickRange,
 } from "../types";
+import { Rounding } from "../types";
 import { DlmmProProgram } from "./program";
 
 export class RewardService extends DlmmProProgram {
@@ -142,7 +155,26 @@ export class RewardService extends DlmmProProgram {
           source: params.funderTokenAccount,
           destination: rewardVault,
           authority: params.funder,
-          amount: params.parameters.maxAmount,
+          amount: async () => {
+            const clock = await readClock(this.connection, this.commitment);
+            const openTime = params.parameters.openTime ?? clock.timestamp;
+            const poolSide = calculateRewardAmount(
+              safeSub(params.parameters.endTime, openTime, U64_MAX),
+              params.parameters.emissionPerSecond,
+              Rounding.Up,
+            );
+            const mint = await readTransferFeeMint(
+              this.connection,
+              params.rewardMint,
+              this.commitment,
+            );
+            return cappedTransferFeeIncludedAmount(
+              mint,
+              clock.epoch,
+              poolSide,
+              params.parameters.maxAmount,
+            );
+          },
         },
       },
     );
@@ -213,7 +245,7 @@ export class RewardService extends DlmmProProgram {
           source: rewardVault,
           destination: params.userTokenAccount,
           authority: derivePoolAuthority(),
-          amount: params.minAmount ?? new BN(0),
+          amount: () => this.refreshedRewardAmount(params),
         },
       },
     );
@@ -294,7 +326,7 @@ export class RewardService extends DlmmProProgram {
           source: rewardVault,
           destination: params.receiverTokenAccount,
           authority: derivePoolAuthority(),
-          amount: params.minAmount ?? new BN(0),
+          amount: () => this.ineligibleRewardHookAmount(params),
         },
       },
     );
@@ -318,6 +350,89 @@ export class RewardService extends DlmmProProgram {
 
     tx.feePayer = params.authority;
     return { tx };
+  }
+
+  private async refreshedRewardAmount(params: {
+    pool: PublicKey;
+    nftMint: PublicKey;
+    rewardIndex: number;
+    bitmap: BN;
+  }): Promise<BN> {
+    const { pool, extensions } = await this.state.fetchPoolWithExtensions(
+      params.pool,
+    );
+    if (!extensions.rewards) {
+      throw PoolError.invalidPoolType();
+    }
+    if (
+      params.rewardIndex < 0 ||
+      params.rewardIndex >= extensions.rewards.length
+    ) {
+      throw PoolError.invalidRewardIndex();
+    }
+    const reward = extensions.rewards[params.rewardIndex];
+    if (reward.mint.equals(PublicKey.default)) {
+      throw PoolError.rewardUninitialized();
+    }
+    const clock = await readClock(this.connection, this.commitment);
+    const next = nextRewardUpdates({
+      rewards: extensions.rewards,
+      liquidity: pool.liquidity,
+      currentTimestamp: clock.timestamp,
+    })[params.rewardIndex];
+    const { positions } = await this.state.fetchPositionArrayWithPositions(
+      derivePosition(params.nftMint),
+      { withReward: true },
+    );
+    const selected = positionIndexesFromBitmap(params.bitmap);
+    for (const index of selected) {
+      if (!positions[index]) {
+        throw PoolError.invalidParameters();
+      }
+    }
+    const refreshed = new Set(
+      selected.filter(
+        (index) => !positionTotalLiquidity(positions[index]).isZero(),
+      ),
+    );
+    const tickIndexes = new Set<number>();
+    for (const index of refreshed) {
+      tickIndexes.add(
+        tickIndexFromId(positions[index].tickLowerId, pool.tickSpacing),
+      );
+      tickIndexes.add(
+        tickIndexFromId(positions[index].tickUpperId, pool.tickSpacing),
+      );
+    }
+    const ticks = ticksById(
+      await this.state.fetchTickArraysWithTicks(
+        [...tickIndexes].map((index) => deriveTickArray(params.pool, index)),
+        { withReward: true },
+      ),
+    );
+    return claimableRewardAmount({
+      positions,
+      refreshed,
+      tickCurrentId: pool.tickCurrentId,
+      ticks,
+      rewardIndex: params.rewardIndex,
+      rewardGrowthGlobal: next.rewardGrowthGlobal,
+    });
+  }
+
+  private async ineligibleRewardHookAmount(params: {
+    pool: PublicKey;
+    index: number;
+  }): Promise<BN> {
+    const { pool, extensions } = await this.state.fetchPoolWithExtensions(
+      params.pool,
+    );
+    const reward = extensions.rewards?.[params.index];
+    if (!reward || reward.mint.equals(PublicKey.default)) {
+      throw PoolError.rewardUninitialized();
+    }
+    const clock = await readClock(this.connection, this.commitment);
+    return ineligibleRewardAmount(reward, pool.liquidity, clock.timestamp);
   }
 
   private async rewardPool(

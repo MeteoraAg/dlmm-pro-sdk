@@ -13,21 +13,33 @@ import {
   PublicKey,
 } from "@solana/web3.js";
 import BN from "bn.js";
-import { PoolError } from "../errors";
+import { toBigInt, tryCastU64 } from "../math";
 import { remainingAccountsFromHooks, type HookKey } from "./remaining_accounts";
+
+export type TransferHookAmount = BN | (() => Promise<BN>);
 
 export type TransferHookLeg = {
   mint: PublicKey;
   source: PublicKey;
   destination: PublicKey;
   authority: PublicKey;
-  /** Token amount the program will transfer. Hook seeds that include the amount use this value. */
-  amount: BN;
+  /**
+   * Amount the program transfers. A function is called only after the mint
+   * is known to have a transfer hook, and a zero amount omits the slice
+   * because the program skips that transfer.
+   */
+  amount: TransferHookAmount;
 };
 
+async function transferAmount(amount: TransferHookAmount): Promise<BN> {
+  const value = typeof amount === "function" ? await amount() : amount;
+  return tryCastU64(value);
+}
+
 /**
- * Extra account metas a Token-2022 transfer of `mint` needs. Legacy SPL mints
- * and Token-2022 mints without a transfer hook return an empty list.
+ * Extra account metas a Token-2022 transfer of `mint` needs. Legacy SPL mints,
+ * Token-2022 mints without a transfer hook, and a zero transfer amount return
+ * an empty list.
  *
  * The returned metas are everything after source, mint, destination, and
  * authority — the same slice the program reads from `RemainingAccountsInfo`.
@@ -56,7 +68,11 @@ export async function getExtraAccountMetasForTransferHook(
     return [];
   }
 
-  const amount = BigInt(leg.amount.toString());
+  const amountBn = await transferAmount(leg.amount);
+  if (amountBn.isZero()) {
+    return [];
+  }
+  const amount = toBigInt(amountBn);
   const transfer = createTransferCheckedInstruction(
     leg.source,
     leg.mint,

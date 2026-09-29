@@ -1,3 +1,4 @@
+import { getAccount, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import { PublicKey, Transaction, type AccountMeta } from "@solana/web3.js";
 import BN from "bn.js";
 import {
@@ -7,16 +8,24 @@ import {
 } from "../constants";
 import { PoolError } from "../errors";
 import {
+  cancelLimitOrderTransfers,
+  cappedTransferFeeIncludedAmount,
   deriveLimitOrder,
   derivePoolAuthority,
   deriveReserve,
   findNftAccount,
+  lazy,
+  readClock,
   readTokenAccountMint,
+  readTransferFeeMint,
+  requireTick,
   resolveInstructionHooks,
   resolveTokenProgram,
   SWAP_HOOKS,
+  ticksById,
 } from "../helpers";
 import { assertI32, assertU64, assertU128 } from "../helpers/validation";
+import { safeAdd, U64_MAX } from "../math";
 import {
   LimitOrderDelegatePermission,
   type OpenLimitOrderParameters,
@@ -102,7 +111,26 @@ export class LimitOrderService extends DlmmProProgram {
           source: params.userToken,
           destination: deriveReserve(params.tokenMint, params.pool),
           authority: params.owner,
-          amount: maxAmount,
+          amount: async () => {
+            const total = params.parameters.ticks.reduce(
+              (sum, tick) => safeAdd(sum, tick.amount, U64_MAX),
+              new BN(0),
+            );
+            const [mint, clock] = await Promise.all([
+              readTransferFeeMint(
+                this.connection,
+                params.tokenMint,
+                this.commitment,
+              ),
+              readClock(this.connection, this.commitment),
+            ]);
+            return cappedTransferFeeIncludedAmount(
+              mint,
+              clock.epoch,
+              total,
+              maxAmount,
+            );
+          },
         },
       },
     );
@@ -181,8 +209,6 @@ export class LimitOrderService extends DlmmProProgram {
       }
     }
     const poolAuthority = derivePoolAuthority();
-    const minAmountX = params.minAmountX ?? new BN(0);
-    const minAmountY = params.minAmountY ?? new BN(0);
     const referralMint = params.referralToken
       ? await readTokenAccountMint(
           this.connection,
@@ -197,6 +223,7 @@ export class LimitOrderService extends DlmmProProgram {
     ) {
       throw PoolError.invalidAccount();
     }
+    const payout = lazy(() => this.cancelTransferAmounts(params, referralMint));
     const hooks = await resolveInstructionHooks(
       this.connection,
       this.commitment,
@@ -212,14 +239,14 @@ export class LimitOrderService extends DlmmProProgram {
           source: deriveReserve(params.tokenXMint, params.pool),
           destination: params.userTokenX,
           authority: poolAuthority,
-          amount: minAmountX,
+          amount: async () => (await payout()).amountX,
         },
         transferHookY: {
           mint: params.tokenYMint,
           source: deriveReserve(params.tokenYMint, params.pool),
           destination: params.userTokenY,
           authority: poolAuthority,
-          amount: minAmountY,
+          amount: async () => (await payout()).amountY,
         },
         transferHookReferral:
           params.referralToken && referralMint
@@ -228,9 +255,19 @@ export class LimitOrderService extends DlmmProProgram {
                 source: deriveReserve(referralMint, params.pool),
                 destination: params.referralToken,
                 authority: poolAuthority,
-                amount: referralMint.equals(params.tokenXMint)
-                  ? minAmountX
-                  : minAmountY,
+                amount: async () => {
+                  const result = await payout();
+                  if (result.referralFee.isZero()) {
+                    return result.referralFee;
+                  }
+                  const feeMint = result.referralOnX
+                    ? params.tokenXMint
+                    : params.tokenYMint;
+                  if (!referralMint.equals(feeMint)) {
+                    throw PoolError.invalidAccount();
+                  }
+                  return result.referralFee;
+                },
               }
             : undefined,
       },
@@ -288,6 +325,74 @@ export class LimitOrderService extends DlmmProProgram {
 
     tx.feePayer = params.signer;
     return { tx };
+  }
+
+  private async cancelTransferAmounts(
+    params: {
+      pool: PublicKey;
+      nftMint: PublicKey;
+      owner: PublicKey;
+      tickIds: number[];
+      tickArrays: PublicKey[];
+      referralToken?: PublicKey | null;
+      nftAccount?: PublicKey;
+    },
+    referralMint: PublicKey | null,
+  ) {
+    const limitOrder = deriveLimitOrder(params.nftMint);
+    const [header, orders, loaded] = await Promise.all([
+      this.state.fetchLimitOrder(limitOrder),
+      this.state.decodeLimitOrderData(limitOrder),
+      this.state.fetchPoolWithExtensions(params.pool),
+    ]);
+    const ticks = ticksById(
+      await this.state.fetchTickArraysWithTicks(params.tickArrays, {
+        withReward: loaded.extensions.hasLiquidityMining,
+      }),
+    );
+    const paired = params.tickIds.map((tickId) => {
+      const order = orders.find((entry) => entry.tickId === tickId);
+      if (!order) {
+        throw PoolError.cannotFindLimitOrderByTickId();
+      }
+      return { tick: requireTick(ticks, tickId), order };
+    });
+    let referralEligible = false;
+    if (
+      params.referralToken &&
+      referralMint &&
+      !header.referral.equals(PublicKey.default)
+    ) {
+      const nftAccount =
+        params.nftAccount ?? findNftAccount(params.nftMint, params.owner);
+      const referralProgram = await resolveTokenProgram(
+        this.connection,
+        referralMint,
+        this.commitment,
+      );
+      const [nft, referralToken] = await Promise.all([
+        getAccount(
+          this.connection,
+          nftAccount,
+          this.commitment,
+          TOKEN_2022_PROGRAM_ID,
+        ),
+        getAccount(
+          this.connection,
+          params.referralToken,
+          this.commitment,
+          referralProgram,
+        ),
+      ]);
+      referralEligible =
+        !header.referral.equals(nft.owner) &&
+        referralToken.owner.equals(header.referral);
+    }
+    return cancelLimitOrderTransfers({
+      collectFeeMode: loaded.pool.collectFeeMode,
+      orders: paired,
+      referralEligible,
+    });
   }
 
   /** `tickArrays` must be sorted by tick array index in ascending order. */
