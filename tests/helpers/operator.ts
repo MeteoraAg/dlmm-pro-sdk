@@ -1,8 +1,4 @@
 /**
- * Test-only builders for dlmm-pro admin and operator instructions.
- * The published client does not create operators or configs, set pool status,
- * update the partner fee, or claim protocol fees.
- *
  * `tests/fixtures/dlmm_pro.so` is built with the `local` feature, which drops
  * the hardcoded admin check so any wallet can create operators.
  */

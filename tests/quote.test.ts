@@ -257,7 +257,6 @@ describe("quoteExactIn matches on-chain swap", () => {
       new BN(30_000),
       false,
     );
-    // small follow-up swap on the moved price
     await assertQuoteMatchesExecution(
       svm,
       client,

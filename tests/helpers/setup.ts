@@ -1,9 +1,3 @@
-/**
- * Fixture builders. Operator and admin transactions live in `./operator`.
- *
- * `tests/fixtures/dlmm_pro.so` is built with the `local` feature, which drops
- * the hardcoded admin check so any wallet can create operators.
- */
 import { BN, type IdlTypes } from "@coral-xyz/anchor";
 import { PublicKey, type Connection, type Keypair } from "@solana/web3.js";
 import type { LiteSVM } from "litesvm";
@@ -35,7 +29,6 @@ export function randomID(): BN {
   return new BN(Math.floor(Math.random() * 1_000_000_000));
 }
 
-/** Bitmask of enum variants, used for every `permission` and `status` field. */
 export function bitmask(flags: readonly number[]): number {
   return flags.reduce((mask, flag) => mask | (1 << flag), 0);
 }

@@ -61,7 +61,6 @@ export async function createTokenBadge(
   connection: Connection,
   args: {
     tokenMint: PublicKey;
-    /** Access-registry operator keypair with the CreateTokenBadge permission. */
     signer: Keypair;
     payer: Keypair;
     mintScore?: number;
