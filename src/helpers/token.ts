@@ -190,9 +190,6 @@ export async function resolveTokenProgram(
   );
 }
 
-/**
- * Build a setup transaction for a token account, including SOL wrapping when needed.
- */
 export async function prepareTokenAccountTx(
   connection: Connection,
   owner: PublicKey,
