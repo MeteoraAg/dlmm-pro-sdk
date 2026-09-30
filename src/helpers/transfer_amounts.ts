@@ -18,6 +18,8 @@ import {
   U128_MAX,
   U192_MAX,
   U256_MAX,
+  wrappingAdd,
+  wrappingSub,
 } from "../math";
 import { getSqrtPriceFromTickId } from "../math/tick_math";
 import {
@@ -38,16 +40,11 @@ import { CollectFeeMode, Rounding } from "../types";
 import { getAmountsFromLiquidity } from "./liquidity";
 import { positionTotalLiquidity } from "./position_fees";
 
-const U128_MODULUS = U128_MAX.addn(1);
 const BASIS = new BN(MAX_BASIS_POINT);
 
 export function lazy<T>(load: () => Promise<T>): () => Promise<T> {
   let pending: Promise<T> | undefined;
   return () => (pending ??= load());
-}
-
-function wrappingSubU128(lhs: BN, rhs: BN): BN {
-  return lhs.sub(rhs).umod(U128_MODULUS);
 }
 
 function mulDivU192(amount: BN, numerator: BN, denominator: BN): BN {
@@ -357,9 +354,11 @@ export function nextRewardUpdates(args: {
       ),
     );
     return {
-      rewardGrowthGlobal: reward.rewardGrowthGlobal
-        .add(growthDelta)
-        .umod(U128_MODULUS),
+      rewardGrowthGlobal: wrappingAdd(
+        reward.rewardGrowthGlobal,
+        growthDelta,
+        U128_MAX,
+      ),
       cumulativeSecondsDelta: new BN(0),
     };
   });
@@ -406,22 +405,25 @@ export function rewardGrowthInside(args: {
   const below = args.tickLower.liquidityGross.isZero()
     ? args.rewardGrowthGlobal
     : args.tickCurrentId < args.tickLower.tickId
-      ? wrappingSubU128(
+      ? wrappingSub(
           args.rewardGrowthGlobal,
           rewardGrowthOutside(args.tickLower, args.rewardIndex),
+          U128_MAX,
         )
       : rewardGrowthOutside(args.tickLower, args.rewardIndex);
   const above = args.tickUpper.liquidityGross.isZero()
     ? new BN(0)
     : args.tickCurrentId < args.tickUpper.tickId
       ? rewardGrowthOutside(args.tickUpper, args.rewardIndex)
-      : wrappingSubU128(
+      : wrappingSub(
           args.rewardGrowthGlobal,
           rewardGrowthOutside(args.tickUpper, args.rewardIndex),
+          U128_MAX,
         );
-  return wrappingSubU128(
-    wrappingSubU128(args.rewardGrowthGlobal, below),
+  return wrappingSub(
+    wrappingSub(args.rewardGrowthGlobal, below, U128_MAX),
     above,
+    U128_MAX,
   );
 }
 
@@ -437,7 +439,7 @@ function pendingRewardOwed(
   const liquidity = positionTotalLiquidity(position);
   const owed = safeMul(
     liquidity,
-    wrappingSubU128(growthInside, info.growthInsideCheckpoint),
+    wrappingSub(growthInside, info.growthInsideCheckpoint, U128_MAX),
     U256_MAX,
   ).shrn(64);
   const capped = owed.gt(U64_MAX) ? U64_MAX : owed;

@@ -1,12 +1,12 @@
 import BN from "bn.js";
-import { safeAdd, tryCastU64, U64_MAX, U128_MAX } from "../math/safe_math";
+import {
+  safeAdd,
+  tryCastU64,
+  U64_MAX,
+  U128_MAX,
+  wrappingSub,
+} from "../math/safe_math";
 import type { DecodedPosition, DecodedTick } from "../types";
-
-const U128_MODULUS = U128_MAX.addn(1);
-
-function wrappingSubU128(lhs: BN, rhs: BN): BN {
-  return lhs.sub(rhs).umod(U128_MODULUS);
-}
 
 export type TickFeeGrowth = Pick<
   DecodedTick,
@@ -51,8 +51,16 @@ export function getFeeGrowthInside(args: {
     belowX = feeGrowthGlobalX;
     belowY = feeGrowthGlobalY;
   } else if (args.tickCurrentId < args.tickLowerId) {
-    belowX = wrappingSubU128(feeGrowthGlobalX, tickLower.feeGrowthOutsideX);
-    belowY = wrappingSubU128(feeGrowthGlobalY, tickLower.feeGrowthOutsideY);
+    belowX = wrappingSub(
+      feeGrowthGlobalX,
+      tickLower.feeGrowthOutsideX,
+      U128_MAX,
+    );
+    belowY = wrappingSub(
+      feeGrowthGlobalY,
+      tickLower.feeGrowthOutsideY,
+      U128_MAX,
+    );
   } else {
     belowX = tickLower.feeGrowthOutsideX;
     belowY = tickLower.feeGrowthOutsideY;
@@ -67,18 +75,28 @@ export function getFeeGrowthInside(args: {
     aboveX = tickUpper.feeGrowthOutsideX;
     aboveY = tickUpper.feeGrowthOutsideY;
   } else {
-    aboveX = wrappingSubU128(feeGrowthGlobalX, tickUpper.feeGrowthOutsideX);
-    aboveY = wrappingSubU128(feeGrowthGlobalY, tickUpper.feeGrowthOutsideY);
+    aboveX = wrappingSub(
+      feeGrowthGlobalX,
+      tickUpper.feeGrowthOutsideX,
+      U128_MAX,
+    );
+    aboveY = wrappingSub(
+      feeGrowthGlobalY,
+      tickUpper.feeGrowthOutsideY,
+      U128_MAX,
+    );
   }
 
   return {
-    feeGrowthInsideX: wrappingSubU128(
-      wrappingSubU128(feeGrowthGlobalX, belowX),
+    feeGrowthInsideX: wrappingSub(
+      wrappingSub(feeGrowthGlobalX, belowX, U128_MAX),
       aboveX,
+      U128_MAX,
     ),
-    feeGrowthInsideY: wrappingSubU128(
-      wrappingSubU128(feeGrowthGlobalY, belowY),
+    feeGrowthInsideY: wrappingSub(
+      wrappingSub(feeGrowthGlobalY, belowY, U128_MAX),
       aboveY,
+      U128_MAX,
     ),
   };
 }
@@ -98,17 +116,19 @@ export function getPendingFees(
   }
   const deltaX = liquidity
     .mul(
-      wrappingSubU128(
+      wrappingSub(
         feeGrowthInside.feeGrowthInsideX,
         position.feeGrowthCheckpointX,
+        U128_MAX,
       ),
     )
     .shrn(64);
   const deltaY = liquidity
     .mul(
-      wrappingSubU128(
+      wrappingSub(
         feeGrowthInside.feeGrowthInsideY,
         position.feeGrowthCheckpointY,
+        U128_MAX,
       ),
     )
     .shrn(64);

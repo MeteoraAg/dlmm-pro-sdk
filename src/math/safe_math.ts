@@ -65,6 +65,10 @@ export function wrappingAdd(lhs: BN, rhs: BN, max: BN): BN {
   return lhs.add(rhs).and(max);
 }
 
+export function wrappingSub(lhs: BN, rhs: BN, max: BN): BN {
+  return lhs.sub(rhs).umod(max.addn(1));
+}
+
 export function overflowingAdd(
   lhs: BN,
   rhs: BN,
