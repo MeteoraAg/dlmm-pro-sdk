@@ -28,6 +28,7 @@ import {
   tickIndexFromId,
   resolveTokenProgram,
   readTokenAccountMint,
+  readClock,
   assertQuoteTokenBadge,
   validateInitializePoolWithDynamicParameters,
 } from "../helpers";
@@ -710,36 +711,17 @@ export class PoolService extends DlmmProProgram {
     const [inputMintAddress, outputMintAddress] = swapForY
       ? [poolState.tokenXMint, poolState.tokenYMint]
       : [poolState.tokenYMint, poolState.tokenXMint];
-    const unpack = async (
-      address: PublicKey,
-      tokenProgramFlag: number,
-    ): Promise<Mint> => {
-      const info = await this.connection.getAccountInfo(
-        address,
-        this.commitment,
-      );
-      if (!info) {
-        throw new Error(`Mint account not found: ${address.toBase58()}`);
-      }
-      return unpackMint(address, info, getTokenProgram(tokenProgramFlag));
-    };
     const [inputMint, outputMint] = await Promise.all([
-      unpack(
+      this.unpackMintAccount(
         inputMintAddress,
         swapForY ? poolState.tokenXFlag : poolState.tokenYFlag,
       ),
-      unpack(
+      this.unpackMintAccount(
         outputMintAddress,
         swapForY ? poolState.tokenYFlag : poolState.tokenXFlag,
       ),
     ]);
-    const epochInfo = await this.connection.getEpochInfo(this.commitment);
-    const blockTime = await this.connection.getBlockTime(
-      epochInfo.absoluteSlot,
-    );
-    if (blockTime === null) {
-      throw PoolError.undeterminedError();
-    }
+    const clock = await readClock(this.connection, this.commitment);
     const quote = quoteExactIn({
       poolAddress: params.pool,
       pool: poolState,
@@ -750,9 +732,9 @@ export class PoolService extends DlmmProProgram {
       swapForY,
       hasReferral: params.referral != null,
       swapper: params.user,
-      currentSlot: new BN(epochInfo.absoluteSlot),
-      currentTimestamp: new BN(blockTime),
-      epoch: BigInt(epochInfo.epoch),
+      currentSlot: clock.slot,
+      currentTimestamp: clock.timestamp,
+      epoch: clock.epoch,
       inputMint,
       outputMint,
     });
@@ -803,36 +785,18 @@ export class PoolService extends DlmmProProgram {
     const [inputMintAddress, outputMintAddress] = params.swapForY
       ? [poolState.tokenXMint, poolState.tokenYMint]
       : [poolState.tokenYMint, poolState.tokenXMint];
-    const unpack = async (
-      address: PublicKey,
-      tokenProgramFlag: number,
-    ): Promise<Mint> => {
-      const info = await this.connection.getAccountInfo(
-        address,
-        this.commitment,
-      );
-      if (!info) {
-        throw new Error(`Mint account not found: ${address.toBase58()}`);
-      }
-      return unpackMint(address, info, getTokenProgram(tokenProgramFlag));
-    };
     const [inputMint, outputMint] = await Promise.all([
-      unpack(
+      this.unpackMintAccount(
         inputMintAddress,
         params.swapForY ? poolState.tokenXFlag : poolState.tokenYFlag,
       ),
-      unpack(
+      this.unpackMintAccount(
         outputMintAddress,
         params.swapForY ? poolState.tokenYFlag : poolState.tokenXFlag,
       ),
     ]);
 
-    const epochInfo = await this.connection.getEpochInfo(this.commitment);
-    const currentSlot = epochInfo.absoluteSlot;
-    const blockTime = await this.connection.getBlockTime(currentSlot);
-    if (blockTime === null) {
-      throw PoolError.undeterminedError();
-    }
+    const clock = await readClock(this.connection, this.commitment);
 
     return {
       quoteParams: {
@@ -845,9 +809,9 @@ export class PoolService extends DlmmProProgram {
         swapForY: params.swapForY,
         hasReferral: params.hasReferral ?? false,
         swapper: params.swapper ?? null,
-        currentSlot: new BN(currentSlot),
-        currentTimestamp: new BN(blockTime),
-        epoch: BigInt(epochInfo.epoch),
+        currentSlot: clock.slot,
+        currentTimestamp: clock.timestamp,
+        epoch: clock.epoch,
         inputMint,
         outputMint,
       },
@@ -856,6 +820,17 @@ export class PoolService extends DlmmProProgram {
         ? extensionAddress
         : null,
     };
+  }
+
+  private async unpackMintAccount(
+    address: PublicKey,
+    tokenProgramFlag: number,
+  ): Promise<Mint> {
+    const info = await this.connection.getAccountInfo(address, this.commitment);
+    if (!info) {
+      throw new Error(`Mint account not found: ${address.toBase58()}`);
+    }
+    return unpackMint(address, info, getTokenProgram(tokenProgramFlag));
   }
 
   private async initializePoolAccounts(
