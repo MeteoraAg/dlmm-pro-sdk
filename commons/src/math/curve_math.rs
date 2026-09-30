@@ -6,30 +6,20 @@ use anchor_lang::prelude::*;
 use ruint::aliases::U256;
 use ruint::aliases::U320;
 
-/// Round up, down
 #[derive(PartialEq, Clone, Copy)]
 pub enum Rounding {
-    /// Rounding up
     Up,
-    /// Rounding down
     Down,
 }
-/// Gets the delta amount_x for given liquidity and price range
-///
-/// # Formula
-///
-/// * `Δx = L * (1 / √P_lower - 1 / √P_upper)`
-/// * i.e. `L * (√P_upper - √P_lower) / (√P_upper * √P_lower)`
+
+// Δx = L * (√P_upper - √P_lower) / (√P_upper * √P_lower)
 pub fn get_delta_amount_x_unchecked(
     lower_sqrt_price: u128,
     upper_sqrt_price: u128,
     liquidity: u128,
     round: Rounding,
 ) -> Result<U320> {
-    // L = unscaled integer (u128)
-    // denominator = √P_upper * √P_lower = Q128.128 (u128 * u128, fits U256)
-    // numerator = (L << 64) * (√P_upper - √P_lower) = Q128.128
-    // That product passes 2^256 at the per-tick liquidity cap, so it needs U320.
+    // (L << 64) * (√P_upper - √P_lower) passes 2^256 at the per-tick liquidity cap.
     require!(lower_sqrt_price > 0, PoolError::MathOverflow);
     let numerator_1: U320 = U320::from(liquidity).safe_shl(64)?;
     let numerator_2 = U320::from(upper_sqrt_price.safe_sub(lower_sqrt_price)?);
@@ -53,8 +43,7 @@ pub fn get_delta_amount_x(
     Ok(try_cast(result)?)
 }
 
-/// Gets the delta amount_y for given liquidity and price range
-/// Δy = L * (√P_upper - √P_lower)
+// Δy = L * (√P_upper - √P_lower)
 pub fn get_delta_amount_y_unchecked(
     lower_sqrt_price: u128,
     upper_sqrt_price: u128,
@@ -84,8 +73,6 @@ pub fn get_delta_amount_y(
     Ok(try_cast(result)?)
 }
 
-/// Gets the next sqrt price given an input amount of token X or token Y
-/// Throws if price or liquidity are 0, or if the next price overflow q64.64
 pub fn get_next_sqrt_price_from_input(
     sqrt_price: u128,
     liquidity: u128,
@@ -128,17 +115,7 @@ fn get_next_sqrt_price_from_amount_in_y_rounding_down(
     Ok(sqrt_price.saturating_add(quotient))
 }
 
-/// Gets the liquidity for a given amount_x and price range.
-///
-/// Inverse of [`get_delta_amount_x`].
-///
-/// # Formula
-///
-/// From `Δx = L * (√P_upper - √P_lower) / (√P_lower * √P_upper)`:
-///
-/// * `L = Δx * (√P_lower * √P_upper) / (√P_upper - √P_lower)`
-///
-/// Returns `None` if √P_upper <= √P_lower (no X side).
+// L = Δx * √P_lower * √P_upper / (√P_upper - √P_lower); None when there is no X side.
 pub fn get_liquidity_from_amount_x(
     lower_sqrt_price: u128,
     upper_sqrt_price: u128,
@@ -156,17 +133,7 @@ pub fn get_liquidity_from_amount_x(
     Ok(Some(result))
 }
 
-/// Gets the liquidity for a given amount_y and price range.
-///
-/// Inverse of [`get_delta_amount_y`].
-///
-/// # Formula
-///
-/// From `Δy = L * (√P_upper - √P_lower) / 2^64`:
-///
-/// * `L = (Δy << 64) / (√P_upper - √P_lower)`
-///
-/// Returns `None` if √P_upper <= √P_lower (no Y side).
+// L = (Δy << 64) / (√P_upper - √P_lower); None when there is no Y side.
 pub fn get_liquidity_from_amount_y(
     lower_sqrt_price: u128,
     upper_sqrt_price: u128,
