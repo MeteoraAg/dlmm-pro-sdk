@@ -1,5 +1,3 @@
-# TypeScript targets always work. Rust targets need the commons crate.
-
 .DEFAULT_GOAL := help
 
 .PHONY: help fmt-check-ts typecheck test-ts build fmt-check-rs clippy test-rs idl check test
