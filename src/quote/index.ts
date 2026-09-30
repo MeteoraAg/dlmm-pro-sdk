@@ -520,7 +520,6 @@ export function quoteExactIn(params: QuoteExactInParams): QuoteExactInResult {
       if (!step.nextSqrtPrice.eq(currentSqrtPrice)) {
         currentSqrtPrice = step.nextSqrtPrice;
         const nextTickId = tickIdFromSqrtPrice(step.nextSqrtPrice);
-        // ensure current_tick_id is not crossed
         currentTickId = swapForY
           ? Math.max(nextTickId, tick.tickId)
           : Math.min(nextTickId, tick.tickId - 1);
