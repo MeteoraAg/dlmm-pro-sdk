@@ -27,6 +27,8 @@ import {
 const RANGE_A: TickRange = { tickLowerId: -64, tickUpperId: 64 };
 const RANGE_B: TickRange = { tickLowerId: -16, tickUpperId: 16 };
 const RANGE_ABOVE: TickRange = { tickLowerId: 200, tickUpperId: 264 };
+const RANGE_HIGH: TickRange = { tickLowerId: 64, tickUpperId: 192 };
+const RANGE_LOW: TickRange = { tickLowerId: -192, tickUpperId: -64 };
 
 describe("fee compounding", () => {
   const svm = initializeSVM();
@@ -35,6 +37,45 @@ describe("fee compounding", () => {
 
   let market: Awaited<ReturnType<typeof createFundedMarket>>;
   let pool: PublicKey;
+
+  async function pushPrice(
+    direction: "up" | "down",
+    amount: BN,
+  ): Promise<void> {
+    const up = direction === "up";
+    await swap(svm, client, {
+      pool,
+      user: market.swapper,
+      tokenXMint: market.tokenXMint,
+      tokenYMint: market.tokenYMint,
+      userTokenIn: up ? market.swapperTokenY : market.swapperTokenX,
+      userTokenOut: up ? market.swapperTokenX : market.swapperTokenY,
+      inputAmount: amount,
+    });
+  }
+
+  async function pushPriceUntil(
+    direction: "up" | "down",
+    reached: (tickCurrentId: number) => boolean,
+  ): Promise<number> {
+    let amount = 50_000;
+    for (let attempt = 0; attempt < 80; attempt += 1) {
+      const tickCurrentId = (await client.state.fetchPool(pool)).tickCurrentId;
+      if (reached(tickCurrentId)) {
+        return tickCurrentId;
+      }
+      try {
+        await pushPrice(direction, new BN(amount));
+        amount = Math.min(amount * 2, 500_000);
+      } catch (error) {
+        if (amount <= 100) {
+          throw error;
+        }
+        amount = Math.floor(amount / 2);
+      }
+    }
+    throw new Error(`price did not move ${direction} far enough`);
+  }
 
   async function accrueFees(): Promise<void> {
     await swap(svm, client, {
@@ -389,6 +430,131 @@ describe("fee compounding", () => {
       tx,
       [market.lpOwner],
       "InvalidLayoutVersion",
+    );
+  });
+
+  it("redeposits only token Y once the price is above the slot", async () => {
+    await openFundedPosition([RANGE_HIGH]);
+    const opened = await openFundedPosition([RANGE_A]);
+    await accrueFees();
+    await pushPriceUntil("up", (tick) => tick >= RANGE_A.tickUpperId);
+
+    await expect(
+      client.position.compoundFees({
+        ...positionAccounts(opened.nftMint),
+        index: 0,
+        maxAmountY: null,
+      }),
+    ).rejects.toMatchObject({ code: PoolErrorCode.ExceededSlippage });
+
+    const poolState = await client.state.fetchPool(pool);
+    const before = await client.state.decodePositions(opened.position);
+    const xBefore = getTokenAmount(svm, market.lpTokenX);
+    const yBefore = getTokenAmount(svm, market.lpTokenY);
+    const { tx, claimable } = await client.position.compoundFees({
+      ...positionAccounts(opened.nftMint),
+      index: 0,
+    });
+    expect(big(claimable.feeX)).toBeGreaterThan(0n);
+    expect(big(claimable.feeY)).toBeGreaterThan(0n);
+    sendTransaction(svm, tx, [market.lpOwner]);
+
+    const liquidity = getLiquidityFromAmounts({
+      maxTokenX: claimable.feeX,
+      maxTokenY: claimable.feeY,
+      tickLowerId: RANGE_A.tickLowerId,
+      tickUpperId: RANGE_A.tickUpperId,
+      tickCurrentId: poolState.tickCurrentId,
+      currentSqrtPrice: poolState.sqrtPrice,
+    });
+    const deposited = getAmountsFromLiquidity({
+      liquidity,
+      tickLowerId: RANGE_A.tickLowerId,
+      tickUpperId: RANGE_A.tickUpperId,
+      tickCurrentId: poolState.tickCurrentId,
+      currentSqrtPrice: poolState.sqrtPrice,
+    });
+    const after = await client.state.decodePositions(opened.position);
+    expect(deposited.amountX.toString()).toBe("0");
+    expect(big(deposited.amountY)).toBeGreaterThan(0n);
+    expect(
+      positionTotalLiquidity(after[0])
+        .sub(positionTotalLiquidity(before[0]))
+        .toString(),
+    ).toBe(liquidity.toString());
+    expect(getTokenAmount(svm, market.lpTokenX).sub(xBefore).toString()).toBe(
+      claimable.feeX.toString(),
+    );
+    expect(getTokenAmount(svm, market.lpTokenY).sub(yBefore).toString()).toBe(
+      claimable.feeY.sub(deposited.amountY).toString(),
+    );
+  });
+
+  it("redeposits only token X once the price is below the slot", async () => {
+    pool = (
+      await initializeStaticPool(svm, client, {
+        operator: market.operator,
+        payer: market.payer,
+        creator: market.creator.publicKey,
+        tokenXMint: market.tokenXMint,
+        tokenYMint: market.tokenYMint,
+      })
+    ).pool;
+    const opened = await openFundedPosition([RANGE_A, RANGE_LOW]);
+    await accrueFees();
+    await pushPriceUntil("down", (tick) => tick < RANGE_A.tickLowerId);
+
+    await expect(
+      client.position.compoundFees({
+        ...positionAccounts(opened.nftMint),
+        index: 0,
+        maxAmountX: null,
+      }),
+    ).rejects.toMatchObject({ code: PoolErrorCode.ExceededSlippage });
+
+    const poolState = await client.state.fetchPool(pool);
+    const before = await client.state.decodePositions(opened.position);
+    const xBefore = getTokenAmount(svm, market.lpTokenX);
+    const yBefore = getTokenAmount(svm, market.lpTokenY);
+    const { tx, claimable } = await client.position.compoundFees({
+      ...positionAccounts(opened.nftMint),
+      index: 0,
+    });
+    expect(big(claimable.feeX)).toBeGreaterThan(0n);
+    expect(big(claimable.feeY)).toBeGreaterThan(0n);
+    sendTransaction(svm, tx, [market.lpOwner]);
+
+    const liquidity = getLiquidityFromAmounts({
+      maxTokenX: claimable.feeX,
+      maxTokenY: claimable.feeY,
+      tickLowerId: RANGE_A.tickLowerId,
+      tickUpperId: RANGE_A.tickUpperId,
+      tickCurrentId: poolState.tickCurrentId,
+      currentSqrtPrice: poolState.sqrtPrice,
+    });
+    const deposited = getAmountsFromLiquidity({
+      liquidity,
+      tickLowerId: RANGE_A.tickLowerId,
+      tickUpperId: RANGE_A.tickUpperId,
+      tickCurrentId: poolState.tickCurrentId,
+      currentSqrtPrice: poolState.sqrtPrice,
+    });
+    const after = await client.state.decodePositions(opened.position);
+    expect(deposited.amountY.toString()).toBe("0");
+    expect(big(deposited.amountX)).toBeGreaterThan(0n);
+    expect(
+      positionTotalLiquidity(after[0])
+        .sub(positionTotalLiquidity(before[0]))
+        .toString(),
+    ).toBe(liquidity.toString());
+    expect(
+      positionTotalLiquidity(after[1]).eq(positionTotalLiquidity(before[1])),
+    ).toBe(true);
+    expect(getTokenAmount(svm, market.lpTokenY).sub(yBefore).toString()).toBe(
+      claimable.feeY.toString(),
+    );
+    expect(getTokenAmount(svm, market.lpTokenX).sub(xBefore).toString()).toBe(
+      claimable.feeX.sub(deposited.amountX).toString(),
     );
   });
 });
