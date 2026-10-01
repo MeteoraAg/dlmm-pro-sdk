@@ -54,7 +54,11 @@ export class RewardService extends DlmmProProgram {
     this.assertCreator(creator, params.creator, PoolError.invalidPermission());
     await this.assertCreatorRewardMint(params.rewardMint, params.tokenBadge);
 
-    const rewardVault = deriveRewardVault(params.pool, CREATOR_REWARD_INDEX);
+    const rewardVault = deriveRewardVault(
+      params.pool,
+      CREATOR_REWARD_INDEX,
+      this.programId,
+    );
     const tokenProgram =
       params.tokenProgram ??
       (await resolveTokenProgram(
@@ -136,7 +140,11 @@ export class RewardService extends DlmmProProgram {
     if (params.parameters.emissionPerSecond.isZero()) {
       throw PoolError.invalidParameters();
     }
-    const rewardVault = deriveRewardVault(params.pool, params.parameters.index);
+    const rewardVault = deriveRewardVault(
+      params.pool,
+      params.parameters.index,
+      this.programId,
+    );
     const tokenProgram =
       params.tokenProgram ??
       (await resolveTokenProgram(
@@ -224,7 +232,11 @@ export class RewardService extends DlmmProProgram {
     if (params.tickSpacing !== tickSpacing) {
       throw PoolError.invalidParameters();
     }
-    const rewardVault = deriveRewardVault(params.pool, params.rewardIndex);
+    const rewardVault = deriveRewardVault(
+      params.pool,
+      params.rewardIndex,
+      this.programId,
+    );
     const tokenProgram =
       params.tokenProgram ??
       (await resolveTokenProgram(
@@ -244,7 +256,7 @@ export class RewardService extends DlmmProProgram {
           mint: params.rewardMint,
           source: rewardVault,
           destination: params.userTokenAccount,
-          authority: derivePoolAuthority(),
+          authority: derivePoolAuthority(this.programId),
           amount: () => this.refreshedRewardAmount(params),
         },
       },
@@ -254,7 +266,7 @@ export class RewardService extends DlmmProProgram {
       .refreshFeesAndRewards(params.bitmap)
       .accountsPartial({
         pool: params.pool,
-        position: derivePosition(params.nftMint),
+        position: derivePosition(params.nftMint, this.programId),
         nftAccount,
         signer: params.signer,
       })
@@ -264,6 +276,7 @@ export class RewardService extends DlmmProProgram {
           params.tickRanges,
           tickSpacing,
           false,
+          this.programId,
         ),
       )
       .transaction();
@@ -275,7 +288,7 @@ export class RewardService extends DlmmProProgram {
       )
       .accountsPartial({
         pool: params.pool,
-        position: derivePosition(params.nftMint),
+        position: derivePosition(params.nftMint, this.programId),
         nftAccount,
         signer: params.signer,
         rewardVault,
@@ -306,7 +319,11 @@ export class RewardService extends DlmmProProgram {
     transferHookReward?: AccountMeta[];
   }): Promise<{ tx: Transaction }> {
     assertU64(params.minAmount ?? new BN(0));
-    const rewardVault = deriveRewardVault(params.pool, params.index);
+    const rewardVault = deriveRewardVault(
+      params.pool,
+      params.index,
+      this.programId,
+    );
     const tokenProgram =
       params.tokenProgram ??
       (await resolveTokenProgram(
@@ -324,7 +341,7 @@ export class RewardService extends DlmmProProgram {
           mint: params.rewardMint,
           source: rewardVault,
           destination: params.receiverTokenAccount,
-          authority: derivePoolAuthority(),
+          authority: derivePoolAuthority(this.programId),
           amount: () => this.ineligibleRewardHookAmount(params),
         },
       },
@@ -380,7 +397,7 @@ export class RewardService extends DlmmProProgram {
       currentTimestamp: clock.timestamp,
     })[params.rewardIndex];
     const { positions } = await this.state.fetchPositionArrayWithPositions(
-      derivePosition(params.nftMint),
+      derivePosition(params.nftMint, this.programId),
       { withReward: true },
     );
     const selected = positionIndexesFromBitmap(params.bitmap);
@@ -405,7 +422,9 @@ export class RewardService extends DlmmProProgram {
     }
     const ticks = ticksById(
       await this.state.fetchTickArraysWithTicks(
-        [...tickIndexes].map((index) => deriveTickArray(params.pool, index)),
+        [...tickIndexes].map((index) =>
+          deriveTickArray(params.pool, index, this.programId),
+        ),
         { withReward: true },
       ),
     );

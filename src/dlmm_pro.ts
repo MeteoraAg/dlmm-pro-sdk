@@ -1,5 +1,5 @@
 import type { Program } from "@coral-xyz/anchor";
-import type { Commitment, Connection } from "@solana/web3.js";
+import type { Commitment, Connection, PublicKey } from "@solana/web3.js";
 import { createDlmmProProgram } from "./helpers/create_program";
 import type { DlmmPro } from "./idl/dlmm-pro/dlmm_pro";
 import {
@@ -32,10 +32,14 @@ export class DlmmProClient implements DlmmProClientContext {
   readonly position: PositionService;
   readonly reward: RewardService;
 
-  constructor(connection: Connection, commitment: Commitment = "confirmed") {
+  constructor(
+    connection: Connection,
+    commitment: Commitment = "confirmed",
+    programId?: PublicKey,
+  ) {
     this.connection = connection;
     this.commitment = commitment;
-    this.program = createDlmmProProgram(connection);
+    this.program = createDlmmProProgram(connection, programId);
     this.state = new StateService(this);
     this.accessRegistry = new AccessRegistryService(connection, commitment);
     this.limitOrder = new LimitOrderService(this);
@@ -47,7 +51,8 @@ export class DlmmProClient implements DlmmProClientContext {
   static create(
     connection: Connection,
     commitment: Commitment = "confirmed",
+    programId?: PublicKey,
   ): DlmmProClient {
-    return new DlmmProClient(connection, commitment);
+    return new DlmmProClient(connection, commitment, programId);
   }
 }

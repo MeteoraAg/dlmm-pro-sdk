@@ -92,7 +92,7 @@ export class LimitOrderService extends DlmmProProgram {
     if (offSideHook && offSideHook.length > 0) {
       throw PoolError.invalidRemainingAccountSlice();
     }
-    const limitOrder = deriveLimitOrder(params.nftMint);
+    const limitOrder = deriveLimitOrder(params.nftMint, this.programId);
     const nftAccount =
       params.nftAccount ?? findNftAccount(params.nftMint, params.owner);
     const onSideKey = params.parameters.isAskSide
@@ -109,7 +109,11 @@ export class LimitOrderService extends DlmmProProgram {
         [onSideKey]: {
           mint: params.tokenMint,
           source: params.userToken,
-          destination: deriveReserve(params.tokenMint, params.pool),
+          destination: deriveReserve(
+            params.tokenMint,
+            params.pool,
+            this.programId,
+          ),
           authority: params.owner,
           amount: async () => {
             const total = params.parameters.ticks.reduce(
@@ -142,7 +146,7 @@ export class LimitOrderService extends DlmmProProgram {
         nftMint: params.nftMint,
         nftAccount,
         tickArrayBitmapExtension: params.tickArrayBitmapExtension ?? null,
-        reserve: deriveReserve(params.tokenMint, params.pool),
+        reserve: deriveReserve(params.tokenMint, params.pool, this.programId),
         tokenMint: params.tokenMint,
         limitOrder,
         userToken: params.userToken,
@@ -208,7 +212,7 @@ export class LimitOrderService extends DlmmProProgram {
         throw PoolError.invalidParameters();
       }
     }
-    const poolAuthority = derivePoolAuthority();
+    const poolAuthority = derivePoolAuthority(this.programId);
     const referralMint = params.referralToken
       ? await readTokenAccountMint(
           this.connection,
@@ -236,14 +240,14 @@ export class LimitOrderService extends DlmmProProgram {
       {
         transferHookX: {
           mint: params.tokenXMint,
-          source: deriveReserve(params.tokenXMint, params.pool),
+          source: deriveReserve(params.tokenXMint, params.pool, this.programId),
           destination: params.userTokenX,
           authority: poolAuthority,
           amount: async () => (await payout()).amountX,
         },
         transferHookY: {
           mint: params.tokenYMint,
-          source: deriveReserve(params.tokenYMint, params.pool),
+          source: deriveReserve(params.tokenYMint, params.pool, this.programId),
           destination: params.userTokenY,
           authority: poolAuthority,
           amount: async () => (await payout()).amountY,
@@ -252,7 +256,11 @@ export class LimitOrderService extends DlmmProProgram {
           params.referralToken && referralMint
             ? {
                 mint: referralMint,
-                source: deriveReserve(referralMint, params.pool),
+                source: deriveReserve(
+                  referralMint,
+                  params.pool,
+                  this.programId,
+                ),
                 destination: params.referralToken,
                 authority: poolAuthority,
                 amount: async () => {
@@ -299,11 +307,11 @@ export class LimitOrderService extends DlmmProProgram {
       .accountsPartial({
         pool: params.pool,
         tickArrayBitmapExtension: params.tickArrayBitmapExtension ?? null,
-        reserveX: deriveReserve(params.tokenXMint, params.pool),
-        reserveY: deriveReserve(params.tokenYMint, params.pool),
+        reserveX: deriveReserve(params.tokenXMint, params.pool, this.programId),
+        reserveY: deriveReserve(params.tokenYMint, params.pool, this.programId),
         tokenXMint: params.tokenXMint,
         tokenYMint: params.tokenYMint,
-        limitOrder: deriveLimitOrder(params.nftMint),
+        limitOrder: deriveLimitOrder(params.nftMint, this.programId),
         nftAccount:
           params.nftAccount ?? findNftAccount(params.nftMint, params.owner),
         userTokenX: params.userTokenX,
@@ -339,7 +347,7 @@ export class LimitOrderService extends DlmmProProgram {
     },
     referralMint: PublicKey | null,
   ) {
-    const limitOrder = deriveLimitOrder(params.nftMint);
+    const limitOrder = deriveLimitOrder(params.nftMint, this.programId);
     const [header, orders, loaded] = await Promise.all([
       this.state.fetchLimitOrder(limitOrder),
       this.state.decodeLimitOrderData(limitOrder),
@@ -404,7 +412,7 @@ export class LimitOrderService extends DlmmProProgram {
     nftAccount?: PublicKey;
     tickArrays: PublicKey[];
   }): Promise<{ tx: Transaction; limitOrder: PublicKey }> {
-    const limitOrder = deriveLimitOrder(params.nftMint);
+    const limitOrder = deriveLimitOrder(params.nftMint, this.programId);
     const tx = await this.program.methods
       .closeLimitOrder()
       .accountsPartial({

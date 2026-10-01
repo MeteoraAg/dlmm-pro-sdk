@@ -299,7 +299,7 @@ export class PositionService extends DlmmProProgram {
       params.pool,
       params.tickSpacing,
     );
-    const position = derivePosition(params.nftMint);
+    const position = derivePosition(params.nftMint, this.programId);
     const nftAccount =
       params.nftAccount ?? findNftAccount(params.nftMint, params.owner);
 
@@ -314,7 +314,13 @@ export class PositionService extends DlmmProProgram {
         payer: params.payer,
       })
       .remainingAccounts(
-        tickArrayRemainingAccounts(params.pool, params.tickRanges, tickSpacing),
+        tickArrayRemainingAccounts(
+          params.pool,
+          params.tickRanges,
+          tickSpacing,
+          true,
+          this.programId,
+        ),
       )
       .transaction();
 
@@ -525,7 +531,7 @@ export class PositionService extends DlmmProProgram {
   async claimFee(params: ClaimFeeParams): Promise<{ tx: Transaction }> {
     assertU64(params.minAmountX ?? new BN(0));
     assertU64(params.minAmountY ?? new BN(0));
-    const poolAuthority = derivePoolAuthority();
+    const poolAuthority = derivePoolAuthority(this.programId);
     const fees = lazy(() =>
       this.getClaimableFees({
         pool: params.pool,
@@ -545,14 +551,22 @@ export class PositionService extends DlmmProProgram {
         {
           transferHookX: {
             mint: params.tokenXMint,
-            source: deriveReserve(params.tokenXMint, params.pool),
+            source: deriveReserve(
+              params.tokenXMint,
+              params.pool,
+              this.programId,
+            ),
             destination: params.userTokenX,
             authority: poolAuthority,
             amount: async () => (await fees()).feeX,
           },
           transferHookY: {
             mint: params.tokenYMint,
-            source: deriveReserve(params.tokenYMint, params.pool),
+            source: deriveReserve(
+              params.tokenYMint,
+              params.pool,
+              this.programId,
+            ),
             destination: params.userTokenY,
             authority: poolAuthority,
             amount: async () => (await fees()).feeY,
@@ -594,11 +608,11 @@ export class PositionService extends DlmmProProgram {
       )
       .accountsPartial({
         pool: params.pool,
-        position: derivePosition(params.nftMint),
+        position: derivePosition(params.nftMint, this.programId),
         nftAccount,
         signer: params.signer,
-        reserveX: deriveReserve(params.tokenXMint, params.pool),
-        reserveY: deriveReserve(params.tokenYMint, params.pool),
+        reserveX: deriveReserve(params.tokenXMint, params.pool, this.programId),
+        reserveY: deriveReserve(params.tokenYMint, params.pool, this.programId),
         userTokenX: params.userTokenX,
         userTokenY: params.userTokenY,
         tokenXMint: params.tokenXMint,
@@ -811,7 +825,7 @@ export class PositionService extends DlmmProProgram {
       params.pool,
       params.tickSpacing,
     );
-    const position = derivePosition(params.nftMint);
+    const position = derivePosition(params.nftMint, this.programId);
     const nftAccount =
       params.nftAccount ?? findNftAccount(params.nftMint, params.owner);
 
@@ -826,7 +840,13 @@ export class PositionService extends DlmmProProgram {
         owner: params.owner,
       })
       .remainingAccounts(
-        tickArrayRemainingAccounts(params.pool, params.tickRanges, tickSpacing),
+        tickArrayRemainingAccounts(
+          params.pool,
+          params.tickRanges,
+          tickSpacing,
+          true,
+          this.programId,
+        ),
       )
       .transaction();
 
@@ -842,7 +862,7 @@ export class PositionService extends DlmmProProgram {
       params.pool,
       params.tickSpacing,
     );
-    const position = derivePosition(params.nftMint);
+    const position = derivePosition(params.nftMint, this.programId);
     const nftAccount =
       params.nftAccount ?? findNftAccount(params.nftMint, params.owner);
 
@@ -856,7 +876,13 @@ export class PositionService extends DlmmProProgram {
         payer: params.payer,
       })
       .remainingAccounts(
-        tickArrayRemainingAccounts(params.pool, params.tickRanges, tickSpacing),
+        tickArrayRemainingAccounts(
+          params.pool,
+          params.tickRanges,
+          tickSpacing,
+          true,
+          this.programId,
+        ),
       )
       .transaction();
 
@@ -876,7 +902,7 @@ export class PositionService extends DlmmProProgram {
       params.pool,
       params.tickSpacing,
     );
-    const position = derivePosition(params.nftMint);
+    const position = derivePosition(params.nftMint, this.programId);
     const nftAccount =
       params.nftAccount ?? findNftAccount(params.nftMint, params.owner);
 
@@ -890,7 +916,13 @@ export class PositionService extends DlmmProProgram {
         rentReceiver: params.rentReceiver,
       })
       .remainingAccounts(
-        tickArrayRemainingAccounts(params.pool, params.tickRanges, tickSpacing),
+        tickArrayRemainingAccounts(
+          params.pool,
+          params.tickRanges,
+          tickSpacing,
+          true,
+          this.programId,
+        ),
       )
       .transaction();
 
@@ -917,7 +949,7 @@ export class PositionService extends DlmmProProgram {
       })
       .accountsPartial({
         pool: params.pool,
-        position: derivePosition(params.nftMint),
+        position: derivePosition(params.nftMint, this.programId),
         nftAccount:
           params.nftAccount ?? findNftAccount(params.nftMint, params.owner),
         signer: params.signer,
@@ -936,7 +968,7 @@ export class PositionService extends DlmmProProgram {
       .lockVestingPosition(params.parameters)
       .accountsPartial({
         pool: params.pool,
-        position: derivePosition(params.nftMint),
+        position: derivePosition(params.nftMint, this.programId),
         nftAccount:
           params.nftAccount ?? findNftAccount(params.nftMint, params.owner),
         signer: params.signer,
@@ -959,7 +991,7 @@ export class PositionService extends DlmmProProgram {
       .refreshFeesAndRewards(params.bitmap)
       .accountsPartial({
         pool: params.pool,
-        position: derivePosition(params.nftMint),
+        position: derivePosition(params.nftMint, this.programId),
         nftAccount:
           params.nftAccount ?? findNftAccount(params.nftMint, params.owner),
         signer: params.signer,
@@ -970,6 +1002,7 @@ export class PositionService extends DlmmProProgram {
           params.tickRanges,
           tickSpacing,
           false,
+          this.programId,
         ),
       )
       .transaction();
@@ -995,7 +1028,7 @@ export class PositionService extends DlmmProProgram {
     const tx = await this.program.methods
       .updatePositionDelegatePermission(params.permission)
       .accountsPartial({
-        position: derivePosition(params.nftMint),
+        position: derivePosition(params.nftMint, this.programId),
         nftAccount:
           params.nftAccount ?? findNftAccount(params.nftMint, params.owner),
         owner: params.owner,
@@ -1192,7 +1225,7 @@ export class PositionService extends DlmmProProgram {
   private async positionSlots(poolAddress: PublicKey, nftMint: PublicKey) {
     const { pool, extensions } =
       await this.state.fetchPoolWithExtensions(poolAddress);
-    const positionAddress = derivePosition(nftMint);
+    const positionAddress = derivePosition(nftMint, this.programId);
     const loaded = await this.state.fetchPositionArrayWithPositions(
       positionAddress,
       { withReward: extensions.hasLiquidityMining },
@@ -1224,6 +1257,8 @@ export class PositionService extends DlmmProProgram {
           params.pool,
           params.tickRanges,
           tickSpacing,
+          true,
+          this.programId,
         ),
       ],
     };
@@ -1239,10 +1274,18 @@ export class PositionService extends DlmmProProgram {
       params.pool,
       params.tickSpacing,
     );
-    const reserveX = deriveReserve(params.tokenXMint, params.pool);
-    const reserveY = deriveReserve(params.tokenYMint, params.pool);
+    const reserveX = deriveReserve(
+      params.tokenXMint,
+      params.pool,
+      this.programId,
+    );
+    const reserveY = deriveReserve(
+      params.tokenYMint,
+      params.pool,
+      this.programId,
+    );
     const authority =
-      flow === "deposit" ? params.signer : derivePoolAuthority();
+      flow === "deposit" ? params.signer : derivePoolAuthority(this.programId);
     const resolved = await resolveInstructionHooks(
       this.connection,
       this.commitment,
@@ -1269,7 +1312,7 @@ export class PositionService extends DlmmProProgram {
       },
     );
     const remaining = this.liquidityRemaining(params, tickSpacing, resolved);
-    const position = derivePosition(params.nftMint);
+    const position = derivePosition(params.nftMint, this.programId);
     const nftAccount =
       params.nftAccount ?? findNftAccount(params.nftMint, params.owner);
     const [tokenXProgram, tokenYProgram] = await Promise.all([
@@ -1296,8 +1339,8 @@ export class PositionService extends DlmmProProgram {
         tickArrayBitmapExtension: params.tickArrayBitmapExtension ?? null,
         userTokenX: params.userTokenX,
         userTokenY: params.userTokenY,
-        reserveX: deriveReserve(params.tokenXMint, params.pool),
-        reserveY: deriveReserve(params.tokenYMint, params.pool),
+        reserveX,
+        reserveY,
         tokenXMint: params.tokenXMint,
         tokenYMint: params.tokenYMint,
         signer: params.signer,
@@ -1317,7 +1360,7 @@ export class PositionService extends DlmmProProgram {
       pool.extensions,
       PoolExtension.LiquidityMining,
     );
-    const positionAddress = derivePosition(nftMint);
+    const positionAddress = derivePosition(nftMint, this.programId);
     const { positionArray, positions } =
       await this.state.fetchPositionArrayWithPositions(positionAddress, {
         withReward,
@@ -1349,7 +1392,9 @@ export class PositionService extends DlmmProProgram {
       tickArrayIndexes.add(tickIndexFromId(tickUpperId, pool.tickSpacing));
     }
     const tickArrays = await this.state.fetchTickArraysWithTicks(
-      [...tickArrayIndexes].map((index) => deriveTickArray(poolAddress, index)),
+      [...tickArrayIndexes].map((index) =>
+        deriveTickArray(poolAddress, index, this.programId),
+      ),
       { withReward },
     );
     const ticks = new Map<number, DecodedTick>();
@@ -1413,7 +1458,9 @@ export class PositionService extends DlmmProProgram {
     const overflows = [range.tickLowerId, range.tickUpperId].some((tickId) =>
       overflowsDefaultTickArrayBitmap(tickIndexFromId(tickId, tickSpacing)),
     );
-    return overflows ? deriveTickArrayBitmapExtension(pool) : null;
+    return overflows
+      ? deriveTickArrayBitmapExtension(pool, this.programId)
+      : null;
   }
 
   private async resolveTickSpacing(
