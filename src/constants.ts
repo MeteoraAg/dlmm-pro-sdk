@@ -99,11 +99,6 @@ export const MIN_TICK_ID = -443636;
 export const MIN_DELTA_TICK_FOR_DYNAMIC_FEE_UPDATE = new BN(4);
 export const MAX_VESTING_DURATION = new BN(86400 * 365 * 10);
 
-export enum PoolExtension {
-  LiquidityMining = 0,
-  ActivationAccess = 1,
-}
-
 export const Q64 = new BN(1).shln(64);
 export const SCALE_OFFSET = 64;
 export const MAX_EXPONENTIAL = 0x80000;

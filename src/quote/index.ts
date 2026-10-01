@@ -11,7 +11,6 @@ import {
   MAX_BASIS_POINT,
   MM_LAUNCH_POOL_PROTOCOL_FEE_BPS,
   MM_PROTOCOL_FEE_BPS,
-  PoolExtension,
 } from "../constants";
 import { PoolError } from "../errors";
 import { isSupportExtension } from "../helpers/codec";
@@ -34,6 +33,7 @@ import {
 import {
   ActivationType,
   CollectFeeMode,
+  PoolExtension,
   PoolStatus,
   PoolType,
   Rounding,

@@ -1,6 +1,5 @@
 import type { Program } from "@coral-xyz/anchor";
 import { PublicKey, type Commitment, type Connection } from "@solana/web3.js";
-import { PoolExtension } from "../constants";
 import type { DlmmProProvider } from "../dlmm_pro";
 import type { DlmmPro } from "../idl/dlmm-pro/dlmm_pro";
 import {
@@ -13,25 +12,26 @@ import {
   getExtensionBitmapSetIndicesFromState,
   isSupportExtension,
 } from "../helpers/codec";
-import type {
-  DecodePositionsOpts,
-  DecodeTicksOpts,
-  DecodedLimitOrderData,
-  DecodedObservation,
-  DecodedPoolExtensions,
-  DecodedPosition,
-  DecodedPositionWithReward,
-  DecodedTick,
-  DecodedTickWithReward,
-  DynamicConfig,
-  LimitOrder,
-  Operator,
-  Oracle,
-  Pool,
-  PositionArray,
-  StaticConfig,
-  TickArray,
-  TickArrayBitmapExtension,
+import {
+  PoolExtension,
+  type DecodePositionsOpts,
+  type DecodeTicksOpts,
+  type DecodedLimitOrderData,
+  type DecodedObservation,
+  type DecodedPoolExtensions,
+  type DecodedPosition,
+  type DecodedPositionWithReward,
+  type DecodedTick,
+  type DecodedTickWithReward,
+  type DynamicConfig,
+  type LimitOrder,
+  type Operator,
+  type Oracle,
+  type Pool,
+  type PositionArray,
+  type StaticConfig,
+  type TickArray,
+  type TickArrayBitmapExtension,
 } from "../types";
 
 export class StateService {

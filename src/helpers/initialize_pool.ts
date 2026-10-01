@@ -6,7 +6,6 @@ import {
   MIN_SQRT_PRICE,
   NUMBER_OF_ACTIVATION_MODES,
   POOL_EXTENSION_VARIANT_COUNT,
-  PoolExtension,
   WHITELISTED_QUOTE_MINTS,
 } from "../constants";
 import { PoolError } from "../errors";
@@ -27,6 +26,7 @@ import {
   ActivationType,
   BaseFeeMode,
   CollectFeeMode,
+  PoolExtension,
   type InitializePoolWithDynamicParameters,
 } from "../types";
 import { isSupportExtension } from "./codec";

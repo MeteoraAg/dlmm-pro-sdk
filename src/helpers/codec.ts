@@ -1,25 +1,22 @@
 import type { Layout } from "@coral-xyz/borsh";
 import BN from "bn.js";
-import {
-  BITMAP_SIZE,
-  POOL_EXTENSION_VARIANT_COUNT,
-  PoolExtension,
-} from "../constants";
+import { BITMAP_SIZE, POOL_EXTENSION_VARIANT_COUNT } from "../constants";
 import { PoolError } from "../errors";
 import DlmmProIDL from "../idl/dlmm-pro/dlmm_pro.json";
 import { U16_MAX, U32_MAX, U64_MAX } from "../math/safe_math";
-import type {
-  DecodedLimitOrderData,
-  DecodedObservation,
-  DecodedPoolActivation,
-  DecodedPoolExtensions,
-  DecodedPoolRewardInfo,
-  DecodedPosition,
-  DecodedPositionWithReward,
-  DecodedTick,
-  DecodedTickWithReward,
-  BitmapExtensionState,
-  PoolBitmapState,
+import {
+  PoolExtension,
+  type DecodedLimitOrderData,
+  type DecodedObservation,
+  type DecodedPoolActivation,
+  type DecodedPoolExtensions,
+  type DecodedPoolRewardInfo,
+  type DecodedPosition,
+  type DecodedPositionWithReward,
+  type DecodedTick,
+  type DecodedTickWithReward,
+  type BitmapExtensionState,
+  type PoolBitmapState,
 } from "../types";
 import {
   LIMIT_ORDER_DATA_LAYOUT,

@@ -229,6 +229,11 @@ export enum PoolType {
   LaunchPool = 2,
 }
 
+export enum PoolExtension {
+  LiquidityMining = 0,
+  ActivationAccess = 1,
+}
+
 export enum PoolStatus {
   Swap = 0,
   AddLiquidity = 1,

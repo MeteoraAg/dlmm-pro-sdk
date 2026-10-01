@@ -6,7 +6,6 @@ import {
   MAX_VESTING_DURATION,
   MIN_SQRT_PRICE,
   POSITION_MAX_RANGE,
-  PoolExtension,
 } from "../constants";
 import { PoolError } from "../errors";
 import {
@@ -48,6 +47,7 @@ import {
 import { I128_MAX, U64_MAX, U128_MAX, safeAdd, safeMul } from "../math";
 import { calculateTransferFeeExcludedAmount, getCurrentPoint } from "../quote";
 import {
+  PoolExtension,
   PositionDelegatePermission,
   type AddLiquidityByWeightParameters,
   type AddLiquidityImbalanceParameters,
