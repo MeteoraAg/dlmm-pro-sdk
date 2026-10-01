@@ -91,7 +91,6 @@ export const MIN_SQRT_PRICE = new BN(idlConstant("MIN_SQRT_PRICE"));
 export const MAX_SQRT_PRICE = new BN(idlConstant("MAX_SQRT_PRICE"));
 export const MAX_LIQUIDITY_WEIGHT = 255;
 
-// Not in the IDL.
 export const NUMBER_OF_ACTIVATION_MODES = 2;
 export const POOL_EXTENSION_VARIANT_COUNT = 2;
 export const MAX_TIME_BUFFER = 2_592_000; // 30 days in seconds
