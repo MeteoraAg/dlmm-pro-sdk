@@ -67,7 +67,7 @@ export function tickIdFromSqrtPrice(sqrtPrice: BN): number {
 }
 
 /**
- * Compute `(sqrtPrice²) >> 64` with the program's downward rounding.
+ * Compute `(sqrtPrice²) >> 64` with downward rounding.
  */
 export function getPriceFromSqrtPrice(sqrtPrice: BN): BN {
   const a = highU64(sqrtPrice);
