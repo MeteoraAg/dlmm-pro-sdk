@@ -4,6 +4,8 @@ import { PoolError } from "../src/errors";
 import {
   amountsFromShape,
   buildLiquidityShape,
+  checkRanges,
+  compressRanges,
   customWeightsFromGrid,
   encodeAddLiquidityByWeight,
   LIMIT_ORDER_MAX_TICK,
@@ -603,5 +605,193 @@ describe("liquidity shapes", () => {
         unitAmount: new BN(0),
       }),
     ).toThrow(PoolError);
+  });
+});
+
+describe("range cap", () => {
+  function columns(
+    weights: number[],
+    tickSpacing = 10,
+  ): {
+    tickLowerId: number;
+    tickUpperId: number;
+    weight: number;
+  }[] {
+    return weights.map((weight, index) => ({
+      tickLowerId: index * tickSpacing,
+      tickUpperId: (index + 1) * tickSpacing,
+      weight,
+    }));
+  }
+
+  it("counts one-bin ranges as vertical", () => {
+    const ranges = [
+      ...columns([4, 4]),
+      { tickLowerId: 20, tickUpperId: 50, weight: 1 },
+    ];
+    expect(checkRanges(ranges, 10)).toEqual({
+      ranges: 3,
+      vertical: 2,
+      horizontal: 1,
+    });
+  });
+
+  it("rejects more ranges than a position can hold", () => {
+    expect(() => checkRanges(columns(Array(46).fill(1)), 10)).toThrow(
+      /at most 45/,
+    );
+    expect(() => checkRanges(columns([1, 0]), 10)).toThrow(PoolError);
+    expect(() =>
+      checkRanges(
+        [
+          { tickLowerId: 0, tickUpperId: 20, weight: 1 },
+          { tickLowerId: 10, tickUpperId: 30, weight: 1 },
+        ],
+        10,
+      ),
+    ).toThrow(PoolError);
+  });
+
+  it("leaves a shape that already fits unchanged", () => {
+    const ranges = columns([1, 2, 3]);
+    expect(compressRanges(ranges, 10, 0)).toEqual(ranges);
+  });
+
+  it("merges the closest weights and keeps a gap", () => {
+    const ranges = [
+      ...columns([1, 2, 100, 101]),
+      { tickLowerId: 100, tickUpperId: 110, weight: 7 },
+    ];
+    expect(compressRanges(ranges, 10, 0, 3)).toEqual([
+      { tickLowerId: 0, tickUpperId: 20, weight: 1 },
+      { tickLowerId: 20, tickUpperId: 40, weight: 100 },
+      { tickLowerId: 100, tickUpperId: 110, weight: 7 },
+    ]);
+  });
+
+  it("merges the closest weights even when they hold the active tick", () => {
+    expect(compressRanges(columns([100, 101, 1]), 10, 0, 2)).toEqual([
+      { tickLowerId: 0, tickUpperId: 20, weight: 100 },
+      { tickLowerId: 20, tickUpperId: 30, weight: 1 },
+    ]);
+  });
+
+  it("keeps the bins nearest the active tick when two merges are equally close", () => {
+    const ranges = columns([10, 11, 21, 20]);
+    expect(compressRanges(ranges, 10, -40, 3)).toEqual([
+      { tickLowerId: 0, tickUpperId: 10, weight: 10 },
+      { tickLowerId: 10, tickUpperId: 20, weight: 11 },
+      { tickLowerId: 20, tickUpperId: 40, weight: 20 },
+    ]);
+    expect(compressRanges(ranges, 10, 100, 3)).toEqual([
+      { tickLowerId: 0, tickUpperId: 20, weight: 10 },
+      { tickLowerId: 20, tickUpperId: 30, weight: 21 },
+      { tickLowerId: 30, tickUpperId: 40, weight: 20 },
+    ]);
+    expect(compressRanges(ranges, 10, 19, 3)).toEqual([
+      { tickLowerId: 0, tickUpperId: 10, weight: 10 },
+      { tickLowerId: 10, tickUpperId: 20, weight: 11 },
+      { tickLowerId: 20, tickUpperId: 40, weight: 20 },
+    ]);
+    expect(compressRanges(ranges, 10, 20, 3)).toEqual([
+      { tickLowerId: 0, tickUpperId: 20, weight: 10 },
+      { tickLowerId: 20, tickUpperId: 30, weight: 21 },
+      { tickLowerId: 30, tickUpperId: 40, weight: 20 },
+    ]);
+  });
+
+  it("spends the extra merge on the farthest of three equal steps", () => {
+    const ranges = columns([10, 11, 40, 80, 10, 11, 40, 10, 11]);
+    expect(compressRanges(ranges, 10, 15, 8)).toEqual([
+      { tickLowerId: 0, tickUpperId: 10, weight: 10 },
+      { tickLowerId: 10, tickUpperId: 20, weight: 11 },
+      { tickLowerId: 20, tickUpperId: 30, weight: 40 },
+      { tickLowerId: 30, tickUpperId: 40, weight: 80 },
+      { tickLowerId: 40, tickUpperId: 50, weight: 10 },
+      { tickLowerId: 50, tickUpperId: 60, weight: 11 },
+      { tickLowerId: 60, tickUpperId: 70, weight: 40 },
+      { tickLowerId: 70, tickUpperId: 90, weight: 10 },
+    ]);
+    expect(compressRanges(ranges, 10, 85, 8)).toEqual([
+      { tickLowerId: 0, tickUpperId: 20, weight: 10 },
+      { tickLowerId: 20, tickUpperId: 30, weight: 40 },
+      { tickLowerId: 30, tickUpperId: 40, weight: 80 },
+      { tickLowerId: 40, tickUpperId: 50, weight: 10 },
+      { tickLowerId: 50, tickUpperId: 60, weight: 11 },
+      { tickLowerId: 60, tickUpperId: 70, weight: 40 },
+      { tickLowerId: 70, tickUpperId: 80, weight: 10 },
+      { tickLowerId: 80, tickUpperId: 90, weight: 11 },
+    ]);
+  });
+
+  it("compresses the island farther from the active tick", () => {
+    const ranges = [
+      { tickLowerId: 0, tickUpperId: 10, weight: 10 },
+      { tickLowerId: 10, tickUpperId: 20, weight: 11 },
+      { tickLowerId: 100, tickUpperId: 110, weight: 10 },
+      { tickLowerId: 110, tickUpperId: 120, weight: 11 },
+    ];
+    expect(compressRanges(ranges, 10, 0, 3)).toEqual([
+      { tickLowerId: 0, tickUpperId: 10, weight: 10 },
+      { tickLowerId: 10, tickUpperId: 20, weight: 11 },
+      { tickLowerId: 100, tickUpperId: 120, weight: 10 },
+    ]);
+    expect(compressRanges(ranges, 10, 115, 3)).toEqual([
+      { tickLowerId: 0, tickUpperId: 20, weight: 10 },
+      { tickLowerId: 100, tickUpperId: 110, weight: 10 },
+      { tickLowerId: 110, tickUpperId: 120, weight: 11 },
+    ]);
+  });
+
+  it("collapses equal bins to one range", () => {
+    const fitted = compressRanges(columns(Array(46).fill(5)), 10, 0);
+    expect(fitted).toEqual([{ tickLowerId: 0, tickUpperId: 460, weight: 5 }]);
+    expect(checkRanges(fitted, 10)).toEqual({
+      ranges: 1,
+      vertical: 0,
+      horizontal: 1,
+    });
+  });
+
+  it("fits a wide curve into 45 ranges without moving the peak", () => {
+    const weights = toWeightCurve(-500, 500, 0, 10);
+    const ranges = weights.map((entry) => ({
+      tickLowerId: entry.tickId,
+      tickUpperId: entry.tickId + 10,
+      weight: entry.weight,
+    }));
+    expect(ranges.length).toBeGreaterThan(45);
+    const peakWeight = Math.max(...ranges.map((range) => range.weight));
+    const fitted = compressRanges(ranges, 10, 0);
+    expect(fitted.length).toBeLessThanOrEqual(45);
+    expect(fitted[0].tickLowerId).toBe(-500);
+    expect(fitted[fitted.length - 1].tickUpperId).toBe(510);
+    const peak = Math.max(...fitted.map((range) => range.weight));
+    expect(peak).toBeLessThan(peakWeight);
+    expect(
+      fitted.some(
+        (range) =>
+          range.weight === peak &&
+          range.tickLowerId <= 0 &&
+          range.tickUpperId > 0,
+      ),
+    ).toBe(true);
+    expect(checkRanges(fitted, 10).ranges).toBe(fitted.length);
+  });
+
+  it("refuses to bridge more gaps than the cap", () => {
+    const ranges = Array.from({ length: 46 }, (_, index) => ({
+      tickLowerId: index * 20,
+      tickUpperId: index * 20 + 10,
+      weight: 1,
+    }));
+    expect(() => compressRanges(ranges, 10, 0)).toThrow(/cannot fit/);
+  });
+
+  it("rejects an active tick the pool cannot hold", () => {
+    expect(() => compressRanges(columns([1, 2]), 10, 1.5)).toThrow(PoolError);
+    expect(() => compressRanges(columns([1, 2]), 10, MAX_TICK_ID + 1)).toThrow(
+      PoolError,
+    );
   });
 });
