@@ -91,19 +91,14 @@ export const MIN_SQRT_PRICE = new BN(idlConstant("MIN_SQRT_PRICE"));
 export const MAX_SQRT_PRICE = new BN(idlConstant("MAX_SQRT_PRICE"));
 export const MAX_LIQUIDITY_WEIGHT = 255;
 
-// Not in the IDL; must match programs/dlmm-pro/src/constants.rs
+// Not in the IDL.
 export const NUMBER_OF_ACTIVATION_MODES = 2;
-// Not in the IDL; must match PoolExtension::VARIANT_COUNT in programs/dlmm-pro/src/state/pool/mod.rs
 export const POOL_EXTENSION_VARIANT_COUNT = 2;
-// Not in the IDL; must match programs/dlmm-pro/src/activation/activation_time_based.rs
 export const MAX_TIME_BUFFER = 2_592_000; // 30 days in seconds
 export const MAX_SLOT_BUFFER = 6_480_000; // MAX_TIME_BUFFER * 1000 / 400
-// Not in the IDL; must match programs/dlmm-pro/src/constants.rs
 export const MAX_TICK_ID = 443636;
 export const MIN_TICK_ID = -443636;
-// Not in the IDL; must match programs/dlmm-pro/src/constants.rs
 export const MIN_DELTA_TICK_FOR_DYNAMIC_FEE_UPDATE = new BN(4);
-// Not in the IDL; must match programs/dlmm-pro/src/constants.rs
 export const MAX_VESTING_DURATION = new BN(86400 * 365 * 10);
 
 export enum PoolExtension {
