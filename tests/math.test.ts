@@ -16,8 +16,7 @@ import {
 import { big } from "./helpers/bn";
 import { SQRT_PRICE_ONE } from "./helpers/constants";
 
-// Ported from programs/dlmm-pro/src/tests/test_tick_math.rs (exact_bit_values),
-// cross-checked there against Orca Whirlpools. [tick, sqrtPrice(tick), sqrtPrice(-tick)].
+// [tick, sqrtPrice(tick), sqrtPrice(-tick)].
 const EXACT_BIT_VALUES: [number, string, string][] = [
   [0, "18446744073709551616", "18446744073709551616"],
   [1, "18447666387855959850", "18445821805675392311"],
@@ -153,8 +152,7 @@ describe("fee sharing math", () => {
     expect(upRemainder.toNumber()).toBe(966);
   });
 
-  // Program semantics (math/fee_sharing_math.rs): the mm/limit-order split
-  // rounds up in favor of the mm; both protocol cuts round down.
+  // The mm/limit-order split rounds up in favor of the mm; both protocol cuts round down.
   it("splits fees up for the mm share and down for the protocol cuts", () => {
     const split = splitFees(
       new BN(101),
