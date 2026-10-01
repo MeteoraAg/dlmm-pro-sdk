@@ -501,7 +501,6 @@ pub fn get_base_fee_numerator(
     }
 }
 
-/// Encode `BaseFeeConfig.data` for [`BaseFeeMode::Fixed`].
 pub fn encode_fixed_base_fee_data(cliff_fee_numerator: u64) -> [u8; 31] {
     let mut data = [0u8; 31];
     data[..8].copy_from_slice(&cliff_fee_numerator.to_le_bytes());

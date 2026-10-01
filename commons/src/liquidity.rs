@@ -1,4 +1,3 @@
-//! Liquidity sizing helpers mirroring the TypeScript SDK's `liquidity.ts`.
 use anchor_lang::prelude::*;
 use ruint::aliases::U320;
 

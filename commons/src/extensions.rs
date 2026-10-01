@@ -56,7 +56,6 @@ impl Pool {
         self.is_bitmap_extension_initialized == 1
     }
 
-    // return OK(None) if no more bits
     pub fn get_non_zero_liquidity_next_index(
         &self,
         swap_for_y: bool,
@@ -223,11 +222,8 @@ impl Pool {
         let collect_fee_mode = try_cast(self.collect_fee_mode)?;
 
         let (fees_on_input, fees_on_token_x) = match (collect_fee_mode, swap_for_y) {
-            // When collecting fees on input token
             (CollectFeeMode::OutputToken, true) => (false, false),
             (CollectFeeMode::OutputToken, false) => (false, true),
-
-            // When collecting fees on token Y
             (CollectFeeMode::OnlyY, true) => (false, false),
             (CollectFeeMode::OnlyY, false) => (true, false),
         };
@@ -288,7 +284,6 @@ impl VariableFee {
         let elapsed = current_timestamp.saturating_sub(self.last_update_timestamp);
         // Not high frequency trade
         if elapsed >= dynamic_fee_config.filter_period.into() {
-            // Update sqrt of last transaction
             self.sqrt_price_reference = sqrt_price_current;
             // filter period < t < decay_period. Decay time window.
             if elapsed < dynamic_fee_config.decay_period.into() {
@@ -487,7 +482,6 @@ impl TickArrayBitmapExtension {
         let offset: usize = Self::get_bitmap_offset(start_index)?;
         let tick_array_offset = Self::tick_array_offset_in_bitmap(start_index)?;
         if start_index < 0 {
-            // iter in negative_bitmap
             if start_index < end_index {
                 for i in (0..=offset).rev() {
                     let mut bitmap = U512::from_limbs(self.negative_bitmap[i]);
@@ -550,7 +544,6 @@ impl TickArrayBitmapExtension {
                 }
             }
         } else {
-            // iter in positive_bitmap
             if start_index < end_index {
                 for i in offset..EXTENSION_BITMAP_SIZE {
                     let mut bitmap = U512::from_limbs(self.positive_bitmap[i]);

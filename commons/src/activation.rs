@@ -1,4 +1,3 @@
-//! Activation gating ported from the program's `activation` module.
 use anchor_lang::prelude::*;
 use bytemuck::{Pod, Zeroable};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -7,7 +6,6 @@ use crate::*;
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, IntoPrimitive, TryFromPrimitive)]
-/// Type of the activation
 pub enum ActivationType {
     Slot,
     Timestamp,
@@ -21,7 +19,6 @@ pub enum ActivationMode {
     TimeBased,    // swap and modify liquidity is time based
 }
 
-/// Resolve the pool's "current point" from the activation type.
 pub fn get_current_point(
     activation_type: u8,
     current_slot: u64,

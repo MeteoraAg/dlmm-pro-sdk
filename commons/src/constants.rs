@@ -1,4 +1,3 @@
-//! Constants ported from the on-chain program.
 use anchor_lang::solana_program::pubkey::Pubkey;
 
 pub const BITMAP_SIZE: i32 = 512;

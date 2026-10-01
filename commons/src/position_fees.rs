@@ -1,5 +1,3 @@
-//! Pending swap-fee math for positions, mirroring the TypeScript SDK's
-//! `position_fees.ts` and the program's `position_utils`.
 use anchor_lang::prelude::*;
 use ruint::aliases::U256;
 
