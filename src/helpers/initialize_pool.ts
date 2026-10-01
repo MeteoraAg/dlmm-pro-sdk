@@ -141,8 +141,7 @@ export async function validateInitializePoolWithDynamicParameters(
 
 /**
  * `CollectFeeMode::OnlyY` requires a TokenBadge on token Y unless Y is a
- * whitelisted quote mint (native SOL or USDC). Mirrors
- * `validate_pool_initialization_with_collect_fee_mode`.
+ * whitelisted quote mint (native SOL or USDC).
  */
 export function requiresQuoteTokenBadge(
   collectFeeMode: number,

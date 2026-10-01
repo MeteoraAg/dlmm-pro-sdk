@@ -5,10 +5,6 @@ import type { AccessRegistry } from "../idl/access-registry/access_registry";
 import DlmmProIDL from "../idl/dlmm-pro/dlmm_pro.json";
 import type { DlmmPro } from "../idl/dlmm-pro/dlmm_pro";
 
-/**
- * A read-only provider: the SDK only builds instructions and reads accounts, so
- * no wallet is needed. Callers sign and send the returned transactions.
- */
 function readOnlyProvider(connection: Connection): Provider {
   return { connection };
 }

@@ -100,10 +100,7 @@ export class StateService {
     return this.fetchAccount(positionArrayAddress, "positionArray");
   }
 
-  /**
-   * Position array header together with its decoded slots. `withReward` must
-   * match the pool's liquidity-mining extension bit.
-   */
+  /** `withReward` must match the pool's liquidity-mining extension bit. */
   async fetchPositionArrayWithPositions(
     positionArrayAddress: PublicKey,
     opts: { withReward: boolean },
@@ -188,20 +185,12 @@ export class StateService {
     return this.fetchAccount(oracleAddress, "oracle");
   }
 
-  /**
-   * Decode pool trailing extensions (rewards / activation) by fetching the pool account.
-   * For already-loaded bytes, use `decodePoolExtensionsFromData` from helpers/codec.
-   */
   async decodePoolExtensions(
     poolAddress: PublicKey,
   ): Promise<DecodedPoolExtensions> {
     return (await this.fetchPoolWithExtensions(poolAddress)).extensions;
   }
 
-  /**
-   * Decode position slots after the fixed `PositionArray` header.
-   * For already-loaded bytes, use `decodePositionsFromData` from helpers/codec.
-   */
   async decodePositions(
     positionArrayAddress: PublicKey,
     opts: DecodePositionsOpts = {},
@@ -226,11 +215,7 @@ export class StateService {
     );
   }
 
-  /**
-   * Decode tick slots after the fixed `TickArray` header.
-   * `withReward` must match the pool's liquidity-mining extension bit.
-   * For already-loaded bytes, use `decodeTicksFromData` from helpers/codec.
-   */
+  /** `withReward` must match the pool's liquidity-mining extension bit. */
   async decodeTicks(
     tickArrayAddress: PublicKey,
     opts: DecodeTicksOpts,
@@ -243,10 +228,6 @@ export class StateService {
     );
   }
 
-  /**
-   * Decode `LimitOrderData` entries after the fixed `LimitOrder` header.
-   * For already-loaded bytes, use `decodeLimitOrderDataFromData` from helpers/codec.
-   */
   async decodeLimitOrderData(
     limitOrderAddress: PublicKey,
   ): Promise<DecodedLimitOrderData[]> {
@@ -257,10 +238,6 @@ export class StateService {
     );
   }
 
-  /**
-   * Decode oracle observation ring-buffer entries after the fixed `Oracle` header.
-   * For already-loaded bytes, use `decodeObservationsFromData` from helpers/codec.
-   */
   async decodeObservations(
     oracleAddress: PublicKey,
   ): Promise<DecodedObservation[]> {
@@ -268,20 +245,12 @@ export class StateService {
     return decodeObservationsFromData(data, this.program.account.oracle.size);
   }
 
-  /**
-   * Tick-array indices set in the pool's default bitmap (-512..511).
-   * If you already have a `Pool`, use `getBitmapSetIndicesFromPool` from helpers/codec.
-   */
+  /** Tick-array indices set in the pool's default bitmap (-512..511). */
   async getBitmapSetIndices(poolAddress: PublicKey): Promise<number[]> {
     const poolState = await this.fetchPool(poolAddress);
     return getBitmapSetIndicesFromPool(poolState);
   }
 
-  /**
-   * Tick-array indices set in the bitmap extension account.
-   * If you already have extension state, use `getExtensionBitmapSetIndicesFromState`
-   * from helpers/codec.
-   */
   async getExtensionBitmapSetIndices(
     extensionAddress: PublicKey,
   ): Promise<number[]> {
