@@ -4,7 +4,6 @@ import type BN from "bn.js";
 import type { AccessRegistry } from "./idl/access-registry/access_registry";
 import type { DlmmPro } from "./idl/dlmm-pro/dlmm_pro";
 
-// onchain account states
 export type Pool = IdlAccounts<DlmmPro>["pool"];
 export type StaticConfig = IdlAccounts<DlmmPro>["staticConfig"];
 export type DynamicConfig = IdlAccounts<DlmmPro>["dynamicConfig"];
@@ -16,7 +15,7 @@ export type TickArrayBitmapExtension =
 export type Operator = IdlAccounts<DlmmPro>["operator"];
 export type Oracle = IdlAccounts<DlmmPro>["oracle"];
 
-// The fields tick-array bitmap traversal reads from the pool and its extension.
+// Fields the tick-array bitmap walk reads.
 export type PoolBitmapState = Pick<
   Pool,
   | "tickCurrentId"
@@ -34,7 +33,6 @@ export type BitmapExtensionState = Pick<
 export type TokenBadge = IdlAccounts<AccessRegistry>["tokenBadge"];
 export type AccessRegistryOperator = IdlAccounts<AccessRegistry>["operator"];
 
-// embedded state types used inside accounts
 export type TickRange = IdlTypes<DlmmPro>["tickRange"];
 export type RemainingAccountsInfo = IdlTypes<DlmmPro>["remainingAccountsInfo"];
 export type RemainingAccountsSlice =

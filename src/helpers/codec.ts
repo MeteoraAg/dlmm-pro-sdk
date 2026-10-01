@@ -55,6 +55,7 @@ function assertAccountDiscriminator(data: Buffer, accountName: string): void {
 function decodeSeq<T>(
   layout: Layout<unknown>,
   data: Buffer,
+  // Includes the 8-byte account discriminator.
   offset: number,
   accountName: string,
 ): T[] {
@@ -133,11 +134,6 @@ export function encodePoolExtensions(extensions: PoolExtension[]): number {
   return extensions.reduce((acc, extension) => acc | (1 << extension), 0);
 }
 
-/**
- * Decode pool trailing extension bytes after the fixed `Pool` header
- * @param poolHeaderSize - Discriminator-inclusive Anchor `Pool` account size
- * (`program.account.pool.size`)
- */
 export function decodePoolExtensionsFromData(
   data: Buffer,
   poolHeaderSize: number,
@@ -191,11 +187,6 @@ export function decodePoolExtensionsFromData(
   };
 }
 
-/**
- * Decode position array bytes after the fixed `PositionArray` header
- * @param positionArrayHeaderSize - Discriminator-inclusive Anchor
- * `PositionArray` account size (`program.account.positionArray.size`)
- */
 export function decodePositionsFromData(
   data: Buffer,
   positionArrayHeaderSize: number,
@@ -217,11 +208,6 @@ export function decodePositionsFromData(
   );
 }
 
-/**
- * Decode tick array bytes after the fixed `TickArray` header
- * @param tickArrayHeaderSize - Discriminator-inclusive Anchor `TickArray`
- * account size (`program.account.tickArray.size`)
- */
 export function decodeTicksFromData(
   data: Buffer,
   tickArrayHeaderSize: number,
@@ -243,11 +229,6 @@ export function decodeTicksFromData(
   );
 }
 
-/**
- * Decode limit order data bytes after the fixed `LimitOrder` header
- * @param limitOrderHeaderSize - Discriminator-inclusive Anchor `LimitOrder`
- * account size (`program.account.limitOrder.size`)
- */
 export function decodeLimitOrderDataFromData(
   data: Buffer,
   limitOrderHeaderSize: number,
@@ -260,11 +241,6 @@ export function decodeLimitOrderDataFromData(
   );
 }
 
-/**
- * Decode observation bytes after the fixed `Oracle` header
- * @param oracleHeaderSize - Discriminator-inclusive Anchor `Oracle` account
- * size (`program.account.oracle.size`)
- */
 export function decodeObservationsFromData(
   data: Buffer,
   oracleHeaderSize: number,

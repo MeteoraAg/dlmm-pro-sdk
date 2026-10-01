@@ -1,9 +1,3 @@
-/**
- * Program IDL in camelCase format in order to be used in JS/TS.
- *
- * Note that this is only a type helper and is not the actual IDL. The original
- * IDL can be found at `target/idl/dlmm_pro.json`.
- */
 export type DlmmPro = {
   "address": "dProsbmsDQTXqfYkseAShmotRn53K5YJGzmjXaZXN5w",
   "metadata": {
