@@ -11,8 +11,6 @@ import {
   ORACLE_PREFIX,
   POOL_AUTHORITY_PREFIX,
   POOL_PREFIX,
-  PROTOCOL_FEE_AUTHORITY_PREFIX,
-  PROTOCOL_FEE_PROGRAM_ID,
   POSITION_PREFIX,
   RESERVE_PREFIX,
   REWARD_VAULT_PREFIX,
@@ -56,14 +54,6 @@ export function derivePoolAuthority(
   return PublicKey.findProgramAddressSync(
     [Buffer.from(POOL_AUTHORITY_PREFIX)],
     programId,
-  )[0];
-}
-
-/** PDA of the external protocol-fee program. It is the `claim_protocol_fee2` signer. */
-export function deriveProtocolFeeAuthority(): PublicKey {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from(PROTOCOL_FEE_AUTHORITY_PREFIX)],
-    PROTOCOL_FEE_PROGRAM_ID,
   )[0];
 }
 

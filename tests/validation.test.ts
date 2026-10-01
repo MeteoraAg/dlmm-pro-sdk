@@ -16,7 +16,6 @@ import {
   liquidityBitmap,
   positionIndexesFromBitmap,
   PoolErrorCode,
-  deriveProtocolFeeAuthority,
   LIQUIDITY_HOOKS,
   remainingAccountsFromHooks,
   tickArrayRemainingAccounts,
@@ -62,12 +61,6 @@ describe("client-side validation", () => {
       remainingAccountsFromHooks({ transferHookReward: [] }, LIQUIDITY_HOOKS)
         .remainingAccounts,
     ).toEqual([]);
-  });
-
-  it("derives the protocol-fee authority the claim instruction hardcodes", () => {
-    expect(deriveProtocolFeeAuthority().toBase58()).toBe(
-      "FkU5rQCWQM131skHCpcEbK8P1JrQGsBgqXe55w525SSF",
-    );
   });
 
   it("limits liquidity bitmaps to position slots supported by the program", () => {

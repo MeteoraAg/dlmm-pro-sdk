@@ -13,7 +13,6 @@
  */
 import { PublicKey, type Connection, type Keypair } from "@solana/web3.js";
 import type { LiteSVM } from "litesvm";
-import { ACCESS_REGISTRY_OPERATOR_PERMISSION_COUNT } from "../../src/constants";
 import { PoolError } from "../../src/errors";
 import { createAccessRegistryProgram } from "../../src/helpers/create_program";
 import {
@@ -23,6 +22,7 @@ import {
 } from "../../src/helpers";
 import { assertU8 } from "../../src/helpers/validation";
 import type { AccessRegistryOperatorPermission } from "../../src/types";
+import { ACCESS_REGISTRY_OPERATOR_PERMISSION_COUNT } from "./constants";
 import { sendTransaction } from "./svm";
 
 export { deriveAccessRegistryOperator, deriveTokenBadge };

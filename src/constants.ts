@@ -27,8 +27,6 @@ export const WHITELISTED_QUOTE_MINTS: readonly PublicKey[] = [
 export const OPERATOR_PREFIX = "operator";
 export const STATIC_CONFIG_PREFIX = "s_config";
 export const DYNAMIC_CONFIG_PREFIX = "d_config";
-// Seed under ACCESS_REGISTRY_PROGRAM_ID, not the dlmm-pro program
-export const TOKEN_BADGE_PREFIX = "token_badge";
 export const POOL_PREFIX = "pool";
 export const LAUNCH_POOL_PREFIX = "l_pool";
 export const POOL_AUTHORITY_PREFIX = "pool_auth";
@@ -39,19 +37,9 @@ export const TICK_ARRAY_PREFIX = "tick_array";
 export const POSITION_PREFIX = "position";
 export const LIMIT_ORDER_PREFIX = "limit_order";
 export const REWARD_VAULT_PREFIX = "reward";
-export const PROTOCOL_FEE_AUTHORITY_PREFIX = "protocol_fee_authority";
-export const PROTOCOL_FEE_PROGRAM_ID = new PublicKey(
-  "pFee3tb7qh5z53jRF4PbLwmNd148Q8ypLNZbqsMeinA",
-);
 
-/** `OperatorPermission::VARIANT_COUNT` in the program. */
-export const OPERATOR_PERMISSION_COUNT = 6;
-/** `DynamicConfigPermission::VARIANT_COUNT` in the program. */
-export const DYNAMIC_CONFIG_PERMISSION_COUNT = 1;
-/** `PoolStatus::VARIANT_COUNT` in the program. */
-export const POOL_STATUS_COUNT = 2;
-/** access-registry `OperatorPermission::VARIANT_COUNT`. */
-export const ACCESS_REGISTRY_OPERATOR_PERMISSION_COUNT = 2;
+// Seed under ACCESS_REGISTRY_PROGRAM_ID, not the dlmm-pro program.
+export const TOKEN_BADGE_PREFIX = "token_badge";
 
 export const BITMAP_SIZE = Number(idlConstant("BITMAP_SIZE"));
 export const MAX_TICKS_PER_ARRAY = Number(
@@ -65,6 +53,7 @@ export const MAX_BASIS_POINT = Number(idlConstant("MAX_BASIS_POINT"));
 export const FEE_DENOMINATOR = new BN(idlConstant("FEE_DENOMINATOR"));
 export const HOST_FEE_BPS = Number(idlConstant("HOST_FEE_BPS"));
 export const MM_PROTOCOL_FEE_BPS = Number(idlConstant("MM_PROTOCOL_FEE_BPS"));
+export const MAX_PARTNER_FEE_BPS = Number(idlConstant("MAX_PARTNER_FEE_BPS"));
 export const MM_LAUNCH_POOL_PROTOCOL_FEE_BPS = Number(
   idlConstant("MM_LAUNCH_POOL_PROTOCOL_FEE_BPS"),
 );
@@ -79,7 +68,6 @@ export const LIMIT_ORDER_MAX_TICK = Number(
 );
 export const MAX_FEE_NUMERATOR = new BN(idlConstant("MAX_FEE_NUMERATOR"));
 export const MIN_FEE_NUMERATOR = new BN(idlConstant("MIN_FEE_NUMERATOR"));
-export const MAX_PARTNER_FEE_BPS = Number(idlConstant("MAX_PARTNER_FEE_BPS"));
 export const MIN_REWARD_DURATION = new BN(idlConstant("MIN_REWARD_DURATION"));
 export const MAX_REWARD_DURATION = new BN(idlConstant("MAX_REWARD_DURATION"));
 export const MAX_REWARD_START_DELAY = new BN(

@@ -6,13 +6,9 @@ import { PublicKey, type Connection, type Keypair } from "@solana/web3.js";
 import BN from "bn.js";
 import type { LiteSVM } from "litesvm";
 import {
-  DYNAMIC_CONFIG_PERMISSION_COUNT,
   MAX_PARTNER_FEE_BPS,
   MAX_TICK_SPACING,
-  OPERATOR_PERMISSION_COUNT,
   POOL_EXTENSION_VARIANT_COUNT,
-  POOL_STATUS_COUNT,
-  PoolExtension,
 } from "../../src/constants";
 import { PoolError } from "../../src/errors";
 import { createDlmmProProgram } from "../../src/helpers/create_program";
@@ -32,10 +28,16 @@ import {
 } from "../../src/math/safe_math";
 import {
   DlmmProClient,
+  PoolExtension,
   type DynamicConfigParameters,
   type OperatorPermission,
   type StaticConfigParameters,
 } from "../../src";
+import {
+  DYNAMIC_CONFIG_PERMISSION_COUNT,
+  OPERATOR_PERMISSION_COUNT,
+  POOL_STATUS_COUNT,
+} from "./constants";
 import { sendTransaction } from "./svm";
 
 function operatorSigners(operator: Keypair, payer: Keypair): Keypair[] {
