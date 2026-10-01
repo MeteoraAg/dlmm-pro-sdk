@@ -239,7 +239,6 @@ describe("quoteExactIn matches on-chain swap", () => {
     });
     await seedLiquidity(svm, client, market, pool);
 
-    // X -> Y, crossing from the current tick array into the one below it
     await assertQuoteMatchesExecution(
       svm,
       client,
@@ -248,7 +247,6 @@ describe("quoteExactIn matches on-chain swap", () => {
       new BN(50_000),
       true,
     );
-    // Y -> X back across the boundary (ascending traversal)
     await assertQuoteMatchesExecution(
       svm,
       client,

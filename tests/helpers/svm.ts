@@ -29,7 +29,7 @@ function programSoPath(): string {
 export function initializeSVM(): LiteSVM {
   const svm = new LiteSVM();
   svm.addProgramFromFile(DLMM_PRO_PROGRAM_ID, programSoPath());
-  // External program owning TokenBadge, required for OnlyY pool creation
+  // AccessRegistry owns TokenBadge, required for OnlyY pool creation
   svm.addProgramFromFile(
     ACCESS_REGISTRY_PROGRAM_ID,
     path.resolve(helpersDir, "../fixtures/access_registry.so"),
