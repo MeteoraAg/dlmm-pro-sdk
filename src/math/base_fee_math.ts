@@ -1,7 +1,11 @@
 import BN from "bn.js";
-import { MAX_BASIS_POINT } from "../constants";
+import {
+  MAX_BASIS_POINT,
+  MAX_EXPONENTIAL,
+  Q64,
+  SCALE_OFFSET,
+} from "../constants";
 import { PoolError } from "../errors";
-import { MAX_EXPONENTIAL, Q64, SCALE_OFFSET } from "./constants_math";
 import {
   checkedDiv,
   checkedMul,

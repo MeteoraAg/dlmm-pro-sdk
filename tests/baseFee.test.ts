@@ -24,9 +24,8 @@ import {
   bondingCurveActivationParameters,
   validateBaseFeeConfig,
   type BaseFeeConfig,
+  Q64,
 } from "../src";
-
-const Q64 = new BN(1).shln(64);
 
 function baseFeeConfig(
   baseFeeMode: BaseFeeMode,
