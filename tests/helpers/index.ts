@@ -4,7 +4,6 @@ export * from "./bn";
 export * from "./chart";
 export * from "./constants";
 export * from "./connection";
-export * from "./program";
 export * from "./setup";
 export * from "./svm";
 export * from "./token";
