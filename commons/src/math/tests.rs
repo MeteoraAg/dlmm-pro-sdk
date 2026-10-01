@@ -2,7 +2,6 @@ use crate::*;
 
 #[test]
 fn tick_math_exact_bit_values() {
-    // reference values shared with the program's test_tick_math.rs
     let conditions: &[(i32, u128, u128)] = &[
         (0, 18446744073709551616, 18446744073709551616),
         (1, 18447666387855959850, 18445821805675392311),
