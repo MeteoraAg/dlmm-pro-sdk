@@ -1,6 +1,7 @@
 import type { AccountMeta, PublicKey } from "@solana/web3.js";
 import {
   BITMAP_SIZE,
+  DLMM_PRO_PROGRAM_ID,
   MAX_TICK_SPACING,
   MAX_TICKS_PER_ARRAY,
   MAX_TICK_ID,
@@ -97,6 +98,7 @@ export function tickArraysForRanges(
   pool: PublicKey,
   ranges: TickRange[],
   tickSpacing: number,
+  programId: PublicKey = DLMM_PRO_PROGRAM_ID,
 ): PublicKey[] {
   const indexes = new Set<number>();
   for (const range of ranges) {
@@ -105,7 +107,7 @@ export function tickArraysForRanges(
   }
   return [...indexes]
     .sort((a, b) => a - b)
-    .map((index) => deriveTickArray(pool, index));
+    .map((index) => deriveTickArray(pool, index, programId));
 }
 
 /** Tick arrays for a swap, ordered for the program's single forward pass: descending indices when `swapForY`, ascending otherwise, starting from the current tick's array. */
@@ -115,7 +117,9 @@ export function tickArraysForSwap(args: {
   extensionState?: BitmapExtensionState | null;
   swapForY: boolean;
   maxTickArrays?: number;
+  programId?: PublicKey;
 }): { tickArrays: PublicKey[]; requiresBitmapExtension: boolean } {
+  const programId = args.programId ?? DLMM_PRO_PROGRAM_ID;
   const maxTickArrays = args.maxTickArrays ?? 3;
   if (!Number.isInteger(maxTickArrays) || maxTickArrays <= 0) {
     throw PoolError.invalidParameters();
@@ -142,7 +146,9 @@ export function tickArraysForSwap(args: {
     .slice(0, maxTickArrays);
 
   return {
-    tickArrays: selected.map((index) => deriveTickArray(args.pool, index)),
+    tickArrays: selected.map((index) =>
+      deriveTickArray(args.pool, index, programId),
+    ),
     // The program reads the extension account only while the pool flag is
     // set, and then whenever the internal bitmap runs out mid-traversal, so
     // the flag alone decides: pass it when set even if every selected array
@@ -156,11 +162,14 @@ export function tickArrayRemainingAccounts(
   ranges: TickRange[],
   tickSpacing: number,
   isWritable = true,
+  programId: PublicKey = DLMM_PRO_PROGRAM_ID,
 ): AccountMeta[] {
   validateTickRanges(ranges, tickSpacing);
-  return tickArraysForRanges(pool, ranges, tickSpacing).map((pubkey) => ({
-    pubkey,
-    isWritable,
-    isSigner: false,
-  }));
+  return tickArraysForRanges(pool, ranges, tickSpacing, programId).map(
+    (pubkey) => ({
+      pubkey,
+      isWritable,
+      isSigner: false,
+    }),
+  );
 }
