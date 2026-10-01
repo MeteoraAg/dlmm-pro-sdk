@@ -297,11 +297,10 @@ export class RewardService extends DlmmProProgram {
   async withdrawIneligibleRewards(params: {
     pool: PublicKey;
     rewardMint: PublicKey;
-    /** Destination chosen by the reward authority; it does not need to belong to the wallet that funded the reward. */
+    /** Chosen by the reward authority; need not be the wallet that funded the reward. */
     receiverTokenAccount: PublicKey;
     authority: PublicKey;
     index: number;
-    /** Minimum reward amount to receive after transfer fees; defaults to no minimum. */
     minAmount?: BN;
     tokenProgram?: PublicKey;
     transferHookReward?: AccountMeta[];

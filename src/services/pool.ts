@@ -178,10 +178,8 @@ export type InitializeLaunchPoolParams = {
 
 export class PoolService extends DlmmProProgram {
   /**
-   * Fetch every account an exact-in quote needs and run `quoteExactIn` —
-   * amounts match what the `swap` instruction produces for the same accounts
-   * and clock. For hot paths, fetch accounts yourself and call `quoteExactIn`
-   * from the package root directly.
+   * A result with `amountLeft` greater than zero is a partial fill; `swap`
+   * reverts on that input. Pass accounts you already have to `quoteExactIn`.
    */
   async quoteExactIn(
     params: QuoteExactInRequest,
