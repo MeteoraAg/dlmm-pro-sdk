@@ -77,8 +77,7 @@ export function deriveOperator(
   )[0];
 }
 
-// Both programs use the same seeds, so the operator registries only differ by
-// program id — dlmm-pro and access-registry permissions are not interchangeable.
+// Same seeds; the program id is what keeps the two operator registries apart.
 export function deriveAccessRegistryOperator(
   whitelistedAddress: PublicKey,
 ): PublicKey {
@@ -121,7 +120,6 @@ export function deriveTokenBadge(
   )[0];
 }
 
-// Static/dynamic config pool: `["pool", config, max(mintX,mintY), min(mintX,mintY)]`
 export function derivePool(
   config: PublicKey,
   tokenXMint: PublicKey,
@@ -135,7 +133,6 @@ export function derivePool(
   )[0];
 }
 
-// Launch pool: `["l_pool", max(mintX,mintY), min(mintX,mintY)]`
 export function deriveLaunchPool(
   tokenXMint: PublicKey,
   tokenYMint: PublicKey,

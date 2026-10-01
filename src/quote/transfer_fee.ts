@@ -24,9 +24,8 @@ export type TransferFeeIncludedAmount = {
 };
 
 /**
- * Amount that arrives after the mint's Token-2022 transfer fee — the
- * off-chain equivalent of the program's `calculate_transfer_fee_excluded_amount`.
- * Pass the unpacked mint (`unpackMint` with the owning token program) or
+ * Amount that arrives after the mint's Token-2022 transfer fee.
+ * Pass the unpacked mint (`unpackMint` with the owning token program), or
  * `null` for mints without transfer-fee data.
  */
 export function calculateTransferFeeExcludedAmount(
@@ -98,10 +97,8 @@ function calculateInverseFee(
 
 /**
  * Amount to send so that `transferFeeExcludedAmount` arrives after the mint's
- * Token-2022 transfer fee — the off-chain equivalent of the program's
- * `calculate_transfer_fee_included_amount_unchecked`.
- * Pass the unpacked mint (`unpackMint` with the owning token program) or
- * `null` for mints without transfer-fee data.
+ * Token-2022 transfer fee. Pass the unpacked mint (`unpackMint` with the
+ * owning token program), or `null` for mints without transfer-fee data.
  */
 export function calculateTransferFeeIncludedAmount(
   mint: Mint | null | undefined,

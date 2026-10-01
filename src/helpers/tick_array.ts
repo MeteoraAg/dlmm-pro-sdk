@@ -50,7 +50,6 @@ export function tickIndexFromId(tickId: number, tickSpacing: number): number {
   return index;
 }
 
-/** Whether `tickIndex` falls outside the pool account's inline tick-array bitmap. */
 export function overflowsDefaultTickArrayBitmap(tickIndex: number): boolean {
   return tickIndex < -BITMAP_SIZE || tickIndex > BITMAP_SIZE - 1;
 }

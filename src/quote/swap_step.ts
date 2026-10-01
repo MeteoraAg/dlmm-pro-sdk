@@ -90,14 +90,12 @@ export function tickGetAmountInUnchecked(
   rounding: Rounding,
 ): BN {
   if (swapForY) {
-    // (amount_y << 128) / price_x128
     const price = safeMul(sqrtPrice, sqrtPrice, U256_MAX);
     const prod = safeShl(outAmount, 128, U256_MAX);
     return rounding === Rounding.Up
       ? divCeil(prod, price)
       : safeDiv(prod, price, U256_MAX);
   }
-  // (price_x128 * amount_x) >> 128
   const price = safeMul(sqrtPrice, sqrtPrice, U256_MAX);
   const prod = safeMul(price, outAmount, U320_MAX);
   return rounding === Rounding.Up ? downScaleCeil(prod, 128) : prod.shrn(128);
@@ -109,12 +107,10 @@ export function tickGetAmountOut(
   swapForY: boolean,
 ): BN {
   if (swapForY) {
-    // (price_x128 * amount_in) >> 128
     const price = safeMul(sqrtPrice, sqrtPrice, U256_MAX);
     const prod = safeMul(price, amountIn, U320_MAX);
     return tryCastU64(prod.shrn(128));
   }
-  // (amount_in << 128) / price_x128
   const price = safeMul(sqrtPrice, sqrtPrice, U256_MAX);
   const prod = safeShl(amountIn, 128, U256_MAX);
   return tryCastU64(safeDiv(prod, price, U256_MAX));
@@ -395,7 +391,6 @@ export function getSwapResultExactIn(
   };
 }
 
-/** Mirrors `SwapStepResult::get_fulfilled_order_amount`. */
 export function getFulfilledOrderAmount(swapResult: SwapStepResult): BN {
   return safeAdd(
     swapResult.processedOrderAmountOut,
@@ -404,7 +399,6 @@ export function getFulfilledOrderAmount(swapResult: SwapStepResult): BN {
   );
 }
 
-/** Apply a swap step to a working tick copy — mirrors `Tick::apply_swap_result`. */
 export function applySwapResultToTick(
   tick: DecodedTick,
   swapForY: boolean,

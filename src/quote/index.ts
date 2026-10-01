@@ -205,10 +205,6 @@ export function getCurrentPoint(
   return type === ActivationType.Slot ? currentSlot : currentTimestamp;
 }
 
-/**
- * Whether the pool allows swapping right now for `swapper` — the off-chain
- * equivalent of the program's `validate_pool_can_swap`.
- */
 export function validatePoolCanSwap(
   pool: Pool,
   poolActivation: DecodedPoolActivation | null | undefined,
@@ -346,12 +342,8 @@ function isNextTickId(
 }
 
 /**
- * Quote an exact-in swap against parsed pool state.
- *
- * The traversal, fee math and rounding mirror the on-chain swap loop; the only
- * difference is that nothing is persisted. When `QuoteExactInResult.amountLeft`
- * is zero, the resulting amounts equal what the `swap` instruction produces for
- * the same accounts and clock.
+ * Nothing is persisted. When `amountLeft` is zero, the amounts match `swap`
+ * for the same accounts and clock.
  */
 export function quoteExactIn(params: QuoteExactInParams): QuoteExactInResult {
   const {
@@ -423,7 +415,7 @@ export function quoteExactIn(params: QuoteExactInParams): QuoteExactInResult {
     if (tickArray.tickIndex !== currentTickIndex) {
       continue;
     }
-    // Like the program, only arrays the traversal reaches are bound to the pool.
+    // Unreached arrays are not checked against the pool.
     if (!tickArray.pool.equals(poolAddress)) {
       throw PoolError.invalidTickArray();
     }
@@ -432,7 +424,6 @@ export function quoteExactIn(params: QuoteExactInParams): QuoteExactInResult {
       ticks: tickArray.ticks.map((tick) => ({ ...tick })),
     });
 
-    // No next index is needed after the last supplied tick array.
     if (i === tickArrays.length - 1) {
       break;
     }
@@ -471,7 +462,6 @@ export function quoteExactIn(params: QuoteExactInParams): QuoteExactInResult {
     volatilityReference: pool.variableFee.volatilityReference,
   };
 
-  // Pool::update_dynamic_fee_pre_swap
   if (isDynamicFeeEnabled(pool.feeConfig.dynamicFee)) {
     updateReferences(
       variableFee,
