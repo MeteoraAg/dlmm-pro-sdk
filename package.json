@@ -1,6 +1,6 @@
 {
   "name": "@meteora-ag/dlmm-pro-sdk",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "TypeScript SDK for the Meteora DLMM Pro program.",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -39,7 +39,7 @@
     "test:all": "pnpm test && pnpm test:rust",
     "test:watch": "vitest"
   },
-  "license": "ISC",
+  "license": "MIT",
   "packageManager": "pnpm@11.22.0",
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",
@@ -58,5 +58,8 @@
     "tsx": "^4.23.12",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
