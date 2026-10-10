@@ -1,46 +1,66 @@
 # DLMM Pro SDK
 
-A TypeScript SDK for interacting with Meteora's DLMM Pro
+TypeScript client for [DLMM Pro](https://github.com/MeteoraAg/dlmm-pro) release `0.1.0`.
 
-## Overview
+Program ID: `dPro1D5wiqnGMH8vMDG23jh35btTHoWdyqXjqkqxe8n` (devnet).
+Access registry: `regUFehW9oycnaV2auYyfqyYjKG1W1uLNT7rtUeemQr`.
 
-This SDK provides a set of tools and methods to interact with the [Meteora DLMM Pro](https://github.com/MeteoraAg/dlmm-pro).
-
-For detailed technical documentation, please refer to the [DLMM Pro SDK Documentation](https://github.com/MeteoraAg/dlmm-pro-sdk/blob/main/docs.md).
-
-## Installation
-
-```bash
-pnpm install @meteora-ag/dlmm-pro-sdk
-# or
-yarn add @meteora-ag/dlmm-pro-sdk
+```
+src/            @meteora-ag/dlmm-pro-sdk
+src/idl/        IDL the package ships
+tests/fixtures/ LiteSVM program binaries
 ```
 
-### Initialization
+## TypeScript
+
+```bash
+pnpm add @meteora-ag/dlmm-pro-sdk
+```
 
 ```typescript
 import { Connection } from "@solana/web3.js";
-import { DlmmPro } from "@meteora-ag/dlmm-pro-sdk";
+import { BN } from "bn.js";
+import { DlmmProClient } from "@meteora-ag/dlmm-pro-sdk";
 
-// Initialize a connection to the Solana network
-const connection = new Connection("https://api.mainnet-beta.solana.com");
+const client = DlmmProClient.create(
+  new Connection("https://api.devnet.solana.com"),
+);
 
-// Create a new instance of the DLMM Pro SDK
-const dlmmPro = new DlmmPro(connection, "confirmed");
+const { quote, tickArrays, tickArrayBitmapExtension } =
+  await client.pool.quoteExactIn({
+    pool,
+    inputAmount: new BN(1_000_000),
+    swapForY: true,
+  });
+// quote.transferFeeExcludedOutAmount is what the swapper receives.
+// Pass tickArrays and tickArrayBitmapExtension through to client.pool.swap.
 ```
 
-### Test
+`DlmmProClient` wraps instruction builders and account decoders: `pool`,
+`position`, `limitOrder`, `reward`, `state`, and `accessRegistry`. Math, PDAs,
+activation, base-fee encoding, and deposit shapes are exported from the package
+root. `docs.md` covers instruction coverage, quotes, transfer hooks, and
+delegates.
 
-```
+IDL JSON is exported from `@meteora-ag/dlmm-pro-sdk/idl/dlmm-pro` and
+`@meteora-ag/dlmm-pro-sdk/idl/access-registry`.
+
+## Develop
+
+Node 22 and pnpm.
+
+```bash
 pnpm install
-pnpm test
+make check   # prettier and tsc
+make test    # vitest
 ```
 
-## Deployments
+`make help` lists the individual targets.
 
-- Mainnet-beta: dLmmthrtCtGNx512fjkTsWx7otWdv1SKrbQDR8dbffA
-- Devnet: dLmmthrtCtGNx512fjkTsWx7otWdv1SKrbQDR8dbffA
+CI: `.github/workflows/sdk.yml` runs the checks, with the LiteSVM suite on
+`ubuntu-24.04-arm` because x86_64 LiteSVM's SBF JIT corrupts Node.
 
-## Faucets
-
-https://faucet.raccoons.dev/
+`tests/fixtures/dlmm_pro.so` is dlmm-pro release 0.1.0 (`dc65a03`) and
+`tests/fixtures/access_registry.so` is access-registry `d542263`, both built
+with `--features local`, which stubs the admin check. The suite reads
+`DLMM_PRO_SO_PATH`.
