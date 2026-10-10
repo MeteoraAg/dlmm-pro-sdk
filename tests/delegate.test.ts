@@ -2,7 +2,8 @@ import { BN } from "@coral-xyz/anchor";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
-  delegatePermissionMask,
+  limitOrderDelegatePermissionMask,
+  positionDelegatePermissionMask,
   DlmmProClient,
   encodePoolExtensions,
   LimitOrderDelegatePermission,
@@ -101,7 +102,7 @@ describe("NFT delegates", () => {
     const { tx } = await client.position.updatePositionDelegatePermission({
       nftMint,
       owner: market.lpOwner.publicKey,
-      permission: delegatePermissionMask(permissions),
+      permission: positionDelegatePermissionMask(permissions),
     });
     sendTransaction(svm, tx, [market.lpOwner]);
   }
@@ -282,7 +283,7 @@ describe("NFT delegates", () => {
         limitOrder: opened.limitOrder,
         nftAccount: opened.nftAccount,
         owner: market.lpOwner.publicKey,
-        permission: delegatePermissionMask([
+        permission: limitOrderDelegatePermissionMask([
           LimitOrderDelegatePermission.CancelLimitOrder,
         ]),
       });

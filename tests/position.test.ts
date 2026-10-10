@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import {
   buildLiquidityShape,
   customWeightsFromGrid,
-  delegatePermissionMask,
+  positionDelegatePermissionMask,
   deriveReserve,
   deriveTickArrayBitmapExtension,
   DlmmProClient,
@@ -355,7 +355,7 @@ describe("position instructions", () => {
       tickRanges: [RANGE_0],
       tickSpacing,
     });
-    const permission = delegatePermissionMask([
+    const permission = positionDelegatePermissionMask([
       PositionDelegatePermission.AddLiquidity,
       PositionDelegatePermission.ClaimFee,
     ]);

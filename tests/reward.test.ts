@@ -1,6 +1,6 @@
 import { BN } from "@coral-xyz/anchor";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { Keypair } from "@solana/web3.js";
+import { Keypair, type PublicKey } from "@solana/web3.js";
 import { describe, expect, it } from "vitest";
 import {
   deriveRewardVault,
@@ -283,12 +283,24 @@ describe("rewards", () => {
     );
   });
 
-  it("rejects reward indexes outside NUM_REWARDS client-side", async () => {
-    const pool = Keypair.generate().publicKey;
-    expect(() => deriveRewardVault(pool, NUM_REWARDS)).toThrow(
-      expect.objectContaining({ code: PoolErrorCode.InvalidRewardIndex }),
-    );
-    await expect(
+  it("checks the pool type before the reward index", async () => {
+    const market = await createFundedMarket({ svm, client });
+    const poolArgs = {
+      operator: market.operator,
+      payer: market.payer,
+      creator: market.creator.publicKey,
+      tokenXMint: market.tokenXMint,
+      tokenYMint: market.tokenYMint,
+    };
+    const plain = await initializeStaticPool(svm, client, poolArgs);
+    const mining = await initializeStaticPool(svm, client, {
+      ...poolArgs,
+      configArgs: {
+        ...defaultStaticConfigArgs(),
+        extensions: encodePoolExtensions([PoolExtension.LiquidityMining]),
+      },
+    });
+    const withdraw = (pool: PublicKey) =>
       client.reward.withdrawIneligibleRewards({
         pool,
         rewardMint: Keypair.generate().publicKey,
@@ -296,7 +308,16 @@ describe("rewards", () => {
         authority: Keypair.generate().publicKey,
         index: NUM_REWARDS,
         tokenProgram: TOKEN_PROGRAM_ID,
-      }),
-    ).rejects.toMatchObject({ code: PoolErrorCode.InvalidRewardIndex });
+      });
+
+    expect(() => deriveRewardVault(plain.pool, NUM_REWARDS)).toThrow(
+      expect.objectContaining({ code: PoolErrorCode.InvalidRewardIndex }),
+    );
+    await expect(withdraw(plain.pool)).rejects.toMatchObject({
+      code: PoolErrorCode.InvalidPoolType,
+    });
+    await expect(withdraw(mining.pool)).rejects.toMatchObject({
+      code: PoolErrorCode.InvalidRewardIndex,
+    });
   });
 });

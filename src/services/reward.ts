@@ -52,12 +52,16 @@ export class RewardService extends DlmmProProgram {
     tokenBadge?: PublicKey | null;
     tokenProgram?: PublicKey;
   }): Promise<{ tx: Transaction; rewardVault: PublicKey }> {
-    const { rewards, creator } = await this.rewardPool(params.pool);
+    const { pool, rewards } = await this.rewardPool(params.pool);
     if (!rewards[CREATOR_REWARD_INDEX].mint.equals(PublicKey.default)) {
       throw PoolError.invalidRewardState();
     }
     // `operator` is null, so a non-creator fails on-chain with InvalidPermission.
-    this.assertCreator(creator, params.creator, PoolError.invalidPermission());
+    this.assertCreator(
+      pool.creator,
+      params.creator,
+      PoolError.invalidPermission(),
+    );
     await this.assertCreatorRewardMint(params.rewardMint, params.tokenBadge);
 
     const rewardVault = deriveRewardVault(
@@ -98,7 +102,7 @@ export class RewardService extends DlmmProProgram {
     creator: PublicKey;
     newAuthority: PublicKey;
   }): Promise<{ tx: Transaction }> {
-    const { rewards, creator } = await this.rewardPool(params.pool);
+    const { pool, rewards } = await this.rewardPool(params.pool);
     const reward = rewards[CREATOR_REWARD_INDEX];
     if (reward.mint.equals(PublicKey.default)) {
       throw PoolError.rewardUninitialized();
@@ -108,7 +112,7 @@ export class RewardService extends DlmmProProgram {
     }
     // A missing operator account fails on-chain with MissingOperatorAccount.
     this.assertCreator(
-      creator,
+      pool.creator,
       params.creator,
       PoolError.missingOperatorAccount(),
     );
@@ -143,22 +147,23 @@ export class RewardService extends DlmmProProgram {
     assertU64(params.parameters.endTime);
     assertU128(params.parameters.emissionPerSecond);
     assertU64(params.parameters.maxAmount);
+    const { rewards } = await this.rewardPool(params.pool);
     if (params.parameters.emissionPerSecond.isZero()) {
       throw PoolError.invalidParameters();
     }
-    const rewardVault = deriveRewardVault(
-      params.pool,
-      params.parameters.index,
-      this.programId,
-    );
-    const { reward } = await this.rewardAt(
-      params.pool,
+    const reward = this.rewardSlot(
+      rewards,
       params.parameters.index,
       params.rewardMint,
     );
     if (!reward.authority.equals(params.authority)) {
       throw PoolError.invalidPermission();
     }
+    const rewardVault = deriveRewardVault(
+      params.pool,
+      params.parameters.index,
+      this.programId,
+    );
     if (params.parameters.openTime !== null) {
       const duration = safeSub(
         params.parameters.endTime,
@@ -259,19 +264,6 @@ export class RewardService extends DlmmProProgram {
   }): Promise<{ tx: Transaction }> {
     positionIndexesFromBitmap(params.bitmap);
     assertU64(params.minAmount ?? new BN(0));
-    const rewardVault = deriveRewardVault(
-      params.pool,
-      params.rewardIndex,
-      this.programId,
-    );
-    const { pool } = await this.rewardAt(
-      params.pool,
-      params.rewardIndex,
-      params.rewardMint,
-    );
-    if (params.tickSpacing !== pool.tickSpacing) {
-      throw PoolError.invalidParameters();
-    }
     const tokenProgram =
       params.tokenProgram ??
       (await resolveTokenProgram(
@@ -286,6 +278,16 @@ export class RewardService extends DlmmProProgram {
       mint: params.rewardMint,
       tokenProgram,
     });
+    const { pool, rewards } = await this.rewardPool(params.pool);
+    this.rewardSlot(rewards, params.rewardIndex, params.rewardMint);
+    if (params.tickSpacing !== pool.tickSpacing) {
+      throw PoolError.invalidParameters();
+    }
+    const rewardVault = deriveRewardVault(
+      params.pool,
+      params.rewardIndex,
+      this.programId,
+    );
     const nftAccount =
       params.nftAccount ?? findNftAccount(params.nftMint, params.owner);
     const hooks = await resolveInstructionHooks(
@@ -352,19 +354,16 @@ export class RewardService extends DlmmProProgram {
     transferHookReward?: AccountMeta[];
   }): Promise<{ tx: Transaction }> {
     assertU64(params.minAmount ?? new BN(0));
+    const { rewards } = await this.rewardPool(params.pool);
+    const reward = this.rewardSlot(rewards, params.index, params.rewardMint);
+    if (!reward.authority.equals(params.authority)) {
+      throw PoolError.invalidPermission();
+    }
     const rewardVault = deriveRewardVault(
       params.pool,
       params.index,
       this.programId,
     );
-    const { reward } = await this.rewardAt(
-      params.pool,
-      params.index,
-      params.rewardMint,
-    );
-    if (!reward.authority.equals(params.authority)) {
-      throw PoolError.invalidPermission();
-    }
     const tokenProgram =
       params.tokenProgram ??
       (await resolveTokenProgram(
@@ -494,29 +493,25 @@ export class RewardService extends DlmmProProgram {
     return ineligibleRewardAmount(reward, pool.liquidity, clock.timestamp);
   }
 
+  /** The program checks the liquidity-mining extension before anything else. */
   private async rewardPool(
-    pool: PublicKey,
-  ): Promise<{ rewards: DecodedPoolRewardInfo[]; creator: PublicKey }> {
-    const { pool: state, extensions } =
-      await this.state.fetchPoolWithExtensions(pool);
-    if (!extensions.rewards) {
-      throw PoolError.invalidPoolType();
-    }
-    return { rewards: extensions.rewards, creator: state.creator };
-  }
-
-  /** Same checks and order as the program's reward instruction contexts. */
-  private async rewardAt(
     poolAddress: PublicKey,
-    index: number,
-    rewardMint: PublicKey,
-  ): Promise<{ pool: Pool; reward: DecodedPoolRewardInfo }> {
+  ): Promise<{ pool: Pool; rewards: DecodedPoolRewardInfo[] }> {
     const { pool, extensions } =
       await this.state.fetchPoolWithExtensions(poolAddress);
     if (!extensions.rewards) {
       throw PoolError.invalidPoolType();
     }
-    const reward = extensions.rewards[index];
+    return { pool, rewards: extensions.rewards };
+  }
+
+  /** Index, initialised, and mint checks in the order of the reward instruction contexts. */
+  private rewardSlot(
+    rewards: DecodedPoolRewardInfo[],
+    index: number,
+    rewardMint: PublicKey,
+  ): DecodedPoolRewardInfo {
+    const reward = rewards[index];
     if (!reward) {
       throw PoolError.invalidRewardIndex();
     }
@@ -526,7 +521,7 @@ export class RewardService extends DlmmProProgram {
     if (!reward.mint.equals(rewardMint)) {
       throw PoolError.invalidRewardMint();
     }
-    return { pool, reward };
+    return reward;
   }
 
   /**

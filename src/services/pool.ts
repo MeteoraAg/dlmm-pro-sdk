@@ -7,7 +7,11 @@ import {
   type Connection,
 } from "@solana/web3.js";
 import BN from "bn.js";
-import { MAX_SQRT_PRICE, MIN_SQRT_PRICE } from "../constants";
+import {
+  MAX_OBSERVATION_LENGTH,
+  MAX_SQRT_PRICE,
+  MIN_SQRT_PRICE,
+} from "../constants";
 import { PoolError } from "../errors";
 import {
   deriveLaunchPool,
@@ -24,6 +28,7 @@ import {
   SWAP_HOOKS,
   type TransferHookAmount,
   type TransferHookLeg,
+  tickArrayCoversUsableTick,
   tickArraysForSwap,
   tickIndexFromId,
   resolveTokenProgram,
@@ -391,6 +396,10 @@ export class PoolService extends DlmmProProgram {
     index: number;
     funder: PublicKey;
   }): Promise<{ tx: Transaction; tickArray: PublicKey }> {
+    const { tickSpacing } = await this.state.fetchPool(params.pool);
+    if (!tickArrayCoversUsableTick(params.index, tickSpacing)) {
+      throw PoolError.invalidParameters();
+    }
     const tickArray = deriveTickArray(
       params.pool,
       params.index,
@@ -590,6 +599,10 @@ export class PoolService extends DlmmProProgram {
     }
 
     const oracle = deriveOracle(params.pool, this.programId);
+    const observations = await this.state.decodeObservations(oracle);
+    if (observations.length + params.lengthToAdd > MAX_OBSERVATION_LENGTH) {
+      throw PoolError.invalidParameters();
+    }
     const tx = await this.program.methods
       .increaseOracleLength(params.lengthToAdd)
       .accountsPartial({

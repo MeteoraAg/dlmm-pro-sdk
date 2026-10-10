@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import {
   buildLiquidityShape,
   customWeightsFromGrid,
-  delegatePermissionMask,
+  limitOrderDelegatePermissionMask,
   deriveLimitOrder,
   deriveReserve,
   DlmmProClient,
@@ -176,7 +176,7 @@ describe("limit orders", () => {
       ),
     ).toBe(true);
 
-    const permission = delegatePermissionMask([
+    const permission = limitOrderDelegatePermissionMask([
       LimitOrderDelegatePermission.CancelLimitOrder,
     ]);
     const { tx: permTx } =
