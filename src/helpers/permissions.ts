@@ -1,10 +1,14 @@
 import BN from "bn.js";
-import type {
+import {
   LimitOrderDelegatePermission,
   PositionDelegatePermission,
 } from "../types";
-import { PositionDelegatePermission as PositionPermission } from "../types";
 import { PoolError } from "../errors";
+
+const POSITION_DELEGATE_PERMISSION_COUNT =
+  PositionDelegatePermission.UpdatePositionRange + 1;
+const LIMIT_ORDER_DELEGATE_PERMISSION_COUNT =
+  LimitOrderDelegatePermission.CancelLimitOrder + 1;
 
 /** `u128` bitmask of program permission variants. Duplicate flags are ignored. */
 export function permissionBitmask(
@@ -36,20 +40,25 @@ export function bitmaskMax(variantCount: number): BN {
   return new BN(1).shln(variantCount).subn(1);
 }
 
-/** `u32` bitmask for the position and limit-order delegate instructions. */
-export function delegatePermissionMask(
-  permissions: readonly (
-    PositionDelegatePermission | LimitOrderDelegatePermission
-  )[],
-): number {
-  for (const flag of permissions) {
-    if (
-      !Number.isInteger(flag) ||
-      flag < 0 ||
-      flag > PositionPermission.UpdatePositionRange
-    ) {
+function delegateMask(flags: readonly number[], variantCount: number): number {
+  for (const flag of flags) {
+    if (!Number.isInteger(flag) || flag < 0 || flag >= variantCount) {
       throw PoolError.invalidPermission();
     }
   }
-  return permissions.reduce((mask, flag) => mask | (1 << flag), 0);
+  return flags.reduce((mask, flag) => mask | (1 << flag), 0);
+}
+
+/** `u32` bitmask for `updatePositionDelegatePermission`. */
+export function positionDelegatePermissionMask(
+  permissions: readonly PositionDelegatePermission[],
+): number {
+  return delegateMask(permissions, POSITION_DELEGATE_PERMISSION_COUNT);
+}
+
+/** `u32` bitmask for `updateLimitOrderDelegatePermission`. */
+export function limitOrderDelegatePermissionMask(
+  permissions: readonly LimitOrderDelegatePermission[],
+): number {
+  return delegateMask(permissions, LIMIT_ORDER_DELEGATE_PERMISSION_COUNT);
 }

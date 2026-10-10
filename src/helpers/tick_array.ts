@@ -55,6 +55,56 @@ export function overflowsDefaultTickArrayBitmap(tickIndex: number): boolean {
   return tickIndex < -BITMAP_SIZE || tickIndex > BITMAP_SIZE - 1;
 }
 
+const I32_MIN = -0x80000000;
+const I32_MAX = 0x7fffffff;
+
+function assertI32Product(value: number): number {
+  if (value < I32_MIN || value > I32_MAX) {
+    throw PoolError.mathOverflow();
+  }
+  return value;
+}
+
+/** `TickArray::get_min_max_tick_id_from_tick_index`. */
+export function tickArrayTickRange(
+  tickIndex: number,
+  tickSpacing: number,
+): { minTickId: number; maxTickId: number } {
+  if (
+    !Number.isInteger(tickIndex) ||
+    tickIndex < I32_MIN ||
+    tickIndex > I32_MAX ||
+    !Number.isInteger(tickSpacing) ||
+    tickSpacing <= 0 ||
+    tickSpacing > MAX_TICK_SPACING
+  ) {
+    throw PoolError.invalidParameters();
+  }
+  const minWithoutSpacing = assertI32Product(tickIndex * MAX_TICKS_PER_ARRAY);
+  const maxWithoutSpacing = assertI32Product(
+    minWithoutSpacing + MAX_TICKS_PER_ARRAY - 1,
+  );
+  return {
+    minTickId: assertI32Product(minWithoutSpacing * tickSpacing),
+    maxTickId: assertI32Product(maxWithoutSpacing * tickSpacing),
+  };
+}
+
+/** Whether `initialize_tick_array` accepts the index: one of its ticks is inside `MIN_TICK_ID..=MAX_TICK_ID`. */
+export function tickArrayCoversUsableTick(
+  tickIndex: number,
+  tickSpacing: number,
+): boolean {
+  const { minTickId } = tickArrayTickRange(tickIndex, tickSpacing);
+  for (let i = 0; i < MAX_TICKS_PER_ARRAY; i++) {
+    const tickId = minTickId + i * tickSpacing;
+    if (tickId >= MIN_TICK_ID && tickId <= MAX_TICK_ID) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function tickIdsInRange(
   minTickId: number,
   maxTickId: number,
