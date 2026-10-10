@@ -1,10 +1,12 @@
 import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
 import {
+  ACCESS_REGISTRY_PROGRAM_ID,
   DLMM_PRO_PROGRAM_ID,
   DYNAMIC_CONFIG_PREFIX,
   LAUNCH_POOL_PREFIX,
   LIMIT_ORDER_PREFIX,
+  NUM_REWARDS,
   OPERATOR_PREFIX,
   ORACLE_PREFIX,
   POOL_AUTHORITY_PREFIX,
@@ -17,18 +19,31 @@ import {
   TICK_ARRAY_PREFIX,
   TOKEN_BADGE_PREFIX,
 } from "../constants";
+import { PoolError } from "../errors";
 
 function toU64Buffer(index: BN | number): Buffer {
-  return new BN(index).toArrayLike(Buffer, "le", 8);
+  if (
+    typeof index === "number" &&
+    (!Number.isSafeInteger(index) || index < 0)
+  ) {
+    throw PoolError.invalidParameters();
+  }
+  const value = new BN(index);
+  if (value.isNeg() || value.bitLength() > 64) {
+    throw PoolError.invalidParameters();
+  }
+  return value.toArrayLike(Buffer, "le", 8);
 }
 
 function toI32Buffer(index: number): Buffer {
+  if (!Number.isInteger(index) || index < -0x80000000 || index > 0x7fffffff) {
+    throw PoolError.invalidParameters();
+  }
   const buf = Buffer.alloc(4);
   buf.writeInt32LE(index, 0);
   return buf;
 }
 
-// Lexicographic max/min of two pubkeys
 function sortMints(a: PublicKey, b: PublicKey): [PublicKey, PublicKey] {
   return a.toBuffer().compare(b.toBuffer()) > 0 ? [a, b] : [b, a];
 }
@@ -50,6 +65,13 @@ export function deriveOperator(
     [Buffer.from(OPERATOR_PREFIX), whitelistedAddress.toBuffer()],
     programId,
   )[0];
+}
+
+// Same seeds; the program id is what keeps the two operator registries apart.
+export function deriveAccessRegistryOperator(
+  whitelistedAddress: PublicKey,
+): PublicKey {
+  return deriveOperator(whitelistedAddress, ACCESS_REGISTRY_PROGRAM_ID);
 }
 
 export function deriveStaticConfig(
@@ -77,9 +99,10 @@ export function deriveDynamicConfig(
   )[0];
 }
 
+// TokenBadge lives in the external access-registry program, not dlmm-pro
 export function deriveTokenBadge(
   tokenMint: PublicKey,
-  programId: PublicKey = DLMM_PRO_PROGRAM_ID,
+  programId: PublicKey = ACCESS_REGISTRY_PROGRAM_ID,
 ): PublicKey {
   return PublicKey.findProgramAddressSync(
     [Buffer.from(TOKEN_BADGE_PREFIX), tokenMint.toBuffer()],
@@ -87,7 +110,6 @@ export function deriveTokenBadge(
   )[0];
 }
 
-// Static/dynamic config pool: `["pool", config, max(mintX,mintY), min(mintX,mintY)]`
 export function derivePool(
   config: PublicKey,
   tokenXMint: PublicKey,
@@ -101,7 +123,6 @@ export function derivePool(
   )[0];
 }
 
-// Launch pool: `["l_pool", max(mintX,mintY), min(mintX,mintY)]`
 export function deriveLaunchPool(
   tokenXMint: PublicKey,
   tokenYMint: PublicKey,
@@ -144,8 +165,6 @@ export function deriveTickArrayBitmapExtension(
     programId,
   )[0];
 }
-
-export const deriveBitmapExtension = deriveTickArrayBitmapExtension;
 
 export function deriveTickArray(
   pool: PublicKey,
@@ -190,12 +209,23 @@ export function deriveLimitOrder(
   )[0];
 }
 
+export function assertRewardIndex(rewardIndex: number): void {
+  if (
+    !Number.isInteger(rewardIndex) ||
+    rewardIndex < 0 ||
+    rewardIndex >= NUM_REWARDS
+  ) {
+    throw PoolError.invalidRewardIndex();
+  }
+}
+
 // Reward vault PDA — `reward_index` is `u8` on-chain (`to_le_bytes()` = 1 byte)
 export function deriveRewardVault(
   pool: PublicKey,
   rewardIndex: number,
   programId: PublicKey = DLMM_PRO_PROGRAM_ID,
 ): PublicKey {
+  assertRewardIndex(rewardIndex);
   return PublicKey.findProgramAddressSync(
     [
       Buffer.from(REWARD_VAULT_PREFIX),

@@ -1,9 +1,9 @@
 import type { IdlAccounts, IdlTypes } from "@coral-xyz/anchor";
 import type { PublicKey } from "@solana/web3.js";
 import type BN from "bn.js";
-import type { DlmmPro } from "./idl/dlmm_pro";
+import type { AccessRegistry } from "./idl/access-registry/access_registry";
+import type { DlmmPro } from "./idl/dlmm-pro/dlmm_pro";
 
-// onchain account states
 export type Pool = IdlAccounts<DlmmPro>["pool"];
 export type StaticConfig = IdlAccounts<DlmmPro>["staticConfig"];
 export type DynamicConfig = IdlAccounts<DlmmPro>["dynamicConfig"];
@@ -13,17 +13,83 @@ export type TickArray = IdlAccounts<DlmmPro>["tickArray"];
 export type TickArrayBitmapExtension =
   IdlAccounts<DlmmPro>["tickArrayBitmapExtension"];
 export type Operator = IdlAccounts<DlmmPro>["operator"];
-export type TokenBadge = IdlAccounts<DlmmPro>["tokenBadge"];
 export type Oracle = IdlAccounts<DlmmPro>["oracle"];
 
-// embedded state types used inside accounts
+// Fields the tick-array bitmap walk reads.
+export type PoolBitmapState = Pick<
+  Pool,
+  | "tickCurrentId"
+  | "tickSpacing"
+  | "tickArrayBitmap"
+  | "isBitmapExtensionInitialized"
+>;
+export type BitmapExtensionState = Pick<
+  TickArrayBitmapExtension,
+  "positiveBitmap" | "negativeBitmap"
+>;
+
+// TokenBadge and the operator registry are owned by the external
+// access-registry program, not dlmm-pro.
+export type TokenBadge = IdlAccounts<AccessRegistry>["tokenBadge"];
+export type AccessRegistryOperator = IdlAccounts<AccessRegistry>["operator"];
+
+export type TickRange = IdlTypes<DlmmPro>["tickRange"];
+export type RemainingAccountsInfo = IdlTypes<DlmmPro>["remainingAccountsInfo"];
+export type RemainingAccountsSlice =
+  IdlTypes<DlmmPro>["remainingAccountsSlice"];
+export type OpenPositionParameters =
+  IdlTypes<DlmmPro>["openPositionParameters"];
+export type AddLiquidityParameters =
+  IdlTypes<DlmmPro>["addLiquidityParameters"];
+export type AddLiquidityByWeightParameters =
+  IdlTypes<DlmmPro>["addLiquidityByWeightParameters"];
+export type AddLiquidityImbalanceParameters =
+  IdlTypes<DlmmPro>["addLiquidityImbalanceParameters"];
+export type AddLiquidityImbalanceSlippage =
+  IdlTypes<DlmmPro>["addLiquidityImbalanceSlippage"];
+export type SqrtPriceSlippage = IdlTypes<DlmmPro>["sqrtPriceSlippage"];
+export type RemoveLiquidityParameters =
+  IdlTypes<DlmmPro>["removeLiquidityParameters"];
+export type RemoveLiquidityByBpsParameters =
+  IdlTypes<DlmmPro>["removeLiquidityByBpsParameters"];
+export type RemovePositionParameters =
+  IdlTypes<DlmmPro>["removePositionParameters"];
+export type SwapParameters = IdlTypes<DlmmPro>["swapParameters"];
+export type StaticConfigParameters =
+  IdlTypes<DlmmPro>["staticConfigParameters"];
+export type DynamicConfigParameters =
+  IdlTypes<DlmmPro>["dynamicConfigParameters"];
+export type OpenLimitOrderParameters =
+  IdlTypes<DlmmPro>["openLimitOrderParameters"];
+export type CancelLimitOrderParameters =
+  IdlTypes<DlmmPro>["cancelLimitOrderParameters"];
+export type ClaimPartnerFeeParameters =
+  IdlTypes<DlmmPro>["claimPartnerFeeParameters"];
+export type TickLimitOrderAmount = IdlTypes<DlmmPro>["tickLimitOrderAmount"];
+export type RelativeTick = IdlTypes<DlmmPro>["relativeTick"];
+export type SetRewardEmissionParameters =
+  IdlTypes<DlmmPro>["setRewardEmissionParameters"];
+export type LockVestingPositionParameters =
+  IdlTypes<DlmmPro>["lockVestingPositionParameters"];
+export type LockPermanentPositionParameters =
+  IdlTypes<DlmmPro>["lockPermanentPositionParameters"];
+
 export type FeeConfig = IdlTypes<DlmmPro>["feeConfig"];
 export type BaseFeeConfig = IdlTypes<DlmmPro>["baseFeeConfig"];
+export type BaseFeeConfigParameters =
+  IdlTypes<DlmmPro>["baseFeeConfigParameters"];
 export type DynamicFeeConfig = IdlTypes<DlmmPro>["dynamicFeeConfig"];
+export type DynamicFeeParameters = IdlTypes<DlmmPro>["dynamicFeeParameters"];
+export type PoolFeeParameters = IdlTypes<DlmmPro>["poolFeeParameters"];
+export type PoolActivationInfoParameters =
+  IdlTypes<DlmmPro>["poolActivationInfoParameters"];
+export type PoolActivationParameters =
+  IdlTypes<DlmmPro>["poolActivationParameters"];
+export type InitializePoolWithDynamicParameters =
+  IdlTypes<DlmmPro>["initializePoolWithDynamicParameters"];
 export type VariableFee = IdlTypes<DlmmPro>["variableFee"];
 export type PoolPartner = IdlTypes<DlmmPro>["poolPartner"];
 export type PositionVesting = IdlTypes<DlmmPro>["positionVesting"];
-export type Z192 = IdlTypes<DlmmPro>["z192"];
 
 export type DecodedPoolRewardInfo = {
   mint: PublicKey;
@@ -34,7 +100,7 @@ export type DecodedPoolRewardInfo = {
   endTime: BN;
   lastUpdateTime: BN;
   cumulativeSecondsWithEmptyLiquidityReward: BN;
-  rewardGrowthGlobal: Z192;
+  rewardGrowthGlobal: BN;
   rewardTokenFlag: number;
 };
 
@@ -63,8 +129,8 @@ export type DecodedPosition = {
   permanentLockedLiquidity: BN;
   vestingLiquidity: BN;
   releasedVestingLiquidity: BN;
-  feeGrowthCheckpointX: Z192;
-  feeGrowthCheckpointY: Z192;
+  feeGrowthCheckpointX: BN;
+  feeGrowthCheckpointY: BN;
   feePendingX: BN;
   feePendingY: BN;
   tickLowerId: number;
@@ -72,7 +138,7 @@ export type DecodedPosition = {
 };
 
 export type DecodedPositionRewardInfo = {
-  growthInsideCheckpoint: Z192;
+  growthInsideCheckpoint: BN;
   pendingAmount: BN;
 };
 
@@ -88,8 +154,8 @@ export type DecodedTick = {
   sqrtPrice: BN;
   liquidityNet: BN;
   liquidityGross: BN;
-  feeGrowthOutsideX: Z192;
-  feeGrowthOutsideY: Z192;
+  feeGrowthOutsideX: BN;
+  feeGrowthOutsideY: BN;
   refCount: BN;
   tickId: number;
   limitOrderAskSide: number;
@@ -104,7 +170,7 @@ export type DecodedTick = {
 };
 
 export type DecodedTickWithReward = DecodedTick & {
-  rewardGrowthsOutside: Z192[];
+  rewardGrowthsOutside: BN[];
 };
 
 export type DecodeTicksOpts = {
@@ -121,4 +187,125 @@ export type DecodedLimitOrderData = {
 export type DecodedObservation = {
   lastUpdatedTimestamp: BN;
   tickCumulative: BN;
+};
+
+export enum Rounding {
+  Up,
+  Down,
+}
+
+export enum TokenProgramFlags {
+  TokenProgram = 0,
+  TokenProgram2022 = 1,
+}
+
+export enum CollectFeeMode {
+  OutputToken = 0,
+  OnlyY = 1,
+}
+
+export enum BaseFeeMode {
+  Fixed = 0,
+  TimeSchedulerLinear = 1,
+  TimeSchedulerExponential = 2,
+  MarketCapSchedulerLinear = 3,
+  MarketCapSchedulerExponential = 4,
+}
+
+export enum ActivationType {
+  Slot = 0,
+  Timestamp = 1,
+}
+
+export enum ActivationMode {
+  Open = 0,
+  BondingCurve = 1,
+  TimeBased = 2,
+}
+
+export enum PoolType {
+  Static = 0,
+  Dynamic = 1,
+  LaunchPool = 2,
+}
+
+export enum PoolExtension {
+  LiquidityMining = 0,
+  ActivationAccess = 1,
+}
+
+export enum PoolStatus {
+  Swap = 0,
+  AddLiquidity = 1,
+}
+
+export enum StrategyType {
+  Spot = 0,
+  Curve = 1,
+  BidAsk = 2,
+  Custom = 3,
+}
+
+export enum LiquiditySide {
+  Bid = 0,
+  Ask = 1,
+  Active = 2,
+}
+
+export enum DynamicConfigPermission {
+  CreatePoolWithoutMintValidation = 0,
+}
+
+export enum OperatorPermission {
+  CreateConfigKey = 0,
+  RemoveConfigKey = 1,
+  SetPoolStatus = 2,
+  InitializeReward = 3,
+  UpdateRewardAuthority = 4,
+  UpdatePartnerFee = 5,
+}
+
+export enum AccessRegistryOperatorPermission {
+  CreateTokenBadge = 0,
+  CloseTokenBadge = 1,
+}
+
+export enum PositionDelegatePermission {
+  AddLiquidity = 0,
+  RemoveLiquidity = 1,
+  ClaimFee = 2,
+  ClaimReward = 3,
+  UpdatePositionRange = 4,
+}
+
+export enum LimitOrderDelegatePermission {
+  CancelLimitOrder = 0,
+}
+
+export type FeeSetting = {
+  feesOnInput: boolean;
+  feesOnTokenX: boolean;
+  hasReferral: boolean;
+  hasPartner: boolean;
+  mmProtocolFeeBps: number;
+  limitOrderProtocolFeeBps: number;
+  partnerFeeBps: number;
+};
+
+export type SplitFees = {
+  mmFee: BN;
+  limitOrderFee: BN;
+  protocolFeeOnLimitOrderFee: BN;
+  protocolFeeOnMmFee: BN;
+};
+
+export type FilledAmountResult = {
+  amountIn: BN;
+  amountLeft: BN;
+  outAmount: BN;
+  mmAmountIn: BN;
+  mmAmountOut: BN;
+  processedOrderAmountOut: BN;
+  openOrderAmountOut: BN;
+  nextSqrtPrice: BN;
 };

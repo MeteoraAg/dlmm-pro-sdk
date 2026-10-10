@@ -1,8 +1,11 @@
-export * from "./dlmm_pro";
-export * from "./services";
 export * from "./helpers";
-export type * from "./types";
-export type * from "./constants";
+export * from "./math";
+export * from "./base_fee";
+export * from "./errors";
+export * from "./types";
+export * from "./constants";
 
-export type { DlmmPro as DlmmProTypes } from "./idl/dlmm_pro.ts";
-export { default as DlmmProIDL } from "./idl/dlmm_pro.json";
+export type { DlmmPro as DlmmProTypes } from "./idl/dlmm-pro/dlmm_pro";
+export type { AccessRegistry as AccessRegistryTypes } from "./idl/access-registry/access_registry";
+export { default as DlmmProIDL } from "./idl/dlmm-pro/dlmm_pro.json";
+export { default as AccessRegistryIDL } from "./idl/access-registry/access_registry.json";
