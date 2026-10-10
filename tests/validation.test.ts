@@ -7,7 +7,7 @@ import {
   getTokenProgram,
   calculateTransferFeeExcludedAmount,
   defaultDynamicPoolParameters,
-  delegatePermissionMask,
+  positionDelegatePermissionMask,
   deriveStaticConfig,
   deriveTickArray,
   DlmmProClient,
@@ -179,7 +179,7 @@ describe("client-side validation", () => {
     expect(() => deriveStaticConfig(-1)).toThrow();
     expect(() => deriveStaticConfig(1.5)).toThrow();
     expect(() => deriveTickArray(PublicKey.default, Number.NaN)).toThrow();
-    expect(() => delegatePermissionMask([32 as never])).toThrow(
+    expect(() => positionDelegatePermissionMask([32 as never])).toThrow(
       expect.objectContaining({ code: PoolErrorCode.InvalidPermission }),
     );
     expect(() => encodePoolExtensions([32 as never])).toThrow(
