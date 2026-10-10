@@ -5,3 +5,5 @@ coverage
 *.so
 src/idl
 tests/fixtures
+target
+commons/idls
