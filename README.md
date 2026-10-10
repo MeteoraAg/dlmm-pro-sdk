@@ -26,7 +26,7 @@ import { DlmmPro } from "@meteora-ag/dlmm-pro-sdk";
 const connection = new Connection("https://api.mainnet-beta.solana.com");
 
 // Create a new instance of the DLMM Pro SDK
-const dlmmPro = new DlmmPro(connection, 'confirmed');
+const dlmmPro = new DlmmPro(connection, "confirmed");
 ```
 
 ### Test
