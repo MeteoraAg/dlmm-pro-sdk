@@ -65,23 +65,7 @@ fn refresh_and_claim(
     ranges: &[types::TickRange],
     bitmap: u64,
 ) {
-    let refresh = Instruction {
-        program_id: dlmm_pro::ID,
-        accounts: [
-            accounts::RefreshFeesAndRewards {
-                pool,
-                position: seeded.position,
-                nft_account: seeded.nft_account,
-                signer: market.lp.pubkey(),
-                event_authority: derive_event_authority(),
-                program: dlmm_pro::ID,
-            }
-            .to_account_metas(None),
-            tick_array_remaining_accounts(pool, ranges, TICK_SPACING).unwrap(),
-        ]
-        .concat(),
-        data: args::RefreshFeesAndRewards { bitmap }.data(),
-    };
+    let refresh = refresh_fees_and_rewards_ix(market, pool, seeded, ranges, bitmap);
     let claim = Instruction {
         program_id: dlmm_pro::ID,
         accounts: accounts::ClaimFee {

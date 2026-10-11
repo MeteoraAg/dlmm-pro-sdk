@@ -378,6 +378,34 @@ pub fn initialize_static_pool_with_fee_mode(
     initial_sqrt_price: u128,
     collect_fee_mode: CollectFeeMode,
 ) -> Pubkey {
+    initialize_static_pool_with_options(
+        market,
+        dynamic_fee,
+        initial_sqrt_price,
+        collect_fee_mode,
+        0,
+    )
+}
+
+/// Static pool with the liquidity-mining extension, so positions and ticks
+/// carry reward data.
+pub fn initialize_mining_pool(market: &mut Market) -> Pubkey {
+    initialize_static_pool_with_options(
+        market,
+        None,
+        SQRT_PRICE_ONE,
+        CollectFeeMode::OutputToken,
+        1u8 << PoolExtension::LiquidityMining as u8,
+    )
+}
+
+fn initialize_static_pool_with_options(
+    market: &mut Market,
+    dynamic_fee: Option<types::DynamicFeeParameters>,
+    initial_sqrt_price: u128,
+    collect_fee_mode: CollectFeeMode,
+    extensions: u8,
+) -> Pubkey {
     let token_badge_y =
         matches!(collect_fee_mode, CollectFeeMode::OnlyY).then(|| create_token_badge_y(market));
     let config_index = next_config_index();
@@ -407,7 +435,7 @@ pub fn initialize_static_pool_with_fee_mode(
                 tick_spacing: 1,
                 collect_fee_mode: collect_fee_mode.into(),
                 activation_type: ActivationType::Timestamp.into(),
-                extensions: 0,
+                extensions,
                 pool_creator_authority: Some(Pubkey::default()),
             },
         }
@@ -786,6 +814,344 @@ pub fn token_amount(svm: &LiteSVM, address: &Pubkey) -> u64 {
     get_spl_account::<SplTokenAccount>(svm, address)
         .unwrap()
         .amount
+}
+
+pub fn load_position_array(
+    market: &Market,
+    pool_state: &DynamicPool,
+    position: Pubkey,
+) -> DynamicPositionArray {
+    DynamicPositionArray::deserialize(
+        &market.svm.get_account(&position).unwrap().data,
+        pool_state.pool.is_support_liquidity_mining(),
+    )
+    .unwrap()
+}
+
+pub fn load_tick_arrays(
+    market: &Market,
+    pool: Pubkey,
+    pool_state: &DynamicPool,
+    ranges: &[types::TickRange],
+) -> Vec<DynamicTickArray> {
+    tick_arrays_for_ranges(pool, ranges, 1)
+        .unwrap()
+        .iter()
+        .map(|address| {
+            DynamicTickArray::deserialize(
+                &market.svm.get_account(address).unwrap().data,
+                pool_state.pool.is_support_liquidity_mining(),
+            )
+            .unwrap()
+        })
+        .collect()
+}
+
+pub fn refresh_fees_and_rewards_ix(
+    market: &Market,
+    pool: Pubkey,
+    seeded: &SeededPosition,
+    ranges: &[types::TickRange],
+    bitmap: u64,
+) -> Instruction {
+    Instruction {
+        program_id: dlmm_pro::ID,
+        accounts: [
+            accounts::RefreshFeesAndRewards {
+                pool,
+                position: seeded.position,
+                nft_account: seeded.nft_account,
+                signer: market.lp.pubkey(),
+                event_authority: derive_event_authority(),
+                program: dlmm_pro::ID,
+            }
+            .to_account_metas(None),
+            tick_array_remaining_accounts(pool, ranges, 1).unwrap(),
+        ]
+        .concat(),
+        data: args::RefreshFeesAndRewards { bitmap }.data(),
+    }
+}
+
+pub struct RewardSetup {
+    pub mint: Pubkey,
+    pub vault: Pubkey,
+    pub funder_token: Pubkey,
+    pub lp_token: Pubkey,
+}
+
+fn token_account_with(
+    svm: &mut LiteSVM,
+    payer: &Keypair,
+    mint: &Pubkey,
+    owner: &Pubkey,
+    amount: u64,
+) -> Pubkey {
+    let ata = CreateAssociatedTokenAccount::new(svm, payer, mint)
+        .owner(owner)
+        .send()
+        .unwrap();
+    if amount > 0 {
+        let mint_to_ix = mint_to(
+            &litesvm_token::TOKEN_ID,
+            mint,
+            &ata,
+            &payer.pubkey(),
+            &[],
+            amount,
+        )
+        .unwrap();
+        send(svm, &[mint_to_ix], payer, &[payer]);
+    }
+    ata
+}
+
+/// Creator reward slot `index` on a mining pool: a legacy mint, the pool
+/// creator (the market payer) as authority, a funded funder account and an
+/// empty LP account.
+pub fn initialize_reward(market: &mut Market, pool: Pubkey, index: u8) -> RewardSetup {
+    let mint = CreateMint::new(&mut market.svm, &market.payer)
+        .decimals(6)
+        .send()
+        .unwrap();
+    let funder_token = token_account_with(
+        &mut market.svm,
+        &market.payer,
+        &mint,
+        &market.payer.pubkey(),
+        1_000_000_000_000,
+    );
+    let lp_token = token_account_with(
+        &mut market.svm,
+        &market.payer,
+        &mint,
+        &market.lp.pubkey(),
+        0,
+    );
+    let vault = derive_reward_vault(pool, index);
+    let initialize = Instruction {
+        program_id: dlmm_pro::ID,
+        accounts: accounts::InitializeReward {
+            pool,
+            pool_authority: pool_authority::ID,
+            reward_vault: vault,
+            reward_mint: mint,
+            token_badge: None,
+            operator: None,
+            signer: market.payer.pubkey(),
+            payer: market.payer.pubkey(),
+            reward_authority: market.payer.pubkey(),
+            token_program: litesvm_token::TOKEN_ID,
+            system_program: SYSTEM_PROGRAM_ID,
+            event_authority: derive_event_authority(),
+            program: dlmm_pro::ID,
+        }
+        .to_account_metas(None),
+        data: args::InitializeReward { index }.data(),
+    };
+    send(
+        &mut market.svm,
+        &[initialize],
+        &market.payer,
+        &[&market.payer],
+    );
+    RewardSetup {
+        mint,
+        vault,
+        funder_token,
+        lp_token,
+    }
+}
+
+pub fn set_reward_emission(
+    market: &mut Market,
+    pool: Pubkey,
+    reward: &RewardSetup,
+    index: u8,
+    open_time: Option<u64>,
+    end_time: u64,
+    emission_per_second: u128,
+) {
+    let start = open_time.unwrap_or_else(|| unix_timestamp(&market.svm));
+    let max_amount =
+        calculate_reward_amount(end_time - start, emission_per_second, Rounding::Up).unwrap();
+    let emit = Instruction {
+        program_id: dlmm_pro::ID,
+        accounts: accounts::SetRewardEmission {
+            pool,
+            reward_vault: reward.vault,
+            reward_mint: reward.mint,
+            funder_token_account: reward.funder_token,
+            funder: market.payer.pubkey(),
+            authority: market.payer.pubkey(),
+            token_program: litesvm_token::TOKEN_ID,
+            event_authority: derive_event_authority(),
+            program: dlmm_pro::ID,
+        }
+        .to_account_metas(None),
+        data: args::SetRewardEmission {
+            parameters: types::SetRewardEmissionParameters {
+                index,
+                open_time,
+                end_time,
+                emission_per_second,
+                max_amount,
+            },
+            remaining_accounts_info: types::RemainingAccountsInfo { slices: vec![] },
+        }
+        .data(),
+    };
+    send(&mut market.svm, &[emit], &market.payer, &[&market.payer]);
+}
+
+pub fn refresh_and_claim_reward(
+    market: &mut Market,
+    pool: Pubkey,
+    seeded: &SeededPosition,
+    ranges: &[types::TickRange],
+    bitmap: u64,
+    reward: &RewardSetup,
+    index: u8,
+) {
+    let refresh = refresh_fees_and_rewards_ix(market, pool, seeded, ranges, bitmap);
+    let claim = Instruction {
+        program_id: dlmm_pro::ID,
+        accounts: accounts::ClaimReward {
+            pool,
+            pool_authority: pool_authority::ID,
+            position: seeded.position,
+            nft_account: seeded.nft_account,
+            signer: market.lp.pubkey(),
+            reward_vault: reward.vault,
+            reward_mint: reward.mint,
+            user_token_account: reward.lp_token,
+            token_program: litesvm_token::TOKEN_ID,
+            memo_program: MEMO_PROGRAM_ID,
+            event_authority: derive_event_authority(),
+            program: dlmm_pro::ID,
+        }
+        .to_account_metas(None),
+        data: args::ClaimReward {
+            reward_index: index,
+            min_amount: 0,
+            remaining_account_info: types::RemainingAccountsInfo { slices: vec![] },
+        }
+        .data(),
+    };
+    send(
+        &mut market.svm,
+        &[refresh, claim],
+        &market.lp,
+        &[&market.lp],
+    );
+}
+
+/// The reward authority (the market payer) withdraws into its funder account.
+pub fn withdraw_ineligible_rewards(
+    market: &mut Market,
+    pool: Pubkey,
+    reward: &RewardSetup,
+    index: u8,
+) {
+    let withdraw = Instruction {
+        program_id: dlmm_pro::ID,
+        accounts: accounts::WithdrawIneligibleRewards {
+            pool,
+            pool_authority: pool_authority::ID,
+            reward_vault: reward.vault,
+            reward_mint: reward.mint,
+            receiver_token_account: reward.funder_token,
+            authority: market.payer.pubkey(),
+            token_program: litesvm_token::TOKEN_ID,
+            memo_program: MEMO_PROGRAM_ID,
+            event_authority: derive_event_authority(),
+            program: dlmm_pro::ID,
+        }
+        .to_account_metas(None),
+        data: args::WithdrawIneligibleRewards {
+            index,
+            min_amount: 0,
+            remaining_accounts_info: types::RemainingAccountsInfo { slices: vec![] },
+        }
+        .data(),
+    };
+    send(
+        &mut market.svm,
+        &[withdraw],
+        &market.payer,
+        &[&market.payer],
+    );
+}
+
+pub fn lock_vesting_position(
+    market: &mut Market,
+    pool: Pubkey,
+    seeded: &SeededPosition,
+    parameters: types::LockVestingPositionParameters,
+) {
+    let lock = Instruction {
+        program_id: dlmm_pro::ID,
+        accounts: accounts::LockVestingPosition {
+            pool,
+            position: seeded.position,
+            nft_account: seeded.nft_account,
+            signer: market.lp.pubkey(),
+            event_authority: derive_event_authority(),
+            program: dlmm_pro::ID,
+        }
+        .to_account_metas(None),
+        data: args::LockVestingPosition { parameters }.data(),
+    };
+    send(&mut market.svm, &[lock], &market.lp, &[&market.lp]);
+}
+
+pub fn remove_liquidity_by_bps(
+    market: &mut Market,
+    pool: Pubkey,
+    seeded: &SeededPosition,
+    ranges: &[types::TickRange],
+    bps: u16,
+    bitmap: Option<u64>,
+) {
+    let remove = Instruction {
+        program_id: dlmm_pro::ID,
+        accounts: [
+            accounts::RemoveLiquidityByBps {
+                pool,
+                pool_authority: pool_authority::ID,
+                position: seeded.position,
+                nft_account: seeded.nft_account,
+                tick_array_bitmap_extension: None,
+                user_token_x: market.lp_token_x,
+                user_token_y: market.lp_token_y,
+                reserve_x: derive_reserve(market.token_x_mint, pool),
+                reserve_y: derive_reserve(market.token_y_mint, pool),
+                token_x_mint: market.token_x_mint,
+                token_y_mint: market.token_y_mint,
+                signer: market.lp.pubkey(),
+                token_x_program: market.token_x_program,
+                token_y_program: litesvm_token::TOKEN_ID,
+                memo_program: MEMO_PROGRAM_ID,
+                event_authority: derive_event_authority(),
+                program: dlmm_pro::ID,
+            }
+            .to_account_metas(None),
+            tick_array_remaining_accounts(pool, ranges, 1).unwrap(),
+        ]
+        .concat(),
+        data: args::RemoveLiquidityByBps {
+            parameters: types::RemoveLiquidityByBpsParameters {
+                min_amount_x: 0,
+                min_amount_y: 0,
+                expected_layout_version: None,
+                bps,
+                bitmap,
+            },
+            remaining_account_info: types::RemainingAccountsInfo { slices: vec![] },
+        }
+        .data(),
+    };
+    send(&mut market.svm, &[remove], &market.lp, &[&market.lp]);
 }
 
 pub struct QuoteInputs {
