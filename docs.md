@@ -8,6 +8,8 @@ program (`regUFehW9oycnaV2auYyfqyYjKG1W1uLNT7rtUeemQr`). Both IDLs are spec
 The package is JavaScript plus `.d.ts`. `@coral-xyz/anchor` `0.32` and
 `@solana/web3.js` v1 are dependencies. TypeScript is not a peer dependency.
 
+The Rust crate `dlmm-pro-commons` is `publish = false`. Depend on it from git.
+
 ## Client surface
 
 `DlmmProClient.create(connection, commitment?, programId?)` exposes:
@@ -167,4 +169,7 @@ Claims use the post-refresh amounts the program transfers.
 
 ## Versioning
 
-Publish the package on a GitHub release whose tag is `v<package version>`.
+Publish the TypeScript package on a GitHub release whose tag is
+`v<package version>`. The Rust crate is not published. Keep the two IDL copies
+(`src/idl/dlmm-pro/dlmm_pro.json` and `commons/idls/dlmm_pro.json`) identical;
+`make idl` diffs them.

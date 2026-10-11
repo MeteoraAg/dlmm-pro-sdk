@@ -2,9 +2,9 @@
 
 ## 0.1.0
 
-First publishable TypeScript package. Tracks DLMM Pro release `0.1.0`
-(`dc65a03`), program id `dPro1D5wiqnGMH8vMDG23jh35btTHoWdyqXjqkqxe8n`, and
-access-registry `d542263`.
+First publishable TypeScript package and Rust commons crate. Both track DLMM
+Pro release `0.1.0` (`dc65a03`), program id
+`dPro1D5wiqnGMH8vMDG23jh35btTHoWdyqXjqkqxe8n`, and access-registry `d542263`.
 
 Changes against the pre-release program the stack was first written for
 (`9590139`):
@@ -55,3 +55,10 @@ Package:
   `overflowingAdd`, `tryCastBaseFeeMode`, `isOverflowDefaultTickArrayBitmap`
   (use `overflowsDefaultTickArrayBitmap`).
 - `typescript` is not a peer dependency. npm publish runs on a GitHub release.
+
+Rust commons:
+
+- `publish = false`; LiteSVM tests share `tests/fixtures/` with the TypeScript
+  suite.
+- Previews for claimable rewards, ineligible rewards, and vesting unlock match
+  the TypeScript helpers.
