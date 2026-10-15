@@ -1,8 +1,9 @@
 # DLMM Pro SDK
 
-TypeScript SDK for the [Meteora DLMM Pro](https://github.com/MeteoraAg/dlmm-pro)
-program, release 0.1.0: pool creation, quotes and swaps, multi-range
-positions, limit orders, and liquidity-mining rewards.
+TypeScript SDK and Rust crate for the
+[Meteora DLMM Pro](https://github.com/MeteoraAg/dlmm-pro) program, release
+0.1.0: pool creation, quotes and swaps, multi-range positions, limit orders,
+and liquidity-mining rewards.
 
 The function reference is in [docs.md](docs.md).
 
@@ -145,6 +146,40 @@ const { tx } = await client.position.claimFee({
 await sendAndConfirmTransaction(connection, tx, [owner]);
 ```
 
+## Rust
+
+`dlmm-pro-commons` in [commons/](commons) is for Rust integrators such as
+aggregators. It is not on crates.io; depend on it from git:
+
+```toml
+[dependencies]
+dlmm-pro-commons = { git = "https://github.com/MeteoraAg/dlmm-pro-sdk" }
+```
+
+It provides the `declare_program!(dlmm_pro)` types and instruction structs,
+PDAs and constants, parsers for the accounts with a dynamic tail
+(`DynamicPool`, `DynamicTickArray`, `DynamicOracle`, `DynamicLimitOrder`,
+`DynamicPositionArray`), `quote_exact_in` with `tick_arrays_for_swap`,
+Token-2022 transfer-fee and transfer-hook helpers, and `claimable_fees` and
+`claimable_rewards`. `AccountDeserialize` on the `declare_program!` account
+types panics on accounts with a dynamic tail; use the `Dynamic*` parsers.
+
+```rust
+use dlmm_pro_commons::*;
+
+let pool_state = DynamicPool::deserialize(&pool_account_data)?;
+// The account at derive_tick_array_bitmap_extension(pool), once the pool has one.
+let extension = if pool_state.pool.is_bitmap_extension_initialized() {
+    Some(deserialize_anchor_pod_account::<TickArrayBitmapExtension>(&extension_account_data)?)
+} else {
+    None
+};
+let tick_arrays =
+    tick_arrays_for_swap(pool, &pool_state.pool, extension.as_ref(), swap_for_y, 3)?;
+// Fetch and parse the tick arrays and both mints, then:
+let quote = quote_exact_in(QuoteExactInParams { /* parsed accounts, mint data, clock */ })?;
+```
+
 ## Program addresses
 
 - DLMM Pro: `dPro1D5wiqnGMH8vMDG23jh35btTHoWdyqXjqkqxe8n` (devnet)
@@ -156,8 +191,8 @@ from `@meteora-ag/dlmm-pro-sdk/idl/dlmm-pro` and
 
 ## Development
 
-Node 22 and pnpm. The tests run against committed program binaries in
-LiteSVM.
+Node 22 and pnpm; Rust per `rust-toolchain.toml`. Both test suites run
+against committed program binaries in LiteSVM.
 
 ```bash
 pnpm install
@@ -165,6 +200,10 @@ pnpm format     # prettier --check
 pnpm typecheck
 pnpm test
 pnpm build
+
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
 ```
 
 ## License

@@ -19,6 +19,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## commons [0.1.0] - [PR #17](https://github.com/MeteoraAg/dlmm-pro-sdk/pull/17)
+
+### Added
+
+- Added `dlmm-pro-commons` crate for DLMM Pro release 0.1.0. It is not published to crates.io, depend on it from git.
+- Added `declare_program!(dlmm_pro)` types and instruction structs, generated from the same IDL as the TypeScript SDK.
+- Added `DynamicPool`, `DynamicTickArray`, `DynamicPositionArray`, `DynamicLimitOrder` and `DynamicOracle` to support parsing on accounts with dynamic data.
+- Added `quote_exact_in()` to quote an exact in swap, and `tick_arrays_for_swap()` to get the tick arrays a swap needs.
+- Added `tick_arrays_for_tick_ids()` to get the tick arrays for position and limit order instructions.
+- Added Token-2022 transfer fee helpers and `get_extra_account_metas_for_transfer_hook()`.
+- Added `claimable_fees()` and `claimable_rewards()` to get the fees and rewards a position can claim, and `get_amounts_from_liquidity()` to get position amounts.
+- Added PDA helpers, program constants and `PoolError`.
+
 ## @meteora-ag/dlmm-pro-sdk [0.1.0] - [PR #16](https://github.com/MeteoraAg/dlmm-pro-sdk/pull/16)
 
 ### Added
