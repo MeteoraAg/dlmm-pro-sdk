@@ -23,12 +23,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `DlmmProClient` targets DLMM Pro release 0.1.0. Its `pool`, `position`, `limitOrder`, `reward`, `state`, and `accessRegistry` services build the user-facing instructions and read program accounts. `createDlmmProProgram` and `createAccessRegistryProgram` return Anchor programs for the operator and admin instructions.
-- `quoteExactIn` ports the exact-in swap: dynamic and scheduled fees, market-maker and limit-order liquidity, the collect-fee mode, and Token-2022 transfer fees. `client.pool.quoteExactIn` also returns the tick arrays and bitmap extension the swap needs.
-- Builders resolve the Token-2022 transfer-hook accounts of each transfer whose `transferHook*` array is omitted. An explicit array, including `[]`, is sent as given.
-- The limit-order builders derive the tick arrays they need, and builders pass the pool's bitmap extension when the instruction needs it.
-- `getClaimableFees` previews a fee claim. `compoundFees` claims fees and redeposits them in one transaction.
-- `buildLiquidityShape` builds Spot, Curve, BidAsk, or custom-weight deposits in a vertical or horizontal layout. `multiplierFromAmounts`, `encodeAddLiquidityByWeight`, `limitOrderTicksFromShape`, and `relativeTickFromSlippage` turn a shape into deposit or limit-order parameters.
-- `encodeFixedBaseFeeData`, `encodeTimeSchedulerBaseFeeData`, `encodeMarketCapSchedulerBaseFeeData`, `openActivationParameters`, `bondingCurveActivationParameters`, and `timeBasedActivationParameters` encode pool-creation parameters. `getBaseFeeNumerator` evaluates a pool's base fee.
-- PDA, tick, liquidity, permission, and account-decoding helpers.
-- The IDLs of both programs, exported from the package root and as `@meteora-ag/dlmm-pro-sdk/idl/dlmm-pro` and `@meteora-ag/dlmm-pro-sdk/idl/access-registry`.
+- Added `DlmmProClient` with `pool`, `position`, `limitOrder`, `reward`, `state` and `accessRegistry` services for DLMM Pro release 0.1.0.
+- Added pool functions `swap`, `initializePoolWithStaticConfig`, `initializePoolWithDynamicConfig`, `initializeLaunchPool`, `initializeTickArray`, `initializeTickBitmapExtension`, `increaseOracleLength` and `claimPartnerFee`.
+- Added function `quoteExactIn` to quote an exact in swap. It covers dynamic fee, limit order liquidity, collect fee mode and Token-2022 transfer fee, and returns the tick arrays the swap needs.
+- Added position functions `openPosition`, `addLiquidity`, `addLiquidityByWeight`, `addLiquidityImbalance`, `removeLiquidity`, `removeLiquidityByBps`, `claimFee`, `expandPosition`, `removePosition`, `closePosition`, `lockPermanentPosition`, `lockVestingPosition`, `refreshFeesAndRewards` and `updatePositionDelegatePermission`.
+- Added function `getClaimableFees` to get the fees a position can claim, and `compoundFees` to claim fees and add them back to the position in one transaction.
+- Added limit order functions `openLimitOrder`, `cancelLimitOrder`, `closeLimitOrder` and `updateLimitOrderDelegatePermission`.
+- Added reward functions `initializeReward`, `updateRewardAuthority`, `setRewardEmission`, `claimReward` and `withdrawIneligibleRewards`.
+- Added function `buildLiquidityShape` to build Spot, Curve, BidAsk or custom liquidity shapes, with `multiplierFromAmounts`, `encodeAddLiquidityByWeight`, `limitOrderTicksFromShape` and `relativeTickFromSlippage` to turn a shape into deposit or limit order parameters.
+- Added base fee and activation helpers for pool creation: `encodeFixedBaseFeeData`, `encodeTimeSchedulerBaseFeeData`, `encodeMarketCapSchedulerBaseFeeData`, `openActivationParameters`, `bondingCurveActivationParameters` and `timeBasedActivationParameters`.
+- Added PDA, tick, liquidity and account decoding helpers.
+- Builders resolve Token-2022 transfer hook accounts, tick arrays and the tick array bitmap extension when they are not passed in.
+- Exported the DLMM Pro and access registry IDLs, also available as `@meteora-ag/dlmm-pro-sdk/idl/dlmm-pro` and `@meteora-ag/dlmm-pro-sdk/idl/access-registry`.
