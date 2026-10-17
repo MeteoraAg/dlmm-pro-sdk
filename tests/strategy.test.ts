@@ -29,7 +29,7 @@ import { U64_MAX } from "../src/math";
 import {
   quantizeWeights,
   stackWeightLevels,
-  toWeightCurve,
+  toWeightsByStrategy,
 } from "../src/strategy";
 import { transferFeeIncludedAmountWithinU64 } from "../src/quote/transfer_fee";
 import { big, gridWeights, SQRT_PRICE_ONE } from "./helpers";
@@ -399,7 +399,13 @@ describe("liquidity shapes", () => {
   });
 
   it("caps Curve weights at 255 for wide ranges", () => {
-    const weights = toWeightCurve(-3000, 3000, 0, 10);
+    const weights = toWeightsByStrategy({
+      strategy: StrategyType.Curve,
+      minTickId: -3000,
+      maxTickId: 3000,
+      tickSpacing: 10,
+      currentTickId: 0,
+    });
     expect(weights).toHaveLength(601);
     expect(weights[300].tickId).toBe(0);
     expect(weights[300].weight).toBe(255);
@@ -460,6 +466,14 @@ describe("liquidity shapes", () => {
     ).toThrow(
       expect.objectContaining({ code: PoolErrorCode.LiquidityIsTooHigh }),
     );
+    expect(() =>
+      encodeAddLiquidityByWeight({
+        ranges: [{ tickLowerId: -20, tickUpperId: 0, weight: 1 }],
+        maxAmountX: new BN(1),
+        maxAmountY: new BN(1),
+        multiplier: new BN(0),
+      }),
+    ).toThrow(expect.objectContaining({ code: PoolErrorCode.LiquidityIsZero }));
   });
 
   it("encodes non-contiguous position slots in bitmap order", () => {

@@ -90,7 +90,7 @@ describe("tickIndexFromId", () => {
 describe("initializeTickArray", () => {
   it("creates the derived tick array for the pool", async () => {
     const svm = initializeSVM();
-    const client = DlmmProClient.create(createSvmConnection(svm));
+    const client = new DlmmProClient(createSvmConnection(svm));
     const market = await createFundedMarket({ svm, client });
     const pool = await initializeStaticPool(svm, client, market);
 

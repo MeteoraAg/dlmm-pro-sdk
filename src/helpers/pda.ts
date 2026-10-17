@@ -53,13 +53,6 @@ export function deriveOperator(
   )[0];
 }
 
-// Same seeds; the program id is what keeps the two operator registries apart.
-export function deriveAccessRegistryOperator(
-  whitelistedAddress: PublicKey,
-): PublicKey {
-  return deriveOperator(whitelistedAddress, ACCESS_REGISTRY_PROGRAM_ID);
-}
-
 export function deriveStaticConfig(
   index: BN | number,
   programId: PublicKey = DLMM_PRO_PROGRAM_ID,

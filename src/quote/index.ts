@@ -128,6 +128,8 @@ export type QuoteExactInResult = {
   protocolFee: BN;
   hostFee: BN;
   partnerFee: BN;
+  /** Whether the fees are taken in token X, as `EvtSwap.feesOnTokenX`. */
+  feesOnTokenX: boolean;
   nextSqrtPrice: BN;
   nextTickId: number;
   nextLiquidity: BN;
@@ -145,10 +147,7 @@ type SwapFinalResult = {
   protocolFeeOnLimitOrderFee: BN;
 };
 
-export function isPoolStatusEnabled(
-  poolStatus: number,
-  status: PoolStatus,
-): boolean {
+function isPoolStatusEnabled(poolStatus: number, status: PoolStatus): boolean {
   return (poolStatus & (1 << status)) === 0;
 }
 
@@ -182,7 +181,7 @@ export function getFeeSetting(
   };
 }
 
-export function getCurrentPoint(
+function getCurrentPoint(
   activationType: number,
   currentSlot: BN,
   currentTimestamp: BN,
@@ -192,7 +191,7 @@ export function getCurrentPoint(
     : currentTimestamp;
 }
 
-export function validatePoolCanSwap(
+function validatePoolCanSwap(
   pool: Pool,
   poolActivation: DecodedPoolActivation | null | undefined,
   swapper: PublicKey | null | undefined,
@@ -554,6 +553,7 @@ export function quoteExactIn(params: QuoteExactInParams): QuoteExactInResult {
     protocolFee: sharing.protocolFee,
     hostFee: sharing.hostFee,
     partnerFee: sharing.partnerFee,
+    feesOnTokenX: feeSetting.feesOnTokenX,
     nextSqrtPrice: currentSqrtPrice,
     nextTickId: currentTickId,
     nextLiquidity: currentLiquidity,

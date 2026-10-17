@@ -33,7 +33,7 @@ export function isDynamicFeeEnabled(config: DynamicFeeConfig): boolean {
 }
 
 // On-chain approximation: Δtick = sqrt(Pmax) × 20,000 / sqrt(Pmin) − 20,000.
-export function getDeltaTick(sqrtPriceA: BN, sqrtPriceB: BN): BN {
+function getDeltaTick(sqrtPriceA: BN, sqrtPriceB: BN): BN {
   const [upper, lower] = sqrtPriceA.gt(sqrtPriceB)
     ? [sqrtPriceA, sqrtPriceB]
     : [sqrtPriceB, sqrtPriceA];
@@ -132,7 +132,7 @@ export function calculateTradingFeeNumerator(
   return tryCastU64(vFee.add(V_FEE_ROUNDING).div(V_FEE_SCALE));
 }
 
-export function getDynamicFeeNumerator(
+function getDynamicFeeNumerator(
   dynamicFeeConfig: DynamicFeeConfig,
   variableFee: WorkingVariableFee,
 ): BN {

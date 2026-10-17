@@ -56,10 +56,8 @@
   - [fetchTickArraysWithTicks](#fetchtickarrayswithticks)
   - [decodeLimitOrderData](#decodelimitorderdata)
   - [decodeObservations](#decodeobservations)
-  - [Other State Methods](#other-state-methods)
-
-- [Access Registry Functions](#access-registry-functions)
   - [fetchTokenBadge](#fetchtokenbadge)
+  - [Other State Methods](#other-state-methods)
 
 - [Quote Functions](#quote-functions)
   - [quoteExactIn (pure)](#quoteexactin-pure)
@@ -133,7 +131,6 @@ area.
 **Function**
 
 ```typescript
-DlmmProClient.create(connection, commitment?, programId?): DlmmProClient
 new DlmmProClient(connection, commitment?, programId?)
 ```
 
@@ -157,7 +154,6 @@ class DlmmProClient {
   limitOrder: LimitOrderService; // Limit Order Functions
   reward: RewardService; // Reward Functions
   state: StateService; // State Functions
-  accessRegistry: AccessRegistryService; // Access Registry Functions
 }
 ```
 
@@ -168,7 +164,7 @@ import { Connection } from "@solana/web3.js";
 import { DlmmProClient } from "@meteora-ag/dlmm-pro-sdk";
 
 const connection = new Connection("https://api.devnet.solana.com");
-const client = DlmmProClient.create(connection);
+const client = new DlmmProClient(connection);
 ```
 
 **Notes**
@@ -178,7 +174,7 @@ const client = DlmmProClient.create(connection);
   `sendAndConfirmTransaction(connection, tx, signers)` fills in the blockhash.
 - Builders read the accounts they need (pool, mints, transfer-hook accounts)
   at the client's commitment.
-- `accessRegistry` always reads `ACCESS_REGISTRY_PROGRAM_ID`.
+- `state.fetchTokenBadge` always reads `ACCESS_REGISTRY_PROGRAM_ID`.
 - Operator and admin instructions are not wrapped. Build them with
   `client.program.methods.<instruction>(...).instruction()` or
   `.transaction()`; the program has a read-only provider and cannot send.
@@ -552,7 +548,7 @@ await sendAndConfirmTransaction(connection, tx, [owner, poolCreatorAuthority]);
 
 - The builder validates `parameters` before building (fee schedule and
   bounds, dynamic fee, tick spacing, price, extensions, activation slots) and
-  throws `InvalidParameters` on the first violation. With the
+  throws a `PoolError` on the first violation. With the
   ActivationAccess extension it reads the clock to check the activation
   points; see [Base Fee and Activation Functions](#base-fee-and-activation-functions)
   for the rules.
@@ -560,8 +556,9 @@ await sendAndConfirmTransaction(connection, tx, [owner, poolCreatorAuthority]);
   `activationPoint` defaults to the current slot or timestamp. Without it,
   both must be `null`.
 - Token badges as for `initializePoolWithStaticConfig`; a config with
-  `DynamicConfigPermission.CreatePoolWithoutMintValidation` skips the mint
-  checks.
+  `DynamicConfigPermission.CreatePoolWithoutMintValidation` skips the badge
+  and Token-2022 extension checks; the Token-2022 native mint is still
+  rejected and `OnlyY` still needs a badge for token Y.
 
 ---
 
@@ -572,7 +569,7 @@ Creates a launch pool: a dynamic pool keyed by its mint pair, with no config.
 **Function**
 
 ```typescript
-initializeLaunchPool(params: InitializeLaunchPoolParams): Promise<InitializeLaunchPoolResult>
+initializeLaunchPool(params: InitializeLaunchPoolParams): Promise<InitializePoolResult>
 ```
 
 **Parameters**
@@ -596,8 +593,7 @@ type InitializeLaunchPoolParams = {
 
 **Returns**
 
-`InitializePoolResult` plus `userTokenX` and `userTokenY`; `pool` is
-`deriveLaunchPool(tokenXMint, tokenYMint)`. Signer: `payer`.
+`InitializePoolResult`; `pool` is `deriveLaunchPool(tokenXMint, tokenYMint)`. Signer: `payer`.
 
 **Notes**
 
@@ -1854,8 +1850,7 @@ params: {
   tickArrayBitmapExtension?: PublicKey | null; // Default: the pool's extension when it has one and a tick array lies outside the inline bitmap
   referral?: PublicKey | null; // Wallet recorded on the order; shares the limit-order fee on cancel
   nftAccount?: PublicKey; // Default findNftAccount(nftMint, owner)
-  transferHookX?: AccountMeta[]; // Ask only; default: resolved from the mint
-  transferHookY?: AccountMeta[]; // Bid only; default: resolved from the mint
+  transferHook?: AccountMeta[]; // Hook metas for the deposited token; default: resolved from the mint
 }
 ```
 
@@ -1916,8 +1911,6 @@ await sendAndConfirmTransaction(connection, tx, [owner, nftMint]);
 - The program creates missing tick arrays, paid by `payer`. For a relative
   order the default `tickArrays` cover every array the band can resolve the
   ticks to.
-- Only the deposited token's hook array is accepted; a non-empty array for
-  the other side throws `InvalidRemainingAccountSlice`.
 
 ---
 
@@ -2611,6 +2604,39 @@ type DecodedObservation = {
 
 ---
 
+### fetchTokenBadge
+
+Fetches a token badge from the access-registry program.
+
+**Function**
+
+```typescript
+fetchTokenBadge(address): Promise<TokenBadge>
+```
+
+**Parameters**
+
+```typescript
+address: PublicKey; // deriveTokenBadge(tokenMint)
+```
+
+**Returns**
+
+The `TokenBadge` account: `tokenMint` and `mintScore`.
+
+**Example**
+
+```typescript
+const badge = await client.state.fetchTokenBadge(deriveTokenBadge(tokenMint));
+```
+
+**Notes**
+
+- Throws an `Error` when the badge does not exist or is not owned by the
+  access-registry program. Badges are created by access-registry operators.
+
+---
+
 ### Other State Methods
 
 Each returns a `Promise` of the value shown.
@@ -2625,48 +2651,8 @@ Each returns a `Promise` of the value shown.
 | `fetchTickArrayBitmapExtension(extensionAddress)` | `deriveTickArrayBitmapExtension(pool)`                                        | `TickArrayBitmapExtension`: `pool`, `positiveBitmap`, `negativeBitmap`                                                                                     |
 | `fetchOperator(operatorAddress)`                  | `deriveOperator(whitelistedAddress)`                                          | `Operator`: `whitelistedAddress`, `permission` (`OperatorPermission` mask)                                                                                 |
 | `fetchOracle(oracleAddress)`                      | `deriveOracle(pool)`                                                          | `Oracle` header: `pool`, `idx` (latest observation), `lastObservationCreatedTimestamp`                                                                     |
-| `decodePoolExtensions(poolAddress)`               | Pool address                                                                  | `DecodedPoolExtensions`, as `fetchPoolWithExtensions`                                                                                                      |
 | `decodePositions(positionArrayAddress, opts?)`    | `derivePosition(nftMint)`; `opts.withReward` defaults to the pool's extension | `DecodedPosition[]` or `DecodedPositionWithReward[]`, as `fetchPositionArrayWithPositions`                                                                 |
 | `decodeTicks(tickArrayAddress, opts)`             | `deriveTickArray(pool, index)`; `opts.withReward`                             | `DecodedTick[]` or `DecodedTickWithReward[]`, as `fetchTickArraysWithTicks`                                                                                |
-| `getBitmapSetIndices(poolAddress)`                | Pool address                                                                  | Tick array indexes set in the pool's inline bitmap (-512..511), ascending                                                                                  |
-| `getExtensionBitmapSetIndices(extensionAddress)`  | `deriveTickArrayBitmapExtension(pool)`                                        | Tick array indexes set in the bitmap extension, ascending                                                                                                  |
-
----
-
-## Access Registry Functions
-
-### fetchTokenBadge
-
-Fetches a token badge from the access-registry program.
-
-**Function**
-
-```typescript
-fetchTokenBadge(tokenBadge): Promise<TokenBadge>
-```
-
-**Parameters**
-
-```typescript
-tokenBadge: PublicKey; // deriveTokenBadge(tokenMint)
-```
-
-**Returns**
-
-The `TokenBadge` account: `tokenMint` and `mintScore`.
-
-**Example**
-
-```typescript
-const badge = await client.accessRegistry.fetchTokenBadge(
-  deriveTokenBadge(tokenMint),
-);
-```
-
-**Notes**
-
-- Throws an `Error` when the badge does not exist or is not owned by the
-  access-registry program. Badges are created by access-registry operators.
 
 ---
 
@@ -2727,6 +2713,7 @@ type QuoteExactInResult = {
   protocolFee: BN; // Protocol share, after the host and partner fees
   hostFee: BN; // Paid to the referral account
   partnerFee: BN; // Accrued to the pool partner
+  feesOnTokenX: boolean; // Whether the fees are taken in token X, as EvtSwap.feesOnTokenX
   nextSqrtPrice: BN; // Pool sqrt price after the swap
   nextTickId: number; // Pool tick after the swap
   nextLiquidity: BN; // Active liquidity after the swap
@@ -2916,8 +2903,9 @@ const { amount: maxAmount } = calculateTransferFeeIncludedAmount(
 ## Liquidity Shape Functions
 
 A liquidity shape gives every tick column `[tickId, tickId + tickSpacing)`
-between `minTickId` and `maxTickId` an integer weight up to
-`MAX_LIQUIDITY_WEIGHT` (255) and groups the columns into position ranges.
+an integer weight up to `MAX_LIQUIDITY_WEIGHT` (255) and groups the columns
+into position ranges. The columns run from `minTickId` to `maxTickId`, except
+for `StrategyType.Custom`, where `weights` alone defines them.
 `addLiquidityByWeight` deposits `multiplier * weight` liquidity into each
 range, so the weights set the liquidity profile and the multiplier sets the
 size. `limitOrderTicksFromShape` turns the same columns into limit-order
@@ -2940,7 +2928,7 @@ args: {
   maxTickId: number; // Last column, a usable tick
   tickSpacing: number; // The pool's tick spacing
   currentTickId: number; // The pool's current tick
-  weights?: TickWeight[]; // Custom only: { tickId, weight } per column
+  weights?: TickWeight[]; // Custom only: { tickId, weight } per column; the columns come from these alone, and minTickId/maxTickId are only checked as usable ticks
   layout?: LiquidityLayout; // Default Vertical
   maxRanges?: number; // Cap on ranges.length, 1..=POSITION_MAX_RANGE
 }
@@ -3701,12 +3689,11 @@ argument defaults to the program in the last column.
 | `deriveDynamicConfig(poolCreatorAuthority, index, programId?)` | `"d_config"`, poolCreatorAuthority, index as `u64` LE    | DLMM_PRO_PROGRAM_ID        |
 | `deriveOperator(whitelistedAddress, programId?)`               | `"operator"`, whitelistedAddress                         | DLMM_PRO_PROGRAM_ID        |
 | `deriveTokenBadge(tokenMint, programId?)`                      | `"token_badge"`, tokenMint                               | ACCESS_REGISTRY_PROGRAM_ID |
-| `deriveAccessRegistryOperator(whitelistedAddress)`             | `"operator"`, whitelistedAddress                         | ACCESS_REGISTRY_PROGRAM_ID |
 
 `deriveStaticConfig` and `deriveDynamicConfig` take the index as a `BN` or a
 `number`. `deriveRewardVault` throws `InvalidRewardIndex` for an index
-outside `0..NUM_REWARDS - 1`. `deriveAccessRegistryOperator` has no
-`programId` argument.
+outside `0..NUM_REWARDS - 1`. For an access-registry operator, pass
+`ACCESS_REGISTRY_PROGRAM_ID` to `deriveOperator`.
 
 ---
 
@@ -3905,25 +3892,22 @@ const withReward = isSupportExtension(
 ### Raw Account Decoders
 
 These decode the variable tail of raw account data, for example from an
-`onAccountChange` subscription. The `*HeaderSize` argument is the account's
-Anchor size including the discriminator,
-`client.program.account.<account>.size`. Each throws an `Error` when the data
-is not that account type.
+`onAccountChange` subscription. Each throws an `Error` when the data is not
+that account type.
 
-| Function                                                             | Returns                                                         |
-| -------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `decodePoolExtensionsFromData(data, poolHeaderSize, extensions)`     | `DecodedPoolExtensions`; `extensions` is `poolState.extensions` |
-| `decodePositionsFromData(data, positionArrayHeaderSize, withReward)` | Position slots, as `fetchPositionArrayWithPositions`            |
-| `decodeTicksFromData(data, tickArrayHeaderSize, withReward)`         | Ticks, as `fetchTickArraysWithTicks`                            |
-| `decodeLimitOrderDataFromData(data, limitOrderHeaderSize)`           | `DecodedLimitOrderData[]`                                       |
-| `decodeObservationsFromData(data, oracleHeaderSize)`                 | `DecodedObservation[]`                                          |
+| Function                                    | Returns                                              |
+| ------------------------------------------- | ---------------------------------------------------- |
+| `decodePoolExtensionsFromData(data)`        | `DecodedPoolExtensions`                              |
+| `decodePositionsFromData(data, withReward)` | Position slots, as `fetchPositionArrayWithPositions` |
+| `decodeTicksFromData(data, withReward)`     | Ticks, as `fetchTickArraysWithTicks`                 |
+| `decodeLimitOrderDataFromData(data)`        | `DecodedLimitOrderData[]`                            |
+| `decodeObservationsFromData(data)`          | `DecodedObservation[]`                               |
 
 **Example**
 
 ```typescript
-const size = client.program.account.positionArray.size;
 connection.onAccountChange(derivePosition(nftMint), ({ data }) => {
-  const positions = decodePositionsFromData(data, size, withReward);
+  const positions = decodePositionsFromData(data, withReward);
 });
 ```
 

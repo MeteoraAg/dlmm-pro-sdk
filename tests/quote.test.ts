@@ -138,6 +138,7 @@ async function assertQuoteMatchesExecution(
     feesOnInput,
     feesOnTokenX,
   });
+  expect(quote.feesOnTokenX).toBe(event.feesOnTokenX);
 
   // Compared as one object so a mismatch shows the whole quote-vs-chain diff.
   expect({
@@ -210,7 +211,7 @@ async function assertQuoteMatchesExecution(
 describe("quoteExactIn matches on-chain swap", () => {
   it("across tick arrays in both directions", async () => {
     const svm = initializeSVM();
-    const client = DlmmProClient.create(createSvmConnection(svm));
+    const client = new DlmmProClient(createSvmConnection(svm));
     const market = await createFundedMarket({ svm, client });
     const pool = await initializeStaticPool(svm, client, market);
     await seedCrossArrayLiquidity(svm, client, market, pool);
@@ -246,7 +247,7 @@ describe("quoteExactIn matches on-chain swap", () => {
     // LiteSVM's clock starts at unix_timestamp 0; the dynamic-fee reference
     // update assumes elapsed time since the epoch exceeds the filter period.
     warpToTime(svm, 1_755_000_000n);
-    const client = DlmmProClient.create(createSvmConnection(svm));
+    const client = new DlmmProClient(createSvmConnection(svm));
     const market = await createFundedMarket({ svm, client });
 
     const configArgs = defaultStaticConfigArgs();
@@ -285,7 +286,7 @@ describe("quoteExactIn matches on-chain swap", () => {
 
   it("binds only the tick arrays the traversal reaches to the pool", async () => {
     const svm = initializeSVM();
-    const client = DlmmProClient.create(createSvmConnection(svm));
+    const client = new DlmmProClient(createSvmConnection(svm));
     const market = await createFundedMarket({ svm, client });
     const pool = await initializeStaticPool(svm, client, market);
     await seedCrossArrayLiquidity(svm, client, market, pool);
@@ -338,7 +339,7 @@ describe("quoteExactIn matches on-chain swap", () => {
 
   it("accepts a referral account equal to the output token account", async () => {
     const svm = initializeSVM();
-    const client = DlmmProClient.create(createSvmConnection(svm));
+    const client = new DlmmProClient(createSvmConnection(svm));
     const market = await createFundedMarket({ svm, client });
     const pool = await initializeStaticPool(svm, client, market);
     await seedCrossArrayLiquidity(svm, client, market, pool);
@@ -378,7 +379,7 @@ describe("quoteExactIn matches on-chain swap", () => {
 
   it("splits fees to the partner and referral", async () => {
     const svm = initializeSVM();
-    const client = DlmmProClient.create(createSvmConnection(svm));
+    const client = new DlmmProClient(createSvmConnection(svm));
     const market = await createFundedMarket({ svm, client });
 
     // The dynamic config's creator authority becomes the pool partner.
@@ -428,7 +429,7 @@ describe("quoteExactIn matches on-chain swap", () => {
 
   it("with fees collected on token Y only", async () => {
     const svm = initializeSVM();
-    const client = DlmmProClient.create(createSvmConnection(svm));
+    const client = new DlmmProClient(createSvmConnection(svm));
     const market = await createFundedMarket({ svm, client });
 
     // A non-whitelisted quote mint needs a token badge for OnlyY.
@@ -474,7 +475,7 @@ describe("quoteExactIn matches on-chain swap", () => {
 
   it("with a token-2022 transfer-fee mint on both swap directions", async () => {
     const svm = initializeSVM();
-    const client = DlmmProClient.create(createSvmConnection(svm));
+    const client = new DlmmProClient(createSvmConnection(svm));
     const market = await createFundedMarket({ svm, client });
 
     // token X: token-2022 mint with a 1% transfer fee

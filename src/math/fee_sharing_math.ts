@@ -21,7 +21,7 @@ export type FeeSetting = {
   partnerFeeBps: number;
 };
 
-export type SplitFees = {
+type SplitFees = {
   mmFee: BN;
   limitOrderFee: BN;
   protocolFeeOnLimitOrderFee: BN;

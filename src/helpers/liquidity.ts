@@ -1,5 +1,5 @@
 import BN from "bn.js";
-import { POSITION_MAX_RANGE } from "../constants";
+import { MAX_LIQUIDITY_WEIGHT, POSITION_MAX_RANGE } from "../constants";
 import { PoolError } from "../errors";
 import {
   getDeltaAmountX,
@@ -7,8 +7,10 @@ import {
   getLiquidityFromAmountX,
   getLiquidityFromAmountY,
 } from "../math/curve_math";
+import { I128_MAX, U128_MAX, safeMul } from "../math/safe_math";
 import { getSqrtPriceFromTickId } from "../math/tick_math";
-import { Rounding } from "../types";
+import { Rounding, type AddLiquidityByWeightParameters } from "../types";
+import { assertOptionalU16, assertU64, assertU128 } from "./validation";
 
 /**
  * Liquidity for depositing at most `maxTokenX`/`maxTokenY` into the range at
@@ -143,6 +145,53 @@ export function positionIndexesFromBitmap(bitmap: BN): number[] {
     }
   }
   return indexes;
+}
+
+/** Whether a position range can take `weight`: an integer in `1..=MAX_LIQUIDITY_WEIGHT`. */
+export function isLiquidityWeight(weight: number): boolean {
+  return (
+    Number.isInteger(weight) && weight >= 1 && weight <= MAX_LIQUIDITY_WEIGHT
+  );
+}
+
+export function validateBitmapLiquidities(bitmap: BN, liquidities: BN[]): void {
+  const selected = positionIndexesFromBitmap(bitmap);
+  if (selected.length !== liquidities.length) {
+    throw PoolError.invalidParameters();
+  }
+  for (const liquidity of liquidities) {
+    assertU128(liquidity);
+    if (liquidity.isZero()) {
+      throw PoolError.liquidityIsZero();
+    }
+    if (liquidity.gt(I128_MAX)) {
+      throw PoolError.liquidityIsTooHigh();
+    }
+  }
+}
+
+export function validateAddLiquidityByWeightParameters(
+  parameters: AddLiquidityByWeightParameters,
+): void {
+  const { multiplier, liquidities: weights } = parameters;
+  assertU64(parameters.maxAmountX);
+  assertU64(parameters.maxAmountY);
+  assertOptionalU16(parameters.expectedLayoutVersion);
+  assertU128(multiplier);
+  if (multiplier.isZero()) {
+    throw PoolError.liquidityIsZero();
+  }
+  if (positionIndexesFromBitmap(parameters.bitmap).length !== weights.length) {
+    throw PoolError.invalidParameters();
+  }
+  for (const weight of weights) {
+    if (!isLiquidityWeight(weight)) {
+      throw PoolError.invalidParameters();
+    }
+    if (safeMul(multiplier, new BN(weight), U128_MAX).gt(I128_MAX)) {
+      throw PoolError.liquidityIsTooHigh();
+    }
+  }
 }
 
 function requireLiquidity(liquidity: BN | null): BN {

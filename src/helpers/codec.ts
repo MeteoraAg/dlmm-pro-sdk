@@ -1,3 +1,4 @@
+import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
 import type { Layout } from "@coral-xyz/borsh";
 import { BITMAP_SIZE, POOL_EXTENSION_VARIANT_COUNT } from "../constants";
 import { PoolError } from "../errors";
@@ -14,6 +15,7 @@ import {
   type DecodedTick,
   type DecodedTickWithReward,
   type BitmapExtensionState,
+  type Pool,
   type PoolBitmapState,
 } from "../types";
 import {
@@ -26,6 +28,13 @@ import {
   TICK_LAYOUT,
   TICK_WITH_REWARD_LAYOUT,
 } from "./layouts";
+
+const coder = new BorshAccountsCoder(DlmmProIDL as Idl);
+const POOL_HEADER_SIZE = coder.size("Pool");
+const POSITION_ARRAY_HEADER_SIZE = coder.size("PositionArray");
+const TICK_ARRAY_HEADER_SIZE = coder.size("TickArray");
+const LIMIT_ORDER_HEADER_SIZE = coder.size("LimitOrder");
+const ORACLE_HEADER_SIZE = coder.size("Oracle");
 
 const ACCOUNT_DISCRIMINATORS = new Map(
   DlmmProIDL.accounts.map((account) => [
@@ -93,13 +102,12 @@ export function encodePoolExtensions(extensions: PoolExtension[]): number {
 
 export function decodePoolExtensionsFromData(
   data: Buffer,
-  poolHeaderSize: number,
-  extensions: number,
 ): DecodedPoolExtensions {
   assertAccountDiscriminator(data, "Pool");
-  if (data.length < poolHeaderSize) {
+  if (data.length < POOL_HEADER_SIZE) {
     throw new Error("Account data shorter than Pool header size");
   }
+  const { extensions } = coder.decode<Pool>("Pool", data);
   const hasLiquidityMining = isSupportExtension(
     extensions,
     PoolExtension.LiquidityMining,
@@ -109,7 +117,7 @@ export function decodePoolExtensionsFromData(
     PoolExtension.ActivationAccess,
   );
 
-  let offset = poolHeaderSize;
+  let offset = POOL_HEADER_SIZE;
   let rewards: DecodedPoolRewardInfo[] | undefined;
   let activation: DecodedPoolActivation | undefined;
 
@@ -146,66 +154,60 @@ export function decodePoolExtensionsFromData(
 
 export function decodePositionsFromData(
   data: Buffer,
-  positionArrayHeaderSize: number,
   withReward: boolean,
 ): DecodedPosition[] | DecodedPositionWithReward[] {
   if (withReward) {
     return decodeSeq<DecodedPositionWithReward>(
       POSITION_WITH_REWARD_LAYOUT,
       data,
-      positionArrayHeaderSize,
+      POSITION_ARRAY_HEADER_SIZE,
       "PositionArray",
     );
   }
   return decodeSeq<DecodedPosition>(
     POSITION_LAYOUT,
     data,
-    positionArrayHeaderSize,
+    POSITION_ARRAY_HEADER_SIZE,
     "PositionArray",
   );
 }
 
 export function decodeTicksFromData(
   data: Buffer,
-  tickArrayHeaderSize: number,
   withReward: boolean,
 ): DecodedTick[] | DecodedTickWithReward[] {
   if (withReward) {
     return decodeSeq<DecodedTickWithReward>(
       TICK_WITH_REWARD_LAYOUT,
       data,
-      tickArrayHeaderSize,
+      TICK_ARRAY_HEADER_SIZE,
       "TickArray",
     );
   }
   return decodeSeq<DecodedTick>(
     TICK_LAYOUT,
     data,
-    tickArrayHeaderSize,
+    TICK_ARRAY_HEADER_SIZE,
     "TickArray",
   );
 }
 
 export function decodeLimitOrderDataFromData(
   data: Buffer,
-  limitOrderHeaderSize: number,
 ): DecodedLimitOrderData[] {
   return decodeSeq<DecodedLimitOrderData>(
     LIMIT_ORDER_DATA_LAYOUT,
     data,
-    limitOrderHeaderSize,
+    LIMIT_ORDER_HEADER_SIZE,
     "LimitOrder",
   );
 }
 
-export function decodeObservationsFromData(
-  data: Buffer,
-  oracleHeaderSize: number,
-): DecodedObservation[] {
+export function decodeObservationsFromData(data: Buffer): DecodedObservation[] {
   return decodeSeq<DecodedObservation>(
     OBSERVATION_LAYOUT,
     data,
-    oracleHeaderSize,
+    ORACLE_HEADER_SIZE,
     "Oracle",
   );
 }

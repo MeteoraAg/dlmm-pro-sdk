@@ -7,7 +7,6 @@ import {
   deriveRewardVault,
   findNftAccount,
   positionIndexesFromBitmap,
-  REWARD_HOOKS,
   resolveInstructionHooks,
   resolveTokenProgram,
 } from "../helpers";
@@ -106,20 +105,17 @@ export class RewardService extends DlmmProProgram {
           params.rewardMint,
           this.commitment,
         ),
-      resolveInstructionHooks(
-        this.connection,
-        this.commitment,
-        REWARD_HOOKS,
-        { transferHookReward: params.transferHookReward },
-        {
-          transferHookReward: {
+      resolveInstructionHooks(this.connection, this.commitment, {
+        transferHookReward: {
+          metas: params.transferHookReward,
+          leg: {
             mint: params.rewardMint,
             source: params.funderTokenAccount,
             destination: rewardVault,
             authority: params.funder,
           },
         },
-      ),
+      }),
     ]);
 
     const tx = await this.program.methods
@@ -165,7 +161,8 @@ export class RewardService extends DlmmProProgram {
     transferHookReward?: AccountMeta[];
   }): Promise<{ tx: Transaction }> {
     positionIndexesFromBitmap(params.bitmap);
-    assertU64(params.minAmount ?? new BN(0));
+    const minAmount = params.minAmount ?? new BN(0);
+    assertU64(minAmount);
     const rewardVault = deriveRewardVault(
       params.pool,
       params.rewardIndex,
@@ -179,25 +176,22 @@ export class RewardService extends DlmmProProgram {
           params.rewardMint,
           this.commitment,
         ),
-      resolveInstructionHooks(
-        this.connection,
-        this.commitment,
-        REWARD_HOOKS,
-        { transferHookReward: params.transferHookReward },
-        {
-          transferHookReward: {
+      resolveInstructionHooks(this.connection, this.commitment, {
+        transferHookReward: {
+          metas: params.transferHookReward,
+          leg: {
             mint: params.rewardMint,
             source: rewardVault,
             destination: params.userTokenAccount,
             authority: derivePoolAuthority(this.programId),
           },
         },
-      ),
+      }),
     ]);
     const nftAccount =
       params.nftAccount ?? findNftAccount(params.nftMint, params.owner);
 
-    const refresh = await this.refreshFeesAndRewardsTx({
+    const refresh = await this.refreshFeesAndRewardsIx({
       pool: params.pool,
       nftMint: params.nftMint,
       nftAccount,
@@ -207,11 +201,7 @@ export class RewardService extends DlmmProProgram {
       tickSpacing,
     });
     const claim = await this.program.methods
-      .claimReward(
-        params.rewardIndex,
-        params.minAmount ?? new BN(0),
-        hooks.remainingAccountsInfo,
-      )
+      .claimReward(params.rewardIndex, minAmount, hooks.remainingAccountsInfo)
       .accountsPartial({
         pool: params.pool,
         position: derivePosition(params.nftMint, this.programId),
@@ -223,12 +213,9 @@ export class RewardService extends DlmmProProgram {
         tokenProgram,
       })
       .remainingAccounts(hooks.remainingAccounts)
-      .transaction();
+      .instruction();
 
-    const tx = new Transaction().add(
-      ...refresh.instructions,
-      ...claim.instructions,
-    );
+    const tx = new Transaction().add(refresh, claim);
     tx.feePayer = params.signer;
     return { tx };
   }
@@ -244,7 +231,8 @@ export class RewardService extends DlmmProProgram {
     tokenProgram?: PublicKey;
     transferHookReward?: AccountMeta[];
   }): Promise<{ tx: Transaction }> {
-    assertU64(params.minAmount ?? new BN(0));
+    const minAmount = params.minAmount ?? new BN(0);
+    assertU64(minAmount);
     const rewardVault = deriveRewardVault(
       params.pool,
       params.rewardIndex,
@@ -257,26 +245,23 @@ export class RewardService extends DlmmProProgram {
           params.rewardMint,
           this.commitment,
         ),
-      resolveInstructionHooks(
-        this.connection,
-        this.commitment,
-        REWARD_HOOKS,
-        { transferHookReward: params.transferHookReward },
-        {
-          transferHookReward: {
+      resolveInstructionHooks(this.connection, this.commitment, {
+        transferHookReward: {
+          metas: params.transferHookReward,
+          leg: {
             mint: params.rewardMint,
             source: rewardVault,
             destination: params.receiverTokenAccount,
             authority: derivePoolAuthority(this.programId),
           },
         },
-      ),
+      }),
     ]);
 
     const tx = await this.program.methods
       .withdrawIneligibleRewards(
         params.rewardIndex,
-        params.minAmount ?? new BN(0),
+        minAmount,
         hooks.remainingAccountsInfo,
       )
       .accountsPartial({

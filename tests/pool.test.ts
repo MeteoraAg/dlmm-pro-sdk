@@ -32,7 +32,7 @@ import {
 describe("pool", () => {
   const svm = initializeSVM();
   const connection = createSvmConnection(svm);
-  const client = DlmmProClient.create(connection);
+  const client = new DlmmProClient(connection);
   const permissions = [
     OperatorPermission.CreateConfigKey,
     OperatorPermission.SetPoolStatus,

@@ -1,5 +1,6 @@
 import { MAX_LIQUIDITY_WEIGHT } from "../constants";
 import { PoolError } from "../errors";
+import { isLiquidityWeight } from "../helpers/liquidity";
 import { alignTickDown, tickIdsInRange } from "../helpers/tick_array";
 import { StrategyType } from "../types";
 
@@ -30,7 +31,7 @@ function activeIndexOf(
   return Math.floor((currentTickId - minTickId) / tickSpacing);
 }
 
-export function toWeightSpot(
+function toWeightSpot(
   minTickId: number,
   maxTickId: number,
   tickSpacing: number,
@@ -41,7 +42,7 @@ export function toWeightSpot(
   }));
 }
 
-export function toWeightDescending(
+function toWeightDescending(
   minTickId: number,
   maxTickId: number,
   tickSpacing: number,
@@ -55,7 +56,7 @@ export function toWeightDescending(
   }));
 }
 
-export function toWeightAscending(
+function toWeightAscending(
   minTickId: number,
   maxTickId: number,
   tickSpacing: number,
@@ -69,7 +70,7 @@ export function toWeightAscending(
   }));
 }
 
-export function toWeightCurve(
+function toWeightCurve(
   minTickId: number,
   maxTickId: number,
   currentTickId: number,
@@ -97,7 +98,7 @@ export function toWeightCurve(
   });
 }
 
-export function toWeightBidAsk(
+function toWeightBidAsk(
   minTickId: number,
   maxTickId: number,
   currentTickId: number,
@@ -123,13 +124,6 @@ export function toWeightBidAsk(
       weight: riseWeight(Math.abs(index - valleyIndex), span, maxWeight),
     };
   });
-}
-
-/** Whether a position range can take `weight`: an integer in `1..=MAX_LIQUIDITY_WEIGHT`. */
-export function isLiquidityWeight(weight: number): boolean {
-  return (
-    Number.isInteger(weight) && weight >= 1 && weight <= MAX_LIQUIDITY_WEIGHT
-  );
 }
 
 /**
@@ -164,7 +158,7 @@ export function quantizeWeights(
   }));
 }
 
-export function toWeightCustom(weights: TickWeight[]): TickWeight[] {
+function toWeightCustom(weights: TickWeight[]): TickWeight[] {
   if (weights.length === 0) {
     throw PoolError.invalidParameters();
   }

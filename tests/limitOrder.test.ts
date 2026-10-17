@@ -14,10 +14,10 @@ import {
   PoolErrorCode,
   relativeTickFromSlippage,
   StrategyType,
-  tickArraysForRanges,
   tickArraysForTickIds,
   type DlmmProTypes,
 } from "../src";
+import { getExtensionBitmapSetIndicesFromState } from "../src/helpers/codec";
 import {
   accountExists,
   big,
@@ -41,7 +41,7 @@ type CancelEvent = IdlEvents<DlmmProTypes>["evtCancelLimitOrder"];
 
 describe("limit orders", () => {
   const svm = initializeSVM();
-  const client = DlmmProClient.create(createSvmConnection(svm));
+  const client = new DlmmProClient(createSvmConnection(svm));
   const tickSpacing = 1;
   const askTickId = 2;
   const bidTickId = -2;
@@ -387,12 +387,16 @@ describe("limit orders", () => {
       ticks: [{ id: outerTickId, amount: orderAmount }],
     });
     expect(
-      await client.state.getExtensionBitmapSetIndices(extension),
+      getExtensionBitmapSetIndicesFromState(
+        await client.state.fetchTickArrayBitmapExtension(extension),
+      ),
     ).toContain(512);
 
     await cancelAndClose({ pool, ...opened });
     expect(
-      await client.state.getExtensionBitmapSetIndices(extension),
+      getExtensionBitmapSetIndicesFromState(
+        await client.state.fetchTickArrayBitmapExtension(extension),
+      ),
     ).not.toContain(512);
   });
 
@@ -431,11 +435,6 @@ describe("limit orders", () => {
       payer: market.payer.publicKey,
       tokenMint: market.tokenXMint,
       userToken: market.lpTokenX,
-      tickArrays: tickArraysForRanges(
-        pool,
-        [{ tickLowerId: spacing, tickUpperId: spacing }],
-        spacing,
-      ),
     };
 
     await expect(

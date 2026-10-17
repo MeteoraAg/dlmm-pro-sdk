@@ -14,7 +14,6 @@ import {
   MAX_LIMIT_ORDER_DELEGATE_PERMISSION,
   readTokenAccountMint,
   resolveInstructionHooks,
-  SWAP_HOOKS,
   tickArraysForTickIds,
   tickIndexFromId,
 } from "../helpers";
@@ -84,8 +83,8 @@ export class LimitOrderService extends DlmmProProgram {
     tickArrayBitmapExtension?: PublicKey | null;
     referral?: PublicKey | null;
     nftAccount?: PublicKey;
-    transferHookX?: AccountMeta[];
-    transferHookY?: AccountMeta[];
+    /** Hook metas for the token the order deposits; resolved from the mint when omitted. */
+    transferHook?: AccountMeta[];
   }): Promise<{
     tx: Transaction;
     limitOrder: PublicKey;
@@ -117,16 +116,13 @@ export class LimitOrderService extends DlmmProProgram {
       }
     }
     const { isAskSide } = params.parameters;
-    const onSideKey = isAskSide ? "transferHookX" : "transferHookY";
+    const hookKey = isAskSide ? "transferHookX" : "transferHookY";
     const [pool, hooks] = await Promise.all([
       this.state.fetchPool(params.pool),
-      resolveInstructionHooks(
-        this.connection,
-        this.commitment,
-        [onSideKey],
-        { [onSideKey]: params[onSideKey] },
-        {
-          [onSideKey]: {
+      resolveInstructionHooks(this.connection, this.commitment, {
+        [hookKey]: {
+          metas: params.transferHook,
+          leg: {
             mint: params.tokenMint,
             source: params.userToken,
             destination: deriveReserve(
@@ -137,7 +133,7 @@ export class LimitOrderService extends DlmmProProgram {
             authority: params.owner,
           },
         },
-      ),
+      }),
     ]);
     const { tickSpacing } = pool;
     if (relativeTick !== null) {
@@ -234,8 +230,10 @@ export class LimitOrderService extends DlmmProProgram {
     transferHookY?: AccountMeta[];
     transferHookReferral?: AccountMeta[];
   }): Promise<{ tx: Transaction }> {
-    assertU64(params.minAmountX ?? new BN(0));
-    assertU64(params.minAmountY ?? new BN(0));
+    const minAmountX = params.minAmountX ?? new BN(0);
+    const minAmountY = params.minAmountY ?? new BN(0);
+    assertU64(minAmountX);
+    assertU64(minAmountY);
     const limitOrder = deriveLimitOrder(params.nftMint, this.programId);
     const referralToken = params.referralToken;
     const tickIds =
@@ -282,38 +280,41 @@ export class LimitOrderService extends DlmmProProgram {
     const hooks = await resolveInstructionHooks(
       this.connection,
       this.commitment,
-      SWAP_HOOKS,
-      {
-        transferHookX: params.transferHookX,
-        transferHookY: params.transferHookY,
-        transferHookReferral: params.transferHookReferral,
-      },
       {
         transferHookX: {
-          mint: params.tokenXMint,
-          source: reserveX,
-          destination: params.userTokenX,
-          authority: poolAuthority,
+          metas: params.transferHookX,
+          leg: {
+            mint: params.tokenXMint,
+            source: reserveX,
+            destination: params.userTokenX,
+            authority: poolAuthority,
+          },
         },
         transferHookY: {
-          mint: params.tokenYMint,
-          source: reserveY,
-          destination: params.userTokenY,
-          authority: poolAuthority,
+          metas: params.transferHookY,
+          leg: {
+            mint: params.tokenYMint,
+            source: reserveY,
+            destination: params.userTokenY,
+            authority: poolAuthority,
+          },
         },
-        transferHookReferral:
-          referralToken && referralMint
-            ? {
-                mint: referralMint,
-                source: deriveReserve(
-                  referralMint,
-                  params.pool,
-                  this.programId,
-                ),
-                destination: referralToken,
-                authority: poolAuthority,
-              }
-            : undefined,
+        transferHookReferral: {
+          metas: params.transferHookReferral,
+          leg:
+            referralToken && referralMint
+              ? {
+                  mint: referralMint,
+                  source: deriveReserve(
+                    referralMint,
+                    params.pool,
+                    this.programId,
+                  ),
+                  destination: referralToken,
+                  authority: poolAuthority,
+                }
+              : undefined,
+        },
       },
     );
 
@@ -321,8 +322,8 @@ export class LimitOrderService extends DlmmProProgram {
       .cancelLimitOrder(
         {
           tickIds,
-          minAmountX: params.minAmountX ?? new BN(0),
-          minAmountY: params.minAmountY ?? new BN(0),
+          minAmountX,
+          minAmountY,
         },
         hooks.remainingAccountsInfo,
       )

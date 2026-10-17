@@ -8,9 +8,9 @@ import {
 } from "../constants";
 import { PoolError } from "../errors";
 import {
+  getActivationHandler,
   getCurrentPointNumber,
   validateActivationCombination,
-  validateActivationInitialize,
 } from "../activation";
 import {
   tryCastActivationMode,
@@ -85,15 +85,14 @@ export async function validateInitializePoolWithDynamicParameters(
 
     const activationModes: ActivationMode[] = [];
     for (const activation of activations) {
-      validateActivationInitialize(
-        activation,
+      getActivationHandler(activation).validateInitialize({
         activationPoint,
         currentPoint,
         activationType,
-        parameters.initialSqrtPrice,
-        parameters.tickSpacing,
-        poolActivation.whitelistedAddLiquidity,
-      );
+        initSqrtPrice: parameters.initialSqrtPrice,
+        tickSpacing: parameters.tickSpacing,
+        whitelistedAddLiquidity: poolActivation.whitelistedAddLiquidity,
+      });
       activationModes.push(tryCastActivationMode(activation.activationMode));
     }
 

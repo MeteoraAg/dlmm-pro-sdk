@@ -57,7 +57,7 @@ const CLEAR_RANGE_A = new BN(7_000_000);
 
 describe("fee compounding", () => {
   const svm = initializeSVM();
-  const client = DlmmProClient.create(createSvmConnection(svm));
+  const client = new DlmmProClient(createSvmConnection(svm));
 
   let market: Market;
 

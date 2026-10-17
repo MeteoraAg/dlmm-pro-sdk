@@ -32,7 +32,7 @@ import {
 describe("rewards", () => {
   const svm = initializeSVM();
   const connection = createSvmConnection(svm);
-  const client = DlmmProClient.create(connection);
+  const client = new DlmmProClient(connection);
 
   it("initializes a reward, emits, and claims", async () => {
     warpToTime(svm, 1n);

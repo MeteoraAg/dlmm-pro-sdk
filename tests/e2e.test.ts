@@ -34,7 +34,7 @@ import {
 
 describe("e2e", () => {
   const svm = initializeSVM();
-  const client = DlmmProClient.create(createSvmConnection(svm));
+  const client = new DlmmProClient(createSvmConnection(svm));
   const tickRanges = DEFAULT_TICK_RANGES;
   const tickLowerId = tickRanges[0].tickLowerId;
   const tickUpperId = tickRanges[0].tickUpperId;
@@ -52,7 +52,7 @@ describe("e2e", () => {
       client.state.fetchPool(market.payer.publicKey),
     ).rejects.toThrow(/not owned by the DLMM Pro program/);
     await expect(
-      client.accessRegistry.fetchTokenBadge(market.payer.publicKey),
+      client.state.fetchTokenBadge(market.payer.publicKey),
     ).rejects.toThrow(/not owned by the access-registry program/);
   });
 

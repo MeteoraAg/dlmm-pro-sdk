@@ -21,12 +21,11 @@ import { Connection } from "@solana/web3.js";
 import { DlmmProClient } from "@meteora-ag/dlmm-pro-sdk";
 
 const connection = new Connection("https://api.devnet.solana.com");
-const client = DlmmProClient.create(connection); // commitment "confirmed"
+const client = new DlmmProClient(connection); // commitment "confirmed"
 ```
 
 `client.pool`, `client.position`, `client.limitOrder`, and `client.reward`
-build unsigned transactions with the fee payer set; `client.state` and
-`client.accessRegistry` read accounts. Builders resolve Token-2022
+build unsigned transactions with the fee payer set; `client.state` reads accounts. Builders resolve Token-2022
 transfer-hook accounts and the pool's bitmap extension when you omit them,
 and the limit-order builders derive their tick arrays. Operator and admin
 instructions are not wrapped; build them with `client.program.methods`.

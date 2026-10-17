@@ -16,10 +16,11 @@ import BN from "bn.js";
 import type { LiteSVM } from "litesvm";
 import {
   createAccessRegistryProgram,
-  deriveAccessRegistryOperator,
+  deriveOperator,
   deriveTokenBadge,
   permissionBitmask,
 } from "../../src/helpers";
+import { ACCESS_REGISTRY_PROGRAM_ID } from "../../src/constants";
 import type { AccessRegistryOperatorPermission } from "../../src/types";
 import { ACCESS_REGISTRY_OPERATOR_PERMISSION_COUNT } from "./constants";
 import { sendTransaction } from "./svm";
@@ -33,7 +34,10 @@ export async function createAccessRegistryOperator(
   whitelistedAddress: PublicKey,
   permissions: AccessRegistryOperatorPermission[],
 ): Promise<PublicKey> {
-  const operator = deriveAccessRegistryOperator(whitelistedAddress);
+  const operator = deriveOperator(
+    whitelistedAddress,
+    ACCESS_REGISTRY_PROGRAM_ID,
+  );
   const tx = await createAccessRegistryProgram(connection)
     .methods.createOperatorAccount(
       new BN(
@@ -70,7 +74,10 @@ export async function createTokenBadge(
     .accountsPartial({
       tokenBadge,
       tokenMint: args.tokenMint,
-      operator: deriveAccessRegistryOperator(args.signer.publicKey),
+      operator: deriveOperator(
+        args.signer.publicKey,
+        ACCESS_REGISTRY_PROGRAM_ID,
+      ),
       signer: args.signer.publicKey,
       payer: args.payer.publicKey,
     })

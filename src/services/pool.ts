@@ -1,7 +1,6 @@
 import { unpackMint, type Mint } from "@solana/spl-token";
 import { PublicKey, Transaction, type AccountMeta } from "@solana/web3.js";
 import BN from "bn.js";
-import { MAX_SQRT_PRICE, MIN_SQRT_PRICE } from "../constants";
 import { PoolError } from "../errors";
 import {
   deriveLaunchPool,
@@ -12,10 +11,8 @@ import {
   deriveTickArray,
   deriveTickArrayBitmapExtension,
   getTokenProgram,
-  LIQUIDITY_HOOKS,
   overflowsDefaultTickArrayBitmap,
   resolveInstructionHooks,
-  SWAP_HOOKS,
   tickIndexFromId,
   resolveTokenProgram,
   readTokenAccountMint,
@@ -50,11 +47,6 @@ export type InitializePoolAccounts = {
 
 export type InitializePoolResult = InitializePoolAccounts & {
   tx: Transaction;
-};
-
-export type InitializeLaunchPoolResult = InitializePoolResult & {
-  userTokenX: PublicKey;
-  userTokenY: PublicKey;
 };
 
 export type QuoteExactInRequest = {
@@ -98,11 +90,8 @@ export type SwapParams = {
 };
 
 type InitializePoolAccountParams = {
-  pool: PublicKey;
   tokenXMint: PublicKey;
   tokenYMint: PublicKey;
-  initialSqrtPrice: BN;
-  tickSpacing: number;
   tokenXProgram?: PublicKey;
   tokenYProgram?: PublicKey;
   tokenBadgeX?: PublicKey | null;
@@ -230,12 +219,6 @@ export class PoolService extends DlmmProProgram {
     params: InitializePoolWithStaticConfigParams,
   ): Promise<InitializePoolResult> {
     this.assertDistinctMints(params.tokenXMint, params.tokenYMint);
-    if (
-      params.initialSqrtPrice.lt(MIN_SQRT_PRICE) ||
-      params.initialSqrtPrice.gt(MAX_SQRT_PRICE)
-    ) {
-      throw PoolError.invalidParameters();
-    }
     const staticConfig = await this.state.fetchStaticConfig(params.config);
 
     const pool = derivePool(
@@ -244,38 +227,24 @@ export class PoolService extends DlmmProProgram {
       params.tokenYMint,
       this.programId,
     );
-    const accounts = await this.initializePoolAccounts({
+    const accounts = await this.initializePoolAccounts(
       pool,
-      tokenXMint: params.tokenXMint,
-      tokenYMint: params.tokenYMint,
-      initialSqrtPrice: params.initialSqrtPrice,
-      tickSpacing: staticConfig.tickSpacing,
-      tokenXProgram: params.tokenXProgram,
-      tokenYProgram: params.tokenYProgram,
-      tokenBadgeX: params.tokenBadgeX,
-      tokenBadgeY: params.tokenBadgeY,
-      tickArrayBitmapExtension: params.tickArrayBitmapExtension,
-    });
+      params,
+      params.initialSqrtPrice,
+      staticConfig.tickSpacing,
+    );
     const poolCreatorAuthority = staticConfig.poolCreatorAuthority;
 
     const ix = await this.program.methods
       .initializePoolWithStaticConfig(params.initialSqrtPrice)
       .accountsPartial({
-        pool,
+        ...accounts,
         tokenXMint: params.tokenXMint,
         tokenYMint: params.tokenYMint,
-        config: params.config,
-        tickArrayBitmapExtension: accounts.tickArrayBitmapExtension,
-        oracle: accounts.oracle,
-        reserveX: accounts.reserveX,
-        reserveY: accounts.reserveY,
-        tokenBadgeX: accounts.tokenBadgeX,
-        tokenBadgeY: accounts.tokenBadgeY,
         creator: params.creator,
         payer: params.payer,
+        config: params.config,
         poolCreatorAuthority,
-        tokenXProgram: accounts.tokenXProgram,
-        tokenYProgram: accounts.tokenYProgram,
       })
       .instruction();
 
@@ -308,37 +277,23 @@ export class PoolService extends DlmmProProgram {
       params.tokenYMint,
       this.programId,
     );
-    const accounts = await this.initializePoolAccounts({
+    const accounts = await this.initializePoolAccounts(
       pool,
-      tokenXMint: params.tokenXMint,
-      tokenYMint: params.tokenYMint,
-      initialSqrtPrice: params.parameters.initialSqrtPrice,
-      tickSpacing: params.parameters.tickSpacing,
-      tokenXProgram: params.tokenXProgram,
-      tokenYProgram: params.tokenYProgram,
-      tokenBadgeX: params.tokenBadgeX,
-      tokenBadgeY: params.tokenBadgeY,
-      tickArrayBitmapExtension: params.tickArrayBitmapExtension,
-    });
+      params,
+      params.parameters.initialSqrtPrice,
+      params.parameters.tickSpacing,
+    );
 
     const tx = await this.program.methods
       .initializePoolWithDynamicConfig(params.parameters)
       .accountsPartial({
-        pool,
+        ...accounts,
         tokenXMint: params.tokenXMint,
         tokenYMint: params.tokenYMint,
-        config: params.config,
-        tickArrayBitmapExtension: accounts.tickArrayBitmapExtension,
-        oracle: accounts.oracle,
-        reserveX: accounts.reserveX,
-        reserveY: accounts.reserveY,
-        tokenBadgeX: accounts.tokenBadgeX,
-        tokenBadgeY: accounts.tokenBadgeY,
         creator: params.creator,
         payer: params.payer,
+        config: params.config,
         poolCreatorAuthority: params.poolCreatorAuthority,
-        tokenXProgram: accounts.tokenXProgram,
-        tokenYProgram: accounts.tokenYProgram,
       })
       .transaction();
 
@@ -348,7 +303,7 @@ export class PoolService extends DlmmProProgram {
 
   async initializeLaunchPool(
     params: InitializeLaunchPoolParams,
-  ): Promise<InitializeLaunchPoolResult> {
+  ): Promise<InitializePoolResult> {
     this.assertDistinctMints(params.tokenXMint, params.tokenYMint);
     await validateInitializePoolWithDynamicParameters(
       this.connection,
@@ -361,47 +316,28 @@ export class PoolService extends DlmmProProgram {
       params.tokenYMint,
       this.programId,
     );
-    const accounts = await this.initializePoolAccounts({
+    const accounts = await this.initializePoolAccounts(
       pool,
-      tokenXMint: params.tokenXMint,
-      tokenYMint: params.tokenYMint,
-      initialSqrtPrice: params.parameters.initialSqrtPrice,
-      tickSpacing: params.parameters.tickSpacing,
-      tokenXProgram: params.tokenXProgram,
-      tokenYProgram: params.tokenYProgram,
-      tokenBadgeX: params.tokenBadgeX,
-      tokenBadgeY: params.tokenBadgeY,
-      tickArrayBitmapExtension: params.tickArrayBitmapExtension,
-    });
+      params,
+      params.parameters.initialSqrtPrice,
+      params.parameters.tickSpacing,
+    );
 
     const tx = await this.program.methods
       .initializeLaunchPool(params.parameters)
       .accountsPartial({
-        pool,
+        ...accounts,
         tokenXMint: params.tokenXMint,
         tokenYMint: params.tokenYMint,
-        tickArrayBitmapExtension: accounts.tickArrayBitmapExtension,
-        oracle: accounts.oracle,
-        reserveX: accounts.reserveX,
-        reserveY: accounts.reserveY,
-        tokenBadgeX: accounts.tokenBadgeX,
-        tokenBadgeY: accounts.tokenBadgeY,
         creator: params.creator,
         payer: params.payer,
-        tokenXProgram: accounts.tokenXProgram,
-        tokenYProgram: accounts.tokenYProgram,
         userTokenX: params.userTokenX,
         userTokenY: params.userTokenY,
       })
       .transaction();
 
     tx.feePayer = params.payer;
-    return {
-      tx,
-      ...accounts,
-      userTokenX: params.userTokenX,
-      userTokenY: params.userTokenY,
-    };
+    return { tx, ...accounts };
   }
 
   async initializeTickArray(params: {
@@ -491,29 +427,28 @@ export class PoolService extends DlmmProProgram {
         : null;
     const [pool, hooks] = await Promise.all([
       this.state.fetchPool(params.pool),
-      resolveInstructionHooks(
-        this.connection,
-        this.commitment,
-        SWAP_HOOKS,
-        {
-          transferHookX: params.transferHookX,
-          transferHookY: params.transferHookY,
-          transferHookReferral: params.transferHookReferral,
-        },
-        {
-          transferHookX: {
+      resolveInstructionHooks(this.connection, this.commitment, {
+        transferHookX: {
+          metas: params.transferHookX,
+          leg: {
             mint: params.tokenXMint,
             source: xIsInput ? params.userTokenIn : reserveX,
             destination: xIsInput ? reserveX : params.userTokenOut,
             authority: xIsInput ? params.user : poolAuthority,
           },
-          transferHookY: {
+        },
+        transferHookY: {
+          metas: params.transferHookY,
+          leg: {
             mint: params.tokenYMint,
             source: xIsInput ? reserveY : params.userTokenIn,
             destination: xIsInput ? params.userTokenOut : reserveY,
             authority: xIsInput ? poolAuthority : params.user,
           },
-          transferHookReferral:
+        },
+        transferHookReferral: {
+          metas: params.transferHookReferral,
+          leg:
             referral && referralMint
               ? {
                   mint: referralMint,
@@ -527,7 +462,7 @@ export class PoolService extends DlmmProProgram {
                 }
               : undefined,
         },
-      ),
+      }),
     ]);
     const tickArrayBitmapExtension =
       params.tickArrayBitmapExtension !== undefined
@@ -610,8 +545,10 @@ export class PoolService extends DlmmProProgram {
   }): Promise<{ tx: Transaction }> {
     assertU64(params.maxAmountX);
     assertU64(params.maxAmountY);
-    assertU64(params.minAmountX ?? new BN(0));
-    assertU64(params.minAmountY ?? new BN(0));
+    const minAmountX = params.minAmountX ?? new BN(0);
+    const minAmountY = params.minAmountY ?? new BN(0);
+    assertU64(minAmountX);
+    assertU64(minAmountY);
     const poolAuthority = derivePoolAuthority(this.programId);
     const reserveX = deriveReserve(
       params.tokenXMint,
@@ -624,29 +561,26 @@ export class PoolService extends DlmmProProgram {
       this.programId,
     );
     const [hooks, tokenXProgram, tokenYProgram] = await Promise.all([
-      resolveInstructionHooks(
-        this.connection,
-        this.commitment,
-        LIQUIDITY_HOOKS,
-        {
-          transferHookX: params.transferHookX,
-          transferHookY: params.transferHookY,
-        },
-        {
-          transferHookX: {
+      resolveInstructionHooks(this.connection, this.commitment, {
+        transferHookX: {
+          metas: params.transferHookX,
+          leg: {
             mint: params.tokenXMint,
             source: reserveX,
             destination: params.receiverTokenX,
             authority: poolAuthority,
           },
-          transferHookY: {
+        },
+        transferHookY: {
+          metas: params.transferHookY,
+          leg: {
             mint: params.tokenYMint,
             source: reserveY,
             destination: params.receiverTokenY,
             authority: poolAuthority,
           },
         },
-      ),
+      }),
       params.tokenXProgram ??
         resolveTokenProgram(
           this.connection,
@@ -666,8 +600,8 @@ export class PoolService extends DlmmProProgram {
         {
           maxAmountX: params.maxAmountX,
           maxAmountY: params.maxAmountY,
-          minAmountX: params.minAmountX ?? new BN(0),
-          minAmountY: params.minAmountY ?? new BN(0),
+          minAmountX,
+          minAmountY,
         },
         hooks.remainingAccountsInfo,
       )
@@ -709,7 +643,10 @@ export class PoolService extends DlmmProProgram {
   }
 
   private async initializePoolAccounts(
+    pool: PublicKey,
     params: InitializePoolAccountParams,
+    initialSqrtPrice: BN,
+    tickSpacing: number,
   ): Promise<InitializePoolAccounts> {
     const [tokenXProgram, tokenYProgram] = await Promise.all([
       params.tokenXProgram ??
@@ -729,20 +666,20 @@ export class PoolService extends DlmmProProgram {
     // The program initializes the extension in-place and requires it whenever
     // the initial tick sits outside the pool's inline bitmap.
     const initialTickIndex = tickIndexFromId(
-      tickIdFromSqrtPrice(params.initialSqrtPrice),
-      params.tickSpacing,
+      tickIdFromSqrtPrice(initialSqrtPrice),
+      tickSpacing,
     );
     const tickArrayBitmapExtension =
       params.tickArrayBitmapExtension ??
       (overflowsDefaultTickArrayBitmap(initialTickIndex)
-        ? deriveTickArrayBitmapExtension(params.pool, this.programId)
+        ? deriveTickArrayBitmapExtension(pool, this.programId)
         : null);
 
     return {
-      pool: params.pool,
-      oracle: deriveOracle(params.pool, this.programId),
-      reserveX: deriveReserve(params.tokenXMint, params.pool, this.programId),
-      reserveY: deriveReserve(params.tokenYMint, params.pool, this.programId),
+      pool,
+      oracle: deriveOracle(pool, this.programId),
+      reserveX: deriveReserve(params.tokenXMint, pool, this.programId),
+      reserveY: deriveReserve(params.tokenYMint, pool, this.programId),
       tickArrayBitmapExtension,
       tokenXProgram,
       tokenYProgram,

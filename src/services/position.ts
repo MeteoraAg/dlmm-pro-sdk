@@ -1,4 +1,9 @@
-import { Transaction, type AccountMeta, type PublicKey } from "@solana/web3.js";
+import {
+  Transaction,
+  type AccountMeta,
+  type PublicKey,
+  type TransactionInstruction,
+} from "@solana/web3.js";
 import BN from "bn.js";
 import {
   MAX_BASIS_POINT,
@@ -17,7 +22,6 @@ import {
   getPendingFees,
   getTokenProgram,
   isSupportExtension,
-  LIQUIDITY_HOOKS,
   liquidityBitmap,
   MAX_POSITION_DELEGATE_PERMISSION,
   positionIndexesFromBitmap,
@@ -28,6 +32,8 @@ import {
   tickArrayIndexesForTickIds,
   tickArrayRemainingAccounts,
   tickArraysForTickIds,
+  validateAddLiquidityByWeightParameters,
+  validateBitmapLiquidities,
 } from "../helpers";
 import {
   assertOptionalU16,
@@ -36,7 +42,7 @@ import {
   assertU64,
   assertU128,
 } from "../helpers/validation";
-import { I128_MAX, U64_MAX, U128_MAX, safeAdd, safeMul } from "../math";
+import { U64_MAX, safeAdd } from "../math";
 import { calculateTransferFeeExcludedAmount } from "../quote";
 import {
   PoolExtension,
@@ -238,32 +244,6 @@ export type CompoundFeesParams = Omit<PositionTokenAccounts, "tickRanges"> & {
   minAmountY?: BN;
 };
 
-function validateBitmapLiquidities(bitmap: BN, liquidities: BN[]): void {
-  const selected = positionIndexesFromBitmap(bitmap);
-  if (selected.length !== liquidities.length) {
-    throw PoolError.invalidParameters();
-  }
-  for (const liquidity of liquidities) {
-    assertU128(liquidity);
-    if (liquidity.isZero()) {
-      throw PoolError.liquidityIsZero();
-    }
-    if (liquidity.gt(I128_MAX)) {
-      throw PoolError.liquidityIsTooHigh();
-    }
-  }
-}
-
-function validateLiquidityAmounts(
-  amountX: BN,
-  amountY: BN,
-  expectedLayoutVersion: number | null,
-): void {
-  assertU64(amountX);
-  assertU64(amountY);
-  assertOptionalU16(expectedLayoutVersion);
-}
-
 function requireTick(
   ticks: Map<number, DecodedTick>,
   tickId: number,
@@ -313,11 +293,9 @@ export class PositionService extends DlmmProProgram {
   }
 
   async addLiquidity(params: AddLiquidityParams) {
-    validateLiquidityAmounts(
-      params.parameters.maxAmountX,
-      params.parameters.maxAmountY,
-      params.parameters.expectedLayoutVersion,
-    );
+    assertU64(params.parameters.maxAmountX);
+    assertU64(params.parameters.maxAmountY);
+    assertOptionalU16(params.parameters.expectedLayoutVersion);
     validateBitmapLiquidities(
       params.parameters.bitmap,
       params.parameters.liquidities,
@@ -333,31 +311,7 @@ export class PositionService extends DlmmProProgram {
   }
 
   async addLiquidityByWeight(params: AddLiquidityByWeightParams) {
-    const { multiplier, liquidities: weights } = params.parameters;
-    validateLiquidityAmounts(
-      params.parameters.maxAmountX,
-      params.parameters.maxAmountY,
-      params.parameters.expectedLayoutVersion,
-    );
-    assertU128(multiplier);
-    if (multiplier.isZero()) {
-      throw PoolError.liquidityIsZero();
-    }
-    if (
-      positionIndexesFromBitmap(params.parameters.bitmap).length !==
-      weights.length
-    ) {
-      throw PoolError.invalidParameters();
-    }
-    for (const weight of weights) {
-      assertU8(weight);
-      if (weight === 0) {
-        throw PoolError.liquidityIsZero();
-      }
-      if (safeMul(multiplier, new BN(weight), U128_MAX).gt(I128_MAX)) {
-        throw PoolError.liquidityIsTooHigh();
-      }
-    }
+    validateAddLiquidityByWeightParameters(params.parameters);
     const ctx = await this.liquidityAccounts(params, "deposit");
     const tx = await this.program.methods
       .addLiquidityByWeight(params.parameters, ctx.remainingAccountsInfo)
@@ -381,11 +335,9 @@ export class PositionService extends DlmmProProgram {
   }
 
   async removeLiquidity(params: RemoveLiquidityParams) {
-    validateLiquidityAmounts(
-      params.parameters.minAmountX,
-      params.parameters.minAmountY,
-      params.parameters.expectedLayoutVersion,
-    );
+    assertU64(params.parameters.minAmountX);
+    assertU64(params.parameters.minAmountY);
+    assertOptionalU16(params.parameters.expectedLayoutVersion);
     validateBitmapLiquidities(
       params.parameters.bitmap,
       params.parameters.liquidities,
@@ -401,11 +353,9 @@ export class PositionService extends DlmmProProgram {
   }
 
   async removeLiquidityByBps(params: RemoveLiquidityByBpsParams) {
-    validateLiquidityAmounts(
-      params.parameters.minAmountX,
-      params.parameters.minAmountY,
-      params.parameters.expectedLayoutVersion,
-    );
+    assertU64(params.parameters.minAmountX);
+    assertU64(params.parameters.minAmountY);
+    assertOptionalU16(params.parameters.expectedLayoutVersion);
     if (
       !Number.isInteger(params.parameters.bps) ||
       params.parameters.bps <= 0 ||
@@ -427,7 +377,9 @@ export class PositionService extends DlmmProProgram {
   }
 
   async claimFee(params: ClaimFeeParams): Promise<{ tx: Transaction }> {
-    return { tx: await this.claimFeeTx(params) };
+    const tx = new Transaction().add(...(await this.claimFeeIxs(params)));
+    tx.feePayer = params.signer;
+    return { tx };
   }
 
   /**
@@ -451,7 +403,6 @@ export class PositionService extends DlmmProProgram {
     claimable: ClaimableFees;
     parameters: AddLiquidityImbalanceParameters;
   }> {
-    assertU8(params.index);
     const pool = await this.state.fetchPool(params.pool);
     const claimable = await this.claimableFees(
       params.pool,
@@ -534,8 +485,8 @@ export class PositionService extends DlmmProProgram {
       transferHookX: params.transferHookX,
       transferHookY: params.transferHookY,
     };
-    const [claimTx, deposit] = await Promise.all([
-      this.claimFeeTx(
+    const [claimIxs, deposit] = await Promise.all([
+      this.claimFeeIxs(
         {
           ...accounts,
           bitmap: claimable.bitmap,
@@ -560,16 +511,13 @@ export class PositionService extends DlmmProProgram {
         pool,
       ),
     ]);
-    const depositTx = await this.program.methods
+    const depositIx = await this.program.methods
       .addLiquidityImbalance(parameters, deposit.remainingAccountsInfo)
       .accountsPartial(deposit.accounts)
       .remainingAccounts(deposit.remainingAccounts)
-      .transaction();
+      .instruction();
 
-    const tx = new Transaction().add(
-      ...claimTx.instructions,
-      ...depositTx.instructions,
-    );
+    const tx = new Transaction().add(...claimIxs, depositIx);
     tx.feePayer = params.signer;
     return { tx, position: deposit.position, claimable, parameters };
   }
@@ -695,13 +643,11 @@ export class PositionService extends DlmmProProgram {
     ) {
       throw PoolError.invalidParameters();
     }
-    assertOptionalU16(params.expectedLayoutVersion ?? null);
+    const expectedLayoutVersion = params.expectedLayoutVersion ?? null;
+    assertOptionalU16(expectedLayoutVersion);
 
     const tx = await this.program.methods
-      .lockPermanentPosition({
-        bps: params.bps,
-        expectedLayoutVersion: params.expectedLayoutVersion ?? null,
-      })
+      .lockPermanentPosition({ bps: params.bps, expectedLayoutVersion })
       .accountsPartial({
         pool: params.pool,
         position: derivePosition(params.nftMint, this.programId),
@@ -739,7 +685,7 @@ export class PositionService extends DlmmProProgram {
   ): Promise<{ tx: Transaction }> {
     positionIndexesFromBitmap(params.bitmap);
     const { tickSpacing } = await this.state.fetchPool(params.pool);
-    const tx = await this.refreshFeesAndRewardsTx({
+    const ix = await this.refreshFeesAndRewardsIx({
       pool: params.pool,
       nftMint: params.nftMint,
       nftAccount:
@@ -750,6 +696,7 @@ export class PositionService extends DlmmProProgram {
       tickSpacing,
     });
 
+    const tx = new Transaction().add(ix);
     tx.feePayer = params.signer;
     return { tx };
   }
@@ -783,15 +730,17 @@ export class PositionService extends DlmmProProgram {
   }
 
   /** `compoundFees` passes the pool it already read. */
-  private async claimFeeTx(
+  private async claimFeeIxs(
     params: ClaimFeeParams,
     pool?: Pool,
-  ): Promise<Transaction> {
-    assertU64(params.minAmountX ?? new BN(0));
-    assertU64(params.minAmountY ?? new BN(0));
+  ): Promise<TransactionInstruction[]> {
+    const minAmountX = params.minAmountX ?? new BN(0);
+    const minAmountY = params.minAmountY ?? new BN(0);
+    assertU64(minAmountX);
+    assertU64(minAmountY);
     positionIndexesFromBitmap(params.bitmap);
     const ctx = await this.tokenAccounts(params, "withdraw", pool);
-    const refresh = await this.refreshFeesAndRewardsTx({
+    const refresh = await this.refreshFeesAndRewardsIx({
       pool: params.pool,
       nftMint: params.nftMint,
       nftAccount: ctx.accounts.nftAccount,
@@ -801,21 +750,11 @@ export class PositionService extends DlmmProProgram {
       tickSpacing: ctx.pool.tickSpacing,
     });
     const claim = await this.program.methods
-      .claimFee(
-        params.minAmountX ?? new BN(0),
-        params.minAmountY ?? new BN(0),
-        ctx.hooks.remainingAccountsInfo,
-      )
+      .claimFee(minAmountX, minAmountY, ctx.hooks.remainingAccountsInfo)
       .accountsPartial(ctx.accounts)
       .remainingAccounts(ctx.hooks.remainingAccounts)
-      .transaction();
-
-    const tx = new Transaction().add(
-      ...refresh.instructions,
-      ...claim.instructions,
-    );
-    tx.feePayer = params.signer;
-    return tx;
+      .instruction();
+    return [refresh, claim];
   }
 
   /** Accounts and hook metas of an instruction moving X and Y between the user and the reserves. */
@@ -843,29 +782,26 @@ export class PositionService extends DlmmProProgram {
       : derivePoolAuthority(this.programId);
     const [poolState, hooks] = await Promise.all([
       pool ?? this.state.fetchPool(params.pool),
-      resolveInstructionHooks(
-        this.connection,
-        this.commitment,
-        LIQUIDITY_HOOKS,
-        {
-          transferHookX: params.transferHookX,
-          transferHookY: params.transferHookY,
-        },
-        {
-          transferHookX: {
+      resolveInstructionHooks(this.connection, this.commitment, {
+        transferHookX: {
+          metas: params.transferHookX,
+          leg: {
             mint: params.tokenXMint,
             source: deposit ? params.userTokenX : reserveX,
             destination: deposit ? reserveX : params.userTokenX,
             authority,
           },
-          transferHookY: {
+        },
+        transferHookY: {
+          metas: params.transferHookY,
+          leg: {
             mint: params.tokenYMint,
             source: deposit ? params.userTokenY : reserveY,
             destination: deposit ? reserveY : params.userTokenY,
             authority,
           },
         },
-      ),
+      }),
     ]);
     return {
       pool: poolState,

@@ -5,7 +5,10 @@ import {
   type Commitment,
   type Connection,
 } from "@solana/web3.js";
+import { ACCESS_REGISTRY_PROGRAM_ID } from "../constants";
 import type { DlmmProProvider } from "../dlmm_pro";
+import { createAccessRegistryProgram } from "../helpers/create_program";
+import type { AccessRegistry } from "../idl/access-registry/access_registry";
 import type { DlmmPro } from "../idl/dlmm-pro/dlmm_pro";
 import {
   decodeLimitOrderDataFromData,
@@ -13,8 +16,6 @@ import {
   decodePoolExtensionsFromData,
   decodePositionsFromData,
   decodeTicksFromData,
-  getBitmapSetIndicesFromPool,
-  getExtensionBitmapSetIndicesFromState,
   isSupportExtension,
 } from "../helpers/codec";
 import {
@@ -37,15 +38,18 @@ import {
   type StaticConfig,
   type TickArray,
   type TickArrayBitmapExtension,
+  type TokenBadge,
 } from "../types";
 
 export class StateService {
   private readonly program: Program<DlmmPro>;
+  private readonly accessRegistry: Program<AccessRegistry>;
   private readonly commitment: Commitment;
   private readonly connection: Connection;
 
   constructor(provider: DlmmProProvider) {
     this.program = provider.program;
+    this.accessRegistry = createAccessRegistryProgram(provider.connection);
     this.commitment = provider.commitment;
     this.connection = provider.connection;
   }
@@ -89,14 +93,9 @@ export class StateService {
     extensions: DecodedPoolExtensions;
   }> {
     const data = await this.getAccountData(poolAddress);
-    const pool = this.program.coder.accounts.decode<Pool>("pool", data);
     return {
-      pool,
-      extensions: decodePoolExtensionsFromData(
-        data,
-        this.program.account.pool.size,
-        pool.extensions,
-      ),
+      pool: this.program.coder.accounts.decode<Pool>("pool", data),
+      extensions: decodePoolExtensionsFromData(data),
     };
   }
 
@@ -128,11 +127,7 @@ export class StateService {
         "positionArray",
         data,
       ),
-      positions: decodePositionsFromData(
-        data,
-        this.program.account.positionArray.size,
-        opts.withReward,
-      ),
+      positions: decodePositionsFromData(data, opts.withReward),
     };
   }
 
@@ -167,11 +162,7 @@ export class StateService {
           "tickArray",
           data,
         ),
-        ticks: decodeTicksFromData(
-          data,
-          this.program.account.tickArray.size,
-          opts.withReward,
-        ),
+        ticks: decodeTicksFromData(data, opts.withReward),
       };
     });
   }
@@ -182,18 +173,28 @@ export class StateService {
     return this.fetchAccount(extensionAddress, "tickArrayBitmapExtension");
   }
 
+  async fetchTokenBadge(address: PublicKey): Promise<TokenBadge> {
+    const info = await this.connection.getAccountInfo(address, this.commitment);
+    if (!info) {
+      throw new Error(`Account not found: ${address.toBase58()}`);
+    }
+    if (!info.owner.equals(ACCESS_REGISTRY_PROGRAM_ID)) {
+      throw new Error(
+        `Account ${address.toBase58()} is not owned by the access-registry program`,
+      );
+    }
+    return this.accessRegistry.coder.accounts.decode<TokenBadge>(
+      "tokenBadge",
+      info.data,
+    );
+  }
+
   async fetchOperator(operatorAddress: PublicKey): Promise<Operator> {
     return this.fetchAccount(operatorAddress, "operator");
   }
 
   async fetchOracle(oracleAddress: PublicKey): Promise<Oracle> {
     return this.fetchAccount(oracleAddress, "oracle");
-  }
-
-  async decodePoolExtensions(
-    poolAddress: PublicKey,
-  ): Promise<DecodedPoolExtensions> {
-    return (await this.fetchPoolWithExtensions(poolAddress)).extensions;
   }
 
   async decodePositions(
@@ -213,11 +214,7 @@ export class StateService {
         PoolExtension.LiquidityMining,
       );
     }
-    return decodePositionsFromData(
-      data,
-      this.program.account.positionArray.size,
-      withReward,
-    );
+    return decodePositionsFromData(data, withReward);
   }
 
   /** `withReward` must match the pool's liquidity-mining extension bit. */
@@ -226,41 +223,20 @@ export class StateService {
     opts: DecodeTicksOpts,
   ): Promise<DecodedTick[] | DecodedTickWithReward[]> {
     const data = await this.getAccountData(tickArrayAddress);
-    return decodeTicksFromData(
-      data,
-      this.program.account.tickArray.size,
-      opts.withReward,
-    );
+    return decodeTicksFromData(data, opts.withReward);
   }
 
   async decodeLimitOrderData(
     limitOrderAddress: PublicKey,
   ): Promise<DecodedLimitOrderData[]> {
     const data = await this.getAccountData(limitOrderAddress);
-    return decodeLimitOrderDataFromData(
-      data,
-      this.program.account.limitOrder.size,
-    );
+    return decodeLimitOrderDataFromData(data);
   }
 
   async decodeObservations(
     oracleAddress: PublicKey,
   ): Promise<DecodedObservation[]> {
     const data = await this.getAccountData(oracleAddress);
-    return decodeObservationsFromData(data, this.program.account.oracle.size);
-  }
-
-  /** Tick-array indices set in the pool's default bitmap (-512..511). */
-  async getBitmapSetIndices(poolAddress: PublicKey): Promise<number[]> {
-    const poolState = await this.fetchPool(poolAddress);
-    return getBitmapSetIndicesFromPool(poolState);
-  }
-
-  async getExtensionBitmapSetIndices(
-    extensionAddress: PublicKey,
-  ): Promise<number[]> {
-    const extensionState =
-      await this.fetchTickArrayBitmapExtension(extensionAddress);
-    return getExtensionBitmapSetIndicesFromState(extensionState);
+    return decodeObservationsFromData(data);
   }
 }

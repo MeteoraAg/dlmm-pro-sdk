@@ -12,16 +12,14 @@ import {
   getLiquidityFromAmountX,
   getLiquidityFromAmountY,
 } from "../math/curve_math";
-import { getAmountsFromLiquidity, liquidityBitmap } from "../helpers/liquidity";
-import { isUsableTickId } from "../helpers/tick_array";
 import {
-  I128_MAX,
-  U64_MAX,
-  U128_MAX,
-  safeMul,
-  tryCastU64,
-  tryCastU128,
-} from "../math/safe_math";
+  getAmountsFromLiquidity,
+  isLiquidityWeight,
+  liquidityBitmap,
+  validateAddLiquidityByWeightParameters,
+} from "../helpers/liquidity";
+import { isUsableTickId } from "../helpers/tick_array";
+import { I128_MAX, U64_MAX, U128_MAX, safeMul } from "../math/safe_math";
 import { getSqrtPriceFromTickId } from "../math/tick_math";
 import { transferFeeIncludedAmountWithinU64 } from "../quote/transfer_fee";
 import {
@@ -33,7 +31,6 @@ import {
 } from "../types";
 import { stackWeightLevels } from "./layers";
 import {
-  isLiquidityWeight,
   quantizeWeights,
   toWeightsByStrategy,
   type TickWeight,
@@ -180,21 +177,6 @@ export function encodeAddLiquidityByWeight(args: {
   if (args.ranges.length === 0 || args.ranges.length > POSITION_MAX_RANGE) {
     throw PoolError.invalidParameters();
   }
-  if (args.multiplier.lte(new BN(0))) {
-    throw PoolError.invalidParameters();
-  }
-  tryCastU64(args.maxAmountX);
-  tryCastU64(args.maxAmountY);
-  tryCastU128(args.multiplier);
-  if (
-    args.expectedLayoutVersion !== undefined &&
-    (!Number.isInteger(args.expectedLayoutVersion) ||
-      args.expectedLayoutVersion < 0 ||
-      args.expectedLayoutVersion > 0xffff)
-  ) {
-    throw PoolError.invalidParameters();
-  }
-
   const positionIndexes =
     args.positionIndexes ??
     Array.from({ length: args.ranges.length }, (_, index) => index);
@@ -212,14 +194,7 @@ export function encodeAddLiquidityByWeight(args: {
   if (!weights.every(isLiquidityWeight)) {
     throw PoolError.invalidParameters();
   }
-  for (const weight of weights) {
-    const liquidity = safeMul(args.multiplier, new BN(weight), U128_MAX);
-    if (liquidity.gt(I128_MAX)) {
-      throw PoolError.liquidityIsTooHigh();
-    }
-  }
-
-  return {
+  const parameters = {
     maxAmountX: args.maxAmountX,
     maxAmountY: args.maxAmountY,
     expectedLayoutVersion: args.expectedLayoutVersion ?? null,
@@ -227,6 +202,8 @@ export function encodeAddLiquidityByWeight(args: {
     multiplier: args.multiplier,
     liquidities: Buffer.from(weights),
   };
+  validateAddLiquidityByWeightParameters(parameters);
+  return parameters;
 }
 
 export function amountsFromShape(args: {

@@ -49,7 +49,7 @@ function references(pool: Pool): References {
 
 describe("dynamic fee regimes", () => {
   const svm = initializeSVM();
-  const client = DlmmProClient.create(createSvmConnection(svm));
+  const client = new DlmmProClient(createSvmConnection(svm));
 
   let market: Market;
   let pool: PublicKey;

@@ -17,6 +17,10 @@ import {
   tickArraysForTickIds,
 } from "../src";
 import {
+  getBitmapSetIndicesFromPool,
+  getExtensionBitmapSetIndicesFromState,
+} from "../src/helpers/codec";
+import {
   getFeeGrowthInside,
   getPendingFees,
 } from "../src/helpers/position_fees";
@@ -47,7 +51,7 @@ const OUTER_RANGE = { tickLowerId: 65536, tickUpperId: 65664 };
 
 describe("position instructions", () => {
   const svm = initializeSVM();
-  const client = DlmmProClient.create(createSvmConnection(svm));
+  const client = new DlmmProClient(createSvmConnection(svm));
   const tickSpacing = 1;
 
   let market: Market;
@@ -782,11 +786,15 @@ describe("position instructions", () => {
     expect(
       (await getPositionTotalLiquidity(client, opened.nftMint)).gt(new BN(0)),
     ).toBe(true);
-    expect(await client.state.getBitmapSetIndices(outerPool)).not.toContain(
-      512,
-    );
     expect(
-      await client.state.getExtensionBitmapSetIndices(tickArrayBitmapExtension),
+      getBitmapSetIndicesFromPool(await client.state.fetchPool(outerPool)),
+    ).not.toContain(512);
+    expect(
+      getExtensionBitmapSetIndicesFromState(
+        await client.state.fetchTickArrayBitmapExtension(
+          tickArrayBitmapExtension,
+        ),
+      ),
     ).toEqual([512, 513]);
 
     const { tx } = await client.position.removeLiquidityByBps({
@@ -806,7 +814,11 @@ describe("position instructions", () => {
       (await getPositionTotalLiquidity(client, opened.nftMint)).isZero(),
     ).toBe(true);
     expect(
-      await client.state.getExtensionBitmapSetIndices(tickArrayBitmapExtension),
+      getExtensionBitmapSetIndicesFromState(
+        await client.state.fetchTickArrayBitmapExtension(
+          tickArrayBitmapExtension,
+        ),
+      ),
     ).toEqual([]);
   });
 

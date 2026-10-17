@@ -15,10 +15,7 @@ import {
 import { validateDynamicFeeParameters } from "../src/helpers/pool_fees";
 import { getActivationHandler } from "../src/activation";
 import { getBaseFeeHandler } from "../src/base_fee";
-import {
-  LIQUIDITY_HOOKS,
-  remainingAccountsFromHooks,
-} from "../src/helpers/remaining_accounts";
+import { remainingAccountsFromHooks } from "../src/helpers/remaining_accounts";
 import { tickArrayRemainingAccounts } from "../src/helpers/tick_array";
 import { DYNAMIC_FEE_PARAMETERS } from "./helpers";
 
@@ -38,28 +35,6 @@ describe("client-side validation", () => {
         code: PoolErrorCode.InvalidRemainingAccountSlice,
       }),
     );
-  });
-
-  it("rejects hook slices the instruction does not accept", () => {
-    const account = {
-      pubkey: PublicKey.default,
-      isSigner: false,
-      isWritable: false,
-    };
-    expect(() =>
-      remainingAccountsFromHooks(
-        { transferHookReward: [account] },
-        LIQUIDITY_HOOKS,
-      ),
-    ).toThrow(
-      expect.objectContaining({
-        code: PoolErrorCode.InvalidRemainingAccountSlice,
-      }),
-    );
-    expect(
-      remainingAccountsFromHooks({ transferHookReward: [] }, LIQUIDITY_HOOKS)
-        .remainingAccounts,
-    ).toEqual([]);
   });
 
   it("limits liquidity bitmaps to position slots supported by the program", () => {

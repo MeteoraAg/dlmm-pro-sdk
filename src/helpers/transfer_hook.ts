@@ -72,30 +72,29 @@ export async function getExtraAccountMetasForTransferHook(
 }
 
 /**
- * Pack hook metas for one instruction. A caller-supplied array is used as-is.
- * An omitted array is resolved from the mint when a leg is provided.
- * A non-empty array of a slice type the instruction does not accept fails
- * here, matching the program's `InvalidRemainingAccountSlice`.
+ * Pack hook metas for one instruction. A `metas` array is used as-is, even
+ * when empty; otherwise the metas are resolved from `leg`. Keys with neither
+ * are skipped.
  */
 export async function resolveInstructionHooks(
   connection: Connection,
   commitment: Commitment | undefined,
-  allowed: readonly HookKey[],
-  provided: Partial<Record<HookKey, AccountMeta[] | undefined>>,
-  legs: Partial<Record<HookKey, TransferHookLeg | undefined>> = {},
+  hooks: Partial<
+    Record<HookKey, { metas?: AccountMeta[]; leg?: TransferHookLeg }>
+  >,
 ) {
-  const resolved = { ...provided };
+  const resolved: Partial<Record<HookKey, AccountMeta[]>> = {};
   await Promise.all(
-    allowed.map(async (key) => {
-      const leg = legs[key];
-      if (provided[key] === undefined && leg) {
-        resolved[key] = await getExtraAccountMetasForTransferHook(
-          connection,
-          leg,
-          commitment,
-        );
-      }
+    Object.entries(hooks).map(async ([key, { metas, leg }]) => {
+      resolved[key as HookKey] =
+        metas ??
+        (leg &&
+          (await getExtraAccountMetasForTransferHook(
+            connection,
+            leg,
+            commitment,
+          )));
     }),
   );
-  return remainingAccountsFromHooks(resolved, allowed);
+  return remainingAccountsFromHooks(resolved);
 }

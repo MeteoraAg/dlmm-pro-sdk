@@ -14,7 +14,7 @@ import {
 
 describe("oracle", () => {
   const svm = initializeSVM();
-  const client = DlmmProClient.create(createSvmConnection(svm));
+  const client = new DlmmProClient(createSvmConnection(svm));
 
   it("grows the observation buffer and records samples after swaps", async () => {
     warpToTime(svm, 1_700_000_000n);

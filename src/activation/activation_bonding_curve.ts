@@ -74,9 +74,6 @@ export class ActivationBondingCurveHandler {
     if (this.inner.targetIncreaseBps.lte(new BN(MAX_BASIS_POINT))) {
       throw PoolError.invalidParameters();
     }
-    if (!Number.isInteger(tickSpacing) || tickSpacing <= 0) {
-      throw PoolError.invalidParameters();
-    }
 
     const target = mulDivU192(
       initSqrtPrice,

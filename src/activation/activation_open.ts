@@ -18,10 +18,6 @@ export function decodePodAlignedActivationOpen(
   };
 }
 
-export function encodeOpenActivationData(): number[] {
-  return Array.from(Buffer.alloc(15, 0));
-}
-
 export class ActivationOpenHandler {
   readonly inner: PodAlignedActivationOpen;
 
@@ -49,6 +45,6 @@ export class ActivationOpenHandler {
 export function openActivationParameters(): PoolActivationInfoParameters {
   return {
     activationMode: ActivationMode.Open,
-    data: encodeOpenActivationData(),
+    data: Array.from(Buffer.alloc(15, 0)),
   };
 }

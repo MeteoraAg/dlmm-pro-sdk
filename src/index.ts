@@ -46,7 +46,6 @@ export {
 } from "./constants";
 
 export {
-  deriveAccessRegistryOperator,
   deriveDynamicConfig,
   deriveLaunchPool,
   deriveLimitOrder,

@@ -11,7 +11,6 @@ import {
   PoolExtension,
   PositionDelegatePermission,
   positionDelegatePermissionMask,
-  tickArraysForRanges,
   type TickRange,
 } from "../src";
 import {
@@ -76,8 +75,7 @@ describe("delegate permission masks", () => {
 
 describe("NFT delegates", () => {
   const svm = initializeSVM();
-  const client = DlmmProClient.create(createSvmConnection(svm));
-  const tickSpacing = 1;
+  const client = new DlmmProClient(createSvmConnection(svm));
 
   let market: Market;
   let pool: PublicKey;
@@ -183,11 +181,6 @@ describe("NFT delegates", () => {
     await seedPoolLiquidity(svm, client, market, orderPool);
     const tickId = 2;
     const orderAmount = new BN(100_000);
-    const tickArrays = tickArraysForRanges(
-      orderPool,
-      [{ tickLowerId: tickId, tickUpperId: tickId }],
-      tickSpacing,
-    );
     const nftMintKp = Keypair.generate();
     const opened = await client.limitOrder.openLimitOrder({
       pool: orderPool,
@@ -202,7 +195,6 @@ describe("NFT delegates", () => {
         relativeTick: null,
         ticks: [{ id: tickId, amount: orderAmount }],
       },
-      tickArrays,
     });
     sendTransaction(svm, opened.tx, [market.payer, market.lpOwner, nftMintKp]);
 
@@ -225,7 +217,6 @@ describe("NFT delegates", () => {
     const { tx } = await client.limitOrder.cancelLimitOrder({
       ...delegateAccounts(orderPool, nftMintKp.publicKey),
       tickIds: [tickId],
-      tickArrays,
     });
     sendTransaction(svm, tx, [delegate]);
     expect(

@@ -1,6 +1,5 @@
 import type { Commitment, Connection, PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
-import { NUMBER_OF_ACTIVATION_MODES } from "../constants";
 import { PoolError } from "../errors";
 import { readClock } from "../helpers/account_reads";
 import {
@@ -58,34 +57,11 @@ export function getActivationHandler(
   }
 }
 
-export function validateActivationInitialize(
-  info: PoolActivationInfoParameters,
-  activationPoint: BN,
-  currentPoint: BN,
-  activationType: ActivationType,
-  initSqrtPrice: BN,
-  tickSpacing: number,
-  whitelistedAddLiquidity: PublicKey,
-): void {
-  getActivationHandler(info).validateInitialize({
-    activationPoint,
-    currentPoint,
-    activationType,
-    initSqrtPrice,
-    tickSpacing,
-    whitelistedAddLiquidity,
-  });
-}
-
 export function validateActivationCombination(
   activationModes: ActivationMode[],
   activationPoint: BN,
   currentPoint: BN,
 ): void {
-  if (activationModes.length !== NUMBER_OF_ACTIVATION_MODES) {
-    throw PoolError.invalidParameters();
-  }
-
   const [first, second] = activationModes;
   const allowed =
     (first === ActivationMode.Open && second === ActivationMode.Open) ||

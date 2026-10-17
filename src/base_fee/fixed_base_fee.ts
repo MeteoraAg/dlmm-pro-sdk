@@ -2,7 +2,7 @@ import BN from "bn.js";
 import { PoolError } from "../errors";
 import { encodePodU64, toPodBuffer } from "../helpers/pod";
 import type { BaseFeeConfig } from "../types";
-import { validateFeeBounds } from "./fee_fraction";
+import { validateFeeBounds } from "./fee_bounds";
 
 export type PodAlignedFixedFee = {
   baseFeeMode: number;

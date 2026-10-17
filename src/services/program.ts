@@ -3,7 +3,7 @@ import type {
   Commitment,
   Connection,
   PublicKey,
-  Transaction,
+  TransactionInstruction,
 } from "@solana/web3.js";
 import type BN from "bn.js";
 import type { DlmmProClientContext } from "../dlmm_pro";
@@ -27,7 +27,7 @@ export class DlmmProProgram {
     this.state = client.state;
   }
 
-  protected refreshFeesAndRewardsTx(params: {
+  protected refreshFeesAndRewardsIx(params: {
     pool: PublicKey;
     nftMint: PublicKey;
     nftAccount: PublicKey;
@@ -35,7 +35,7 @@ export class DlmmProProgram {
     bitmap: BN;
     tickRanges: TickRange[];
     tickSpacing: number;
-  }): Promise<Transaction> {
+  }): Promise<TransactionInstruction> {
     return this.program.methods
       .refreshFeesAndRewards(params.bitmap)
       .accountsPartial({
@@ -56,6 +56,6 @@ export class DlmmProProgram {
               this.programId,
             ),
       )
-      .transaction();
+      .instruction();
   }
 }

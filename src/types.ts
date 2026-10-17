@@ -102,7 +102,6 @@ export type DecodedPoolRewardInfo = {
   rewardTokenFlag: number;
 };
 
-/** Pool-creation values a slot's `validateInitialize` checks against. */
 export type DecodedPoolActivationInfo = {
   activationMode: number;
   data: number[];

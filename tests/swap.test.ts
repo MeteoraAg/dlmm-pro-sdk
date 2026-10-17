@@ -18,7 +18,7 @@ import {
 
 describe("swap", () => {
   const svm = initializeSVM();
-  const client = DlmmProClient.create(createSvmConnection(svm));
+  const client = new DlmmProClient(createSvmConnection(svm));
   const inputAmount = new BN(50_000);
 
   let market: Market;
@@ -108,6 +108,6 @@ describe("swap", () => {
         },
         tickArrays: [],
       }),
-    ).rejects.toMatchObject({ code: PoolErrorCode.TypeCastFailed });
+    ).rejects.toMatchObject({ code: PoolErrorCode.InvalidParameters });
   });
 });

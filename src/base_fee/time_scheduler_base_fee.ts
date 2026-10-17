@@ -10,7 +10,7 @@ import {
   U64_MAX,
 } from "../math/safe_math";
 import { BaseFeeMode, type BaseFeeConfig } from "../types";
-import { validateFeeBounds } from "./fee_fraction";
+import { validateFeeBounds } from "./fee_bounds";
 
 export type PodAlignedFeeTimeScheduler = {
   baseFeeMode: number;
@@ -109,17 +109,12 @@ export class FeeTimeScheduler {
     return getFeeInPeriod(cliffFeeNumerator, reductionFactor, period);
   }
 
-  getMinFeeNumerator(): BN {
-    return this.getBaseFeeNumeratorByPeriod(this.inner.numberOfPeriod);
-  }
-
-  getMaxFeeNumerator(): BN {
-    return this.inner.cliffFeeNumerator;
-  }
-
   validate(): void {
     validateScheduler(this.inner);
-    validateFeeBounds(this.getMinFeeNumerator(), this.getMaxFeeNumerator());
+    validateFeeBounds(
+      this.getBaseFeeNumeratorByPeriod(this.inner.numberOfPeriod),
+      this.inner.cliffFeeNumerator,
+    );
   }
 
   getBaseFeeNumerator(

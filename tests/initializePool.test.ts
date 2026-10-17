@@ -22,7 +22,7 @@ import {
   PoolErrorCode,
   PoolExtension,
   PoolType,
-  tickArraysForRanges,
+  tickArraysForSwap,
   timeBasedActivationParameters,
   TokenProgramFlags,
   type StaticConfigParameters,
@@ -56,7 +56,7 @@ import {
 describe("initialize pool", () => {
   const svm = initializeSVM();
   const connection = createSvmConnection(svm);
-  const client = DlmmProClient.create(connection);
+  const client = new DlmmProClient(connection);
 
   const admin = createAndFundWallet(svm);
   const operator = createAndFundWallet(svm);
@@ -181,6 +181,9 @@ describe("initialize pool", () => {
         signer: registryOperator,
         payer,
       });
+      expect(
+        (await client.state.fetchTokenBadge(tokenBadgeX)).tokenMint.toBase58(),
+      ).toBe(badgeMint.toBase58());
       const { tx, pool } = await client.pool.initializePoolWithStaticConfig({
         config: await staticConfig(),
         tokenXMint: badgeMint,
@@ -324,7 +327,7 @@ describe("initialize pool", () => {
       });
       sendTransaction(svm, tx, [payer, creator]);
 
-      const extensions = await client.state.decodePoolExtensions(pool);
+      const { extensions } = await client.state.fetchPoolWithExtensions(pool);
       expect(extensions.hasActivationAccess).toBe(true);
       expect(extensions.activation?.activations[1].activationMode).toBe(
         ActivationMode.TimeBased,
@@ -382,7 +385,6 @@ describe("initialize pool", () => {
         tokenYMint,
         payer.publicKey,
       );
-      const tickRanges = [{ tickLowerId: -128, tickUpperId: 128 }];
       const inputAmount = new BN(1_000);
       const { tx: swapTx } = await client.pool.swap({
         pool,
@@ -396,7 +398,11 @@ describe("initialize pool", () => {
           inputAmount,
           minimumOutputAmount: new BN(0),
         },
-        tickArrays: tickArraysForRanges(pool, tickRanges, 1),
+        tickArrays: tickArraysForSwap({
+          pool,
+          poolState: await client.state.fetchPool(pool),
+          swapForY: false,
+        }).tickArrays,
       });
       sendTransactionExpectingError(
         svm,
@@ -450,7 +456,7 @@ describe("initialize pool", () => {
       });
       sendTransaction(svm, tx, [payer, creator]);
 
-      const extensions = await client.state.decodePoolExtensions(pool);
+      const { extensions } = await client.state.fetchPoolWithExtensions(pool);
       expect(extensions.hasActivationAccess).toBe(true);
       expect(extensions.activation?.activations[1].activationMode).toBe(
         ActivationMode.BondingCurve,
