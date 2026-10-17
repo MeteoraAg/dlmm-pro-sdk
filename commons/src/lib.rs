@@ -14,7 +14,7 @@ pub mod constants;
 pub mod error;
 pub mod extensions;
 pub mod liquidity;
-// Kept textually identical to the program's `src/math`, so the two diff cleanly.
+// Copied from the program's src/math; only the msg! logging is removed.
 #[allow(
     clippy::cast_abs_to_unsigned,
     clippy::doc_lazy_continuation,

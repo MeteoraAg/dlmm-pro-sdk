@@ -154,6 +154,7 @@ pub fn claimable_rewards(
     reward_index: usize,
     current_timestamp: u64,
 ) -> Result<u64> {
+    require!(reward_index < NUM_REWARDS, PoolError::InvalidRewardIndex);
     let next = next_rewards_info(pool_reward, pool.liquidity, current_timestamp)?;
     let tick = |tick_id: i32| -> Result<&TickWithReward> {
         ticks
@@ -311,6 +312,22 @@ mod tests {
         assert_eq!(
             pending_rewards(&empty, &[u128::MAX; NUM_REWARDS]).unwrap(),
             [u64::MAX - 1, 1]
+        );
+    }
+
+    #[test]
+    fn claimable_rewards_rejects_an_out_of_range_reward_index() {
+        let position = PositionWithReward::zeroed();
+        assert_eq!(
+            claimable_rewards(
+                &Pool::zeroed(),
+                &PoolReward::zeroed(),
+                &[position],
+                &[],
+                NUM_REWARDS,
+                0,
+            ),
+            Err(PoolError::InvalidRewardIndex.into())
         );
     }
 }

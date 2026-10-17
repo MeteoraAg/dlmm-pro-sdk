@@ -87,8 +87,7 @@ pub fn calculate_transfer_fee_included_amount(
     if let Some(epoch_transfer_fee) = get_epoch_transfer_fee(mint_data, epoch)? {
         let transfer_fee: u64 =
             if u16::from(epoch_transfer_fee.transfer_fee_basis_points) == MAX_FEE_BASIS_POINTS {
-                // edge-case: if transfer fee rate is 100%, SPL's inverse fee is 0;
-                // use maximum_fee like the program does.
+                // edge-case: if transfer fee rate is 100%, current SPL implementation returns 0 as inverse fee.
                 u64::from(epoch_transfer_fee.maximum_fee)
             } else {
                 epoch_transfer_fee
