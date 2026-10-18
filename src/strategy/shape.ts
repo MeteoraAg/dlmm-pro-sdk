@@ -99,7 +99,7 @@ function sideOfTick(
   return LiquiditySide.Active;
 }
 
-export function toLiquidityColumns(
+function toLiquidityColumns(
   weights: TickWeight[],
   tickSpacing: number,
   currentTickId: number,
@@ -119,7 +119,7 @@ export function toLiquidityColumns(
   });
 }
 
-export function mergeEqualWeightRanges(
+function mergeEqualWeightRanges(
   weights: TickWeight[],
   tickSpacing: number,
 ): LiquidityRange[] {

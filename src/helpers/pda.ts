@@ -179,7 +179,7 @@ export function deriveLimitOrder(
   )[0];
 }
 
-export function assertRewardIndex(rewardIndex: number): void {
+function assertRewardIndex(rewardIndex: number): void {
   if (
     !Number.isInteger(rewardIndex) ||
     rewardIndex < 0 ||

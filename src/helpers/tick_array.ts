@@ -72,10 +72,7 @@ export function tickIdsInRange(
   return tickIds;
 }
 
-export function validateTickRanges(
-  ranges: TickRange[],
-  tickSpacing: number,
-): void {
+function validateTickRanges(ranges: TickRange[], tickSpacing: number): void {
   if (ranges.length === 0 || ranges.length > POSITION_MAX_RANGE) {
     throw PoolError.invalidParameters();
   }
