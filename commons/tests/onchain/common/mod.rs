@@ -19,6 +19,7 @@ use litesvm::types::{FailedTransactionMetadata, TransactionMetadata};
 use litesvm::LiteSVM;
 use litesvm_token::spl_token::state::Account as SplTokenAccount;
 use litesvm_token::{get_spl_account, CreateAssociatedTokenAccount, CreateMint};
+use ruint::aliases::{U192, U320};
 use solana_clock::Clock;
 use solana_keypair::Keypair;
 use solana_signer::Signer;
@@ -102,15 +103,59 @@ fn expect_sent(
 
 /// Token-2022 associated token account that holds a position or limit order NFT.
 fn nft_ata(owner: Pubkey, nft_mint: Pubkey) -> Pubkey {
-    Pubkey::find_program_address(
-        &[
-            owner.as_ref(),
-            spl_token_2022::ID.as_ref(),
-            nft_mint.as_ref(),
-        ],
-        &associated_token::ID,
+    associated_token::get_associated_token_address_with_program_id(
+        &owner,
+        &nft_mint,
+        &anchor_spl::token_2022::ID,
     )
-    .0
+}
+
+/// Liquidity for depositing at most `max_token_x`/`max_token_y` into
+/// `[tick_lower_id, tick_upper_id)` at the current price. The budgets are
+/// pool-side amounts: for a Token-2022 transfer-fee mint pass what the pool
+/// receives (`calculate_transfer_fee_excluded_amount`), since `add_liquidity`
+/// compares its fee-inclusive `max_amount_*` against the deposit plus fee.
+fn get_liquidity_from_amounts(
+    max_token_x: u64,
+    max_token_y: u64,
+    tick_lower_id: i32,
+    tick_upper_id: i32,
+    tick_current_id: i32,
+    current_sqrt_price: u128,
+) -> anchor_lang::Result<u128> {
+    let sqrt_price_lower = get_sqrt_price_from_tick_id(tick_lower_id);
+    let sqrt_price_upper = get_sqrt_price_from_tick_id(tick_upper_id);
+
+    let liquidity = if tick_current_id < tick_lower_id {
+        get_liquidity_from_amount_x(sqrt_price_lower, sqrt_price_upper, max_token_x)?
+    } else if tick_current_id < tick_upper_id {
+        let liquidity_x =
+            get_liquidity_from_amount_x(current_sqrt_price, sqrt_price_upper, max_token_x)?;
+        let liquidity_y =
+            get_liquidity_from_amount_y(sqrt_price_lower, current_sqrt_price, max_token_y)?;
+        match (liquidity_x, liquidity_y) {
+            (Some(x), Some(y)) => Some(x.min(y)),
+            (x, y) => x.or(y),
+        }
+    } else {
+        get_liquidity_from_amount_y(sqrt_price_lower, sqrt_price_upper, max_token_y)?
+    };
+
+    Ok(try_cast(liquidity.unwrap_or(U320::ZERO))?)
+}
+
+/// `time_delta * emission_per_second >> 64`.
+fn calculate_reward_amount(
+    time_delta: u64,
+    emission_per_second: u128,
+    rounding: Rounding,
+) -> anchor_lang::Result<u64> {
+    let prod = U192::from(time_delta).safe_mul(U192::from(emission_per_second))?;
+    let reward_amount = match rounding {
+        Rounding::Up => down_scale_ceil(prod, 64),
+        Rounding::Down => prod >> 64,
+    };
+    Ok(reward_amount.safe_cast()?)
 }
 
 fn writable_metas(addresses: &[Pubkey]) -> Vec<AccountMeta> {
@@ -410,25 +455,11 @@ pub fn initialize_static_pool(
     dynamic_fee: Option<types::DynamicFeeParameters>,
     initial_sqrt_price: u128,
 ) -> Pubkey {
-    initialize_static_pool_with_fee_mode(
-        market,
-        dynamic_fee,
-        initial_sqrt_price,
-        CollectFeeMode::OutputToken,
-    )
-}
-
-pub fn initialize_static_pool_with_fee_mode(
-    market: &mut Market,
-    dynamic_fee: Option<types::DynamicFeeParameters>,
-    initial_sqrt_price: u128,
-    collect_fee_mode: CollectFeeMode,
-) -> Pubkey {
     initialize_static_pool_with_options(
         market,
         dynamic_fee,
         initial_sqrt_price,
-        collect_fee_mode,
+        CollectFeeMode::OutputToken,
         0,
     )
 }
@@ -445,7 +476,7 @@ pub fn initialize_mining_pool(market: &mut Market) -> Pubkey {
     )
 }
 
-fn initialize_static_pool_with_options(
+pub fn initialize_static_pool_with_options(
     market: &mut Market,
     dynamic_fee: Option<types::DynamicFeeParameters>,
     initial_sqrt_price: u128,
@@ -1257,7 +1288,6 @@ pub fn execute_swap_expect_failure(
     swap_for_y: bool,
     tick_arrays: &[Pubkey],
     bitmap_extension: Option<Pubkey>,
-    referral: Option<Pubkey>,
 ) -> Vec<String> {
     try_execute_swap(
         market,
@@ -1266,7 +1296,7 @@ pub fn execute_swap_expect_failure(
         swap_for_y,
         tick_arrays,
         bitmap_extension,
-        referral,
+        None,
     )
     .expect_err("swap was expected to fail")
     .meta

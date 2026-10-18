@@ -90,17 +90,6 @@ pub enum Ticks {
 }
 
 impl Ticks {
-    pub fn len(&self) -> usize {
-        match self {
-            Ticks::Base(ticks) => ticks.len(),
-            Ticks::WithReward(ticks) => ticks.len(),
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
     /// The base `Tick` view of every element, dropping reward growths.
     pub fn base_ticks(&self) -> Vec<Tick> {
         match self {
@@ -174,17 +163,6 @@ pub enum Positions {
 }
 
 impl Positions {
-    pub fn len(&self) -> usize {
-        match self {
-            Positions::Base(positions) => positions.len(),
-            Positions::WithReward(positions) => positions.len(),
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
     pub fn base_positions(&self) -> Vec<Position> {
         match self {
             Positions::Base(positions) => positions.clone(),

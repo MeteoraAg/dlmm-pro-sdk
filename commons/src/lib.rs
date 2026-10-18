@@ -1,12 +1,6 @@
 pub use anchor_lang;
 
-mod program {
-    // declare_program! resolves `super::anchor_lang`.
-    #[allow(clippy::single_component_path_imports)]
-    use anchor_lang;
-    anchor_lang::prelude::declare_program!(dlmm_pro);
-}
-pub use program::dlmm_pro;
+anchor_lang::prelude::declare_program!(dlmm_pro);
 
 pub mod activation;
 pub mod base_fee;

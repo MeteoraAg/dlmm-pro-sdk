@@ -184,12 +184,6 @@ pub struct Tick {
     pub limit_order_fee_bid_side: u64,
 }
 
-impl Default for Tick {
-    fn default() -> Self {
-        Zeroable::zeroed()
-    }
-}
-
 pub const TICK_INIT_SPACE: usize = 160;
 
 #[repr(C)]
@@ -198,12 +192,6 @@ pub struct TickWithReward {
     pub inner: Tick,
     // total_reward << 64 / liquidity
     pub reward_growths_outside: [u128; NUM_REWARDS],
-}
-
-impl Default for TickWithReward {
-    fn default() -> Self {
-        Zeroable::zeroed()
-    }
 }
 
 pub const TICK_WITH_REWARD_INIT_SPACE: usize = 192;

@@ -11,20 +11,6 @@ pub struct NextRewardInfo {
     pub cumulative_seconds_with_empty_liquidity_reward: u64,
 }
 
-/// `time_delta * emission_per_second >> 64`.
-pub fn calculate_reward_amount(
-    time_delta: u64,
-    emission_per_second: u128,
-    rounding: Rounding,
-) -> Result<u64> {
-    let prod = U192::from(time_delta).safe_mul(U192::from(emission_per_second))?;
-    let reward_amount = match rounding {
-        Rounding::Up => down_scale_ceil(prod, 64),
-        Rounding::Down => prod >> 64,
-    };
-    Ok(reward_amount.safe_cast()?)
-}
-
 fn next_reward_info_for_slot(
     reward: &PoolRewardInfo,
     liquidity: u128,
@@ -201,20 +187,6 @@ mod tests {
             reward_growth_global: 7,
             ..PoolRewardInfo::zeroed()
         }
-    }
-
-    #[test]
-    fn reward_amount_rounds_both_ways_and_fails_past_u64() {
-        let emission = (1u128 << 64) + 1;
-        assert_eq!(
-            calculate_reward_amount(10, emission, Rounding::Down).unwrap(),
-            10
-        );
-        assert_eq!(
-            calculate_reward_amount(10, emission, Rounding::Up).unwrap(),
-            11
-        );
-        assert!(calculate_reward_amount(u64::MAX, 2 << 64, Rounding::Down).is_err());
     }
 
     #[test]

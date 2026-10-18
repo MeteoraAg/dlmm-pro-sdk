@@ -42,28 +42,6 @@ fn quote_exact_in_matches_onchain_swap_across_tick_arrays() {
 }
 
 #[test]
-fn quote_exact_in_matches_onchain_swap_with_dynamic_fee() {
-    let mut market = create_funded_market();
-    let pool = initialize_static_pool(
-        &mut market,
-        Some(types::DynamicFeeParameters {
-            max_volatility_accumulator: 350_000,
-            variable_fee_control: 2_000_000,
-            filter_period: 30,
-            decay_period: 600,
-            reduction_factor: 5_000,
-            min_delta_tick_for_significant_swap: 4,
-        }),
-        SQRT_PRICE_ONE,
-    );
-    seed_liquidity(&mut market, pool, &seed_ranges(0), None, &SEED_DEPOSITS);
-
-    assert_quote_matches_execution(&mut market, pool, 50_000, true);
-    assert_quote_matches_execution(&mut market, pool, 20_000, true);
-    assert_quote_matches_execution(&mut market, pool, 40_000, false);
-}
-
-#[test]
 fn quote_exact_in_matches_onchain_swap_across_dynamic_fee_regimes() {
     const FILTER_PERIOD: u16 = 30;
     const DECAY_PERIOD: u16 = 600;
@@ -162,11 +140,12 @@ fn quote_fee_split_matches_onchain_with_partner_and_referral() {
 #[test]
 fn quote_exact_in_matches_onchain_swap_with_fees_on_input() {
     let mut market = create_funded_market();
-    let pool = initialize_static_pool_with_fee_mode(
+    let pool = initialize_static_pool_with_options(
         &mut market,
         None,
         SQRT_PRICE_ONE,
         CollectFeeMode::OnlyY,
+        0,
     );
     seed_liquidity(&mut market, pool, &seed_ranges(0), None, &SEED_DEPOSITS);
 
@@ -229,7 +208,6 @@ fn quote_exact_in_reports_amount_left_where_the_program_rejects_the_swap() {
         true,
         &quoted.tick_arrays,
         quoted.bitmap_extension,
-        None,
     );
     assert!(
         logs.iter()
