@@ -13,7 +13,9 @@ import {
   isUsableTickId,
   MAX_LIMIT_ORDER_DELEGATE_PERMISSION,
   readTokenAccountMint,
+  reserveTransferLegs,
   resolveInstructionHooks,
+  tickArrayMetas,
   tickArraysForTickIds,
   tickIndexFromId,
 } from "../helpers";
@@ -201,11 +203,7 @@ export class LimitOrderService extends DlmmProProgram {
       })
       .remainingAccounts([
         ...hooks.remainingAccounts,
-        ...tickArrays.map((pubkey) => ({
-          pubkey,
-          isWritable: true,
-          isSigner: false,
-        })),
+        ...tickArrayMetas(tickArrays),
       ])
       .transaction();
 
@@ -281,38 +279,23 @@ export class LimitOrderService extends DlmmProProgram {
             this.programId,
           );
     const poolAuthority = derivePoolAuthority(this.programId);
-    const reserveX = deriveReserve(
-      params.tokenXMint,
-      params.pool,
-      this.programId,
-    );
-    const reserveY = deriveReserve(
-      params.tokenYMint,
-      params.pool,
-      this.programId,
-    );
+    const { reserveX, reserveY, transferHookX, transferHookY } =
+      reserveTransferLegs({
+        pool: params.pool,
+        tokenXMint: params.tokenXMint,
+        tokenYMint: params.tokenYMint,
+        userTokenX: params.userTokenX,
+        userTokenY: params.userTokenY,
+        authority: poolAuthority,
+        deposit: false,
+        programId: this.programId,
+      });
     const hooks = await resolveInstructionHooks(
       this.connection,
       this.commitment,
       {
-        transferHookX: {
-          metas: params.transferHookX,
-          leg: {
-            mint: params.tokenXMint,
-            source: reserveX,
-            destination: params.userTokenX,
-            authority: poolAuthority,
-          },
-        },
-        transferHookY: {
-          metas: params.transferHookY,
-          leg: {
-            mint: params.tokenYMint,
-            source: reserveY,
-            destination: params.userTokenY,
-            authority: poolAuthority,
-          },
-        },
+        transferHookX: { metas: params.transferHookX, leg: transferHookX },
+        transferHookY: { metas: params.transferHookY, leg: transferHookY },
         transferHookReferral: {
           metas: params.transferHookReferral,
           leg:
@@ -360,11 +343,7 @@ export class LimitOrderService extends DlmmProProgram {
       })
       .remainingAccounts([
         ...hooks.remainingAccounts,
-        ...tickArrays.map((pubkey) => ({
-          pubkey,
-          isWritable: true,
-          isSigner: false,
-        })),
+        ...tickArrayMetas(tickArrays),
       ])
       .transaction();
 
@@ -409,13 +388,7 @@ export class LimitOrderService extends DlmmProProgram {
         owner: params.owner,
         rentReceiver: params.rentReceiver,
       })
-      .remainingAccounts(
-        tickArrays.map((pubkey) => ({
-          pubkey,
-          isWritable: true,
-          isSigner: false,
-        })),
-      )
+      .remainingAccounts(tickArrayMetas(tickArrays))
       .transaction();
 
     tx.feePayer = params.owner;

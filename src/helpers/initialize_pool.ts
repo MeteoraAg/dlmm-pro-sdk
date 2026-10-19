@@ -1,7 +1,6 @@
 import type { Commitment, Connection } from "@solana/web3.js";
 import {
   MAX_SQRT_PRICE,
-  MAX_TICK_SPACING,
   MIN_SQRT_PRICE,
   NUMBER_OF_ACTIVATION_MODES,
   POOL_EXTENSION_VARIANT_COUNT,
@@ -25,6 +24,7 @@ import {
 } from "../types";
 import { isSupportExtension } from "./codec";
 import { validatePoolFeeParameters } from "./pool_fees";
+import { assertTickSpacing } from "./validation";
 
 export async function validateInitializePoolWithDynamicParameters(
   connection: Connection,
@@ -33,15 +33,7 @@ export async function validateInitializePoolWithDynamicParameters(
 ): Promise<void> {
   validatePoolFeeParameters(parameters.poolFees);
 
-  if (
-    !Number.isInteger(parameters.tickSpacing) ||
-    parameters.tickSpacing <= 0 ||
-    parameters.tickSpacing > MAX_TICK_SPACING
-  ) {
-    throw PoolError.invalidParameters(
-      "tickSpacing must be an integer in 1..=MAX_TICK_SPACING",
-    );
-  }
+  assertTickSpacing(parameters.tickSpacing);
 
   tryCastCollectFeeMode(parameters.collectFeeMode);
 

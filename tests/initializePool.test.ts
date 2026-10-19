@@ -328,7 +328,7 @@ describe("initialize pool", () => {
       sendTransaction(svm, tx, [payer, creator]);
 
       const { extensions } = await client.state.fetchPoolWithExtensions(pool);
-      expect(extensions.hasActivationAccess).toBe(true);
+      expect(extensions.activation).toBeDefined();
       expect(extensions.activation?.activations[1].activationMode).toBe(
         ActivationMode.TimeBased,
       );
@@ -457,7 +457,7 @@ describe("initialize pool", () => {
       sendTransaction(svm, tx, [payer, creator]);
 
       const { extensions } = await client.state.fetchPoolWithExtensions(pool);
-      expect(extensions.hasActivationAccess).toBe(true);
+      expect(extensions.activation).toBeDefined();
       expect(extensions.activation?.activations[1].activationMode).toBe(
         ActivationMode.BondingCurve,
       );

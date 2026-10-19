@@ -14,6 +14,7 @@ import {
   safeShl,
   safeSub,
   tryCastU64,
+  U64_MAX,
   U128_MAX,
 } from "./safe_math";
 
@@ -39,6 +40,22 @@ export function getFeeInPeriod(
 
   const fee = safeMul(result, cliffFeeNumerator, U128_MAX).shrn(SCALE_OFFSET);
   return tryCastU64(fee);
+}
+
+export function baseFeeNumeratorByPeriod(
+  linear: boolean,
+  cliffFeeNumerator: BN,
+  reductionFactor: BN,
+  period: number,
+): BN {
+  if (linear) {
+    return safeSub(
+      cliffFeeNumerator,
+      safeMul(reductionFactor, new BN(period), U64_MAX),
+      U64_MAX,
+    );
+  }
+  return getFeeInPeriod(cliffFeeNumerator, reductionFactor, period);
 }
 
 export function pow(base: BN, exp: number): BN | null {

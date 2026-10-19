@@ -3,7 +3,6 @@ import BN from "bn.js";
 import Decimal from "decimal.js";
 import {
   MAX_LIQUIDITY_WEIGHT,
-  MAX_TICK_SPACING,
   MAX_TICK_ID,
   POSITION_MAX_RANGE,
 } from "../constants";
@@ -19,6 +18,7 @@ import {
   validateAddLiquidityByWeightParameters,
 } from "../helpers/liquidity";
 import { isUsableTickId } from "../helpers/tick_array";
+import { assertTickSpacing } from "../helpers/validation";
 import { I128_MAX, U64_MAX, U128_MAX, safeMul } from "../math/safe_math";
 import { getSqrtPriceFromTickId } from "../math/tick_math";
 import { transferFeeIncludedAmountWithinU64 } from "../quote/transfer_fee";
@@ -124,9 +124,6 @@ function mergeEqualWeightRanges(
   tickSpacing: number,
 ): LiquidityRange[] {
   const funded = weights.filter((entry) => entry.weight > 0);
-  if (funded.length === 0) {
-    throw PoolError.invalidParameters("weights must include a positive weight");
-  }
 
   const ranges: LiquidityRange[] = [];
   let start = funded[0];
@@ -261,15 +258,7 @@ export function multiplierFromAmounts(args: {
   if (args.ranges.length === 0) {
     throw PoolError.invalidParameters("ranges must not be empty");
   }
-  if (
-    !Number.isInteger(args.tickSpacing) ||
-    args.tickSpacing < 1 ||
-    args.tickSpacing > MAX_TICK_SPACING
-  ) {
-    throw PoolError.invalidParameters(
-      "tickSpacing must be an integer in 1..=MAX_TICK_SPACING",
-    );
-  }
+  assertTickSpacing(args.tickSpacing);
   if (args.amountX.isNeg() || args.amountY.isNeg()) {
     throw PoolError.invalidParameters(
       "amountX and amountY must not be negative",

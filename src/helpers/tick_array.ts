@@ -11,6 +11,7 @@ import {
 import { PoolError } from "../errors";
 import { deriveTickArray, deriveTickArrayBitmapExtension } from "./pda";
 import type { TickRange } from "../types";
+import { assertTickSpacing } from "./validation";
 
 /** The program's `align_id_to_spacing`: the spacing multiple at or below `tickId`. */
 export function alignTickDown(tickId: number, tickSpacing: number): number {
@@ -35,15 +36,7 @@ export function tickIndexFromId(tickId: number, tickSpacing: number): number {
   if (!Number.isInteger(tickId)) {
     throw PoolError.invalidParameters("tickId must be an integer");
   }
-  if (
-    !Number.isInteger(tickSpacing) ||
-    tickSpacing <= 0 ||
-    tickSpacing > MAX_TICK_SPACING
-  ) {
-    throw PoolError.invalidParameters(
-      "tickSpacing must be an integer in 1..=MAX_TICK_SPACING",
-    );
-  }
+  assertTickSpacing(tickSpacing);
   const scaled = Math.floor(tickId / tickSpacing);
   const index = Math.trunc(scaled / MAX_TICKS_PER_ARRAY);
   if (tickId < 0 && scaled % MAX_TICKS_PER_ARRAY !== 0) {
@@ -153,6 +146,13 @@ export function bitmapExtensionForTickArrays(
     : null;
 }
 
+export function tickArrayMetas(
+  tickArrays: PublicKey[],
+  isWritable = true,
+): AccountMeta[] {
+  return tickArrays.map((pubkey) => ({ pubkey, isWritable, isSigner: false }));
+}
+
 export function tickArrayRemainingAccounts(
   pool: PublicKey,
   ranges: TickRange[],
@@ -161,11 +161,8 @@ export function tickArrayRemainingAccounts(
   programId: PublicKey = DLMM_PRO_PROGRAM_ID,
 ): AccountMeta[] {
   validateTickRanges(ranges, tickSpacing);
-  return tickArraysForRanges(pool, ranges, tickSpacing, programId).map(
-    (pubkey) => ({
-      pubkey,
-      isWritable,
-      isSigner: false,
-    }),
+  return tickArrayMetas(
+    tickArraysForRanges(pool, ranges, tickSpacing, programId),
+    isWritable,
   );
 }

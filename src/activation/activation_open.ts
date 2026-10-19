@@ -1,6 +1,6 @@
 import BN from "bn.js";
-import { PoolError } from "../errors";
 import { toPodBuffer } from "../helpers/pod";
+import { assertZeroPadding } from "../helpers/validation";
 import { ActivationMode, type PoolActivationInfoParameters } from "../types";
 import type { ActivationInitializeContext } from ".";
 
@@ -32,9 +32,7 @@ export class ActivationOpenHandler {
   }
 
   validateInitialize(_context: ActivationInitializeContext): void {
-    if (this.inner.padding.some((byte) => byte !== 0)) {
-      throw PoolError.invalidParameters("padding must be zero");
-    }
+    assertZeroPadding(this.inner.padding);
   }
 
   canSwap(_currentPoint: BN): boolean {

@@ -7,7 +7,8 @@ import {
   encodePodU64,
   toPodBuffer,
 } from "../helpers/pod";
-import { getFeeInPeriod } from "../math/base_fee_math";
+import { assertZeroPadding } from "../helpers/validation";
+import { baseFeeNumeratorByPeriod } from "../math/base_fee_math";
 import {
   safeAdd,
   safeDiv,
@@ -86,9 +87,7 @@ function validateScheduler(inner: PodAlignedFeeMarketCapScheduler): void {
   if (inner.numberOfPeriod === 0) {
     throw PoolError.invalidParameters("numberOfPeriod must be non-zero");
   }
-  if (inner.padding.some((byte) => byte !== 0)) {
-    throw PoolError.invalidParameters("padding must be zero");
-  }
+  assertZeroPadding(inner.padding);
 }
 
 function getPassedPeriod(
@@ -150,15 +149,12 @@ export class FeeMarketCapScheduler {
   }
 
   getBaseFeeNumeratorByPeriod(period: number): BN {
-    const { cliffFeeNumerator, reductionFactor } = this.inner;
-    if (this.inner.baseFeeMode === BaseFeeMode.MarketCapSchedulerLinear) {
-      return safeSub(
-        cliffFeeNumerator,
-        safeMul(reductionFactor, new BN(period), U64_MAX),
-        U64_MAX,
-      );
-    }
-    return getFeeInPeriod(cliffFeeNumerator, reductionFactor, period);
+    return baseFeeNumeratorByPeriod(
+      this.inner.baseFeeMode === BaseFeeMode.MarketCapSchedulerLinear,
+      this.inner.cliffFeeNumerator,
+      this.inner.reductionFactor,
+      period,
+    );
   }
 
   validate(): void {

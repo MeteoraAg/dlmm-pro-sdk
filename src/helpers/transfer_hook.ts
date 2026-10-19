@@ -13,6 +13,7 @@ import {
   PublicKey,
 } from "@solana/web3.js";
 import { readMintAccount } from "./account_reads";
+import { deriveReserve } from "./pda";
 import { remainingAccountsFromHooks, type HookKey } from "./remaining_accounts";
 
 export type TransferHookLeg = {
@@ -21,6 +22,43 @@ export type TransferHookLeg = {
   destination: PublicKey;
   authority: PublicKey;
 };
+
+/** Reserve PDAs and the X/Y legs of an instruction moving both tokens between the user and the reserves. */
+export function reserveTransferLegs(args: {
+  pool: PublicKey;
+  tokenXMint: PublicKey;
+  tokenYMint: PublicKey;
+  userTokenX: PublicKey;
+  userTokenY: PublicKey;
+  /** The user for deposits, the pool authority for withdrawals. */
+  authority: PublicKey;
+  deposit: boolean;
+  programId: PublicKey;
+}): {
+  reserveX: PublicKey;
+  reserveY: PublicKey;
+  transferHookX: TransferHookLeg;
+  transferHookY: TransferHookLeg;
+} {
+  const reserveX = deriveReserve(args.tokenXMint, args.pool, args.programId);
+  const reserveY = deriveReserve(args.tokenYMint, args.pool, args.programId);
+  const leg = (
+    mint: PublicKey,
+    user: PublicKey,
+    reserve: PublicKey,
+  ): TransferHookLeg => ({
+    mint,
+    source: args.deposit ? user : reserve,
+    destination: args.deposit ? reserve : user,
+    authority: args.authority,
+  });
+  return {
+    reserveX,
+    reserveY,
+    transferHookX: leg(args.tokenXMint, args.userTokenX, reserveX),
+    transferHookY: leg(args.tokenYMint, args.userTokenY, reserveY),
+  };
+}
 
 /**
  * Extra account metas a Token-2022 transfer of `mint` needs. Legacy SPL mints

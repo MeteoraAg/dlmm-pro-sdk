@@ -2405,10 +2405,8 @@ poolAddress: PublicKey; // Pool address
 ```typescript
 type DecodedPoolExtensions = {
   extensions: number; // The pool's extension bitmask
-  hasLiquidityMining: boolean;
-  hasActivationAccess: boolean;
   rewards?: DecodedPoolRewardInfo[]; // Reward slots, with LiquidityMining
-  activation?: DecodedPoolActivation; // Whitelists and activation slots, with ActivationAccess
+  activation?: PoolActivationParameters; // Whitelists and activation slots, with ActivationAccess
 };
 
 type DecodedPoolRewardInfo = {
@@ -2422,13 +2420,6 @@ type DecodedPoolRewardInfo = {
   cumulativeSecondsWithEmptyLiquidityReward: BN;
   rewardGrowthGlobal: BN;
   rewardTokenFlag: number;
-};
-
-type DecodedPoolActivation = {
-  whitelistedSwap: PublicKey;
-  whitelistedAddLiquidity: PublicKey;
-  whitelistedRemoveLiquidity: PublicKey;
-  activations: { activationMode: number; data: number[] }[];
 };
 ```
 
@@ -2677,7 +2668,7 @@ quoteExactIn(params: QuoteExactInParams): QuoteExactInResult
 type QuoteExactInParams = {
   poolAddress: PublicKey; // Pool address
   pool: Pool; // fetchPool / fetchPoolWithExtensions
-  poolActivation?: DecodedPoolActivation | null; // extensions.activation; required with the ActivationAccess extension
+  poolActivation?: PoolActivationParameters | null; // extensions.activation; required with the ActivationAccess extension
   tickArrays: QuoteTickArray[]; // In traversal order (tickArraysForSwap)
   bitmapExtension?: TickArrayBitmapExtension | null; // Required when the pool has a bitmap extension
   inputAmount: BN; // Amount sent, before the input mint's transfer fee
@@ -2740,7 +2731,7 @@ const selection = tickArraysForSwap({
 });
 const loaded = await client.state.fetchTickArraysWithTicks(
   selection.tickArrays,
-  { withReward: extensions.hasLiquidityMining },
+  { withReward: extensions.rewards !== undefined },
 );
 const unpack = (mint: PublicKey, flag: number) =>
   getMint(connection, mint, "confirmed", getTokenProgram(flag));

@@ -1,7 +1,8 @@
 import BN from "bn.js";
-import { LIMIT_ORDER_MAX_TICK, MAX_TICK_SPACING } from "../constants";
+import { LIMIT_ORDER_MAX_TICK } from "../constants";
 import { PoolError } from "../errors";
 import { alignTickDown } from "../helpers/tick_array";
+import { assertTickSpacing } from "../helpers/validation";
 import { I32_MAX, I32_MIN, safeAdd, safeMul, U64_MAX } from "../math/safe_math";
 import type { RelativeTick } from "../types";
 import type { LiquidityColumn, LiquidityShape } from "./shape";
@@ -18,15 +19,7 @@ export function relativeTickFromSlippage(args: {
   tickSpacing: number;
   slippageTicks: number;
 }): RelativeTick {
-  if (
-    !Number.isInteger(args.tickSpacing) ||
-    args.tickSpacing <= 0 ||
-    args.tickSpacing > MAX_TICK_SPACING
-  ) {
-    throw PoolError.invalidParameters(
-      "tickSpacing must be an integer in 1..=MAX_TICK_SPACING",
-    );
-  }
+  assertTickSpacing(args.tickSpacing);
   if (
     !Number.isInteger(args.currentTickId) ||
     args.currentTickId < I32_MIN ||

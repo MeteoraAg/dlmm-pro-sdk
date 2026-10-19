@@ -33,14 +33,23 @@ export type ActivationHandler =
   | ActivationBondingCurveHandler
   | ActivationTimeBasedHandler;
 
+export function getCurrentPoint(
+  activationType: number,
+  slot: BN,
+  timestamp: BN,
+): BN {
+  return tryCastActivationType(activationType) === ActivationType.Slot
+    ? slot
+    : timestamp;
+}
+
 export async function getCurrentPointNumber(
   connection: Connection,
   activationType: number,
   commitment?: Commitment,
 ): Promise<BN> {
-  const type = tryCastActivationType(activationType);
   const clock = await readClock(connection, commitment);
-  return type === ActivationType.Slot ? clock.slot : clock.timestamp;
+  return getCurrentPoint(activationType, clock.slot, clock.timestamp);
 }
 
 export function getActivationHandler(

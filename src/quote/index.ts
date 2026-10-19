@@ -1,7 +1,7 @@
 import type { Mint } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
-import { getActivationHandler } from "../activation";
+import { getActivationHandler, getCurrentPoint } from "../activation";
 import {
   HOST_FEE_BPS,
   LIMIT_ORDER_PROTOCOL_FEE_BPS,
@@ -19,7 +19,6 @@ import {
   safeAdd,
   safeSub,
   tickIdFromSqrtPrice,
-  tryCastActivationType,
   tryCastCollectFeeMode,
   tryCastU128,
   U64_MAX,
@@ -30,16 +29,15 @@ import {
   type WorkingVariableFee,
 } from "../math";
 import {
-  ActivationType,
   CollectFeeMode,
   PoolExtension,
   PoolStatus,
   PoolType,
   Rounding,
   TokenProgramFlags,
-  type DecodedPoolActivation,
   type DecodedTick,
   type Pool,
+  type PoolActivationParameters,
   type TickArrayBitmapExtension,
 } from "../types";
 import { getNonZeroLiquidityNextIndex } from "./bitmap_traversal";
@@ -73,7 +71,7 @@ export type QuoteExactInParams = {
    * to gate pre-activation swaps when the pool has the ActivationAccess
    * extension, ignored otherwise.
    */
-  poolActivation?: DecodedPoolActivation | null;
+  poolActivation?: PoolActivationParameters | null;
   /**
    * Parsed tick arrays ordered for the traversal like the swap instruction's
    * remaining accounts: descending indices when `swapForY`, ascending
@@ -181,19 +179,9 @@ export function getFeeSetting(
   };
 }
 
-function getCurrentPoint(
-  activationType: number,
-  currentSlot: BN,
-  currentTimestamp: BN,
-): BN {
-  return tryCastActivationType(activationType) === ActivationType.Slot
-    ? currentSlot
-    : currentTimestamp;
-}
-
 function validatePoolCanSwap(
   pool: Pool,
-  poolActivation: DecodedPoolActivation | null | undefined,
+  poolActivation: PoolActivationParameters | null | undefined,
   swapper: PublicKey | null | undefined,
   currentPoint: BN,
 ): void {

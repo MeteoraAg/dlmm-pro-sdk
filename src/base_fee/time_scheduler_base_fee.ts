@@ -1,14 +1,9 @@
 import BN from "bn.js";
 import { PoolError } from "../errors";
 import { encodePodU16, encodePodU64, toPodBuffer } from "../helpers/pod";
-import { getFeeInPeriod } from "../math/base_fee_math";
-import {
-  safeDiv,
-  safeMul,
-  safeSub,
-  tryCastU16,
-  U64_MAX,
-} from "../math/safe_math";
+import { assertZeroPadding } from "../helpers/validation";
+import { baseFeeNumeratorByPeriod } from "../math/base_fee_math";
+import { safeDiv, safeSub, tryCastU16, U64_MAX } from "../math/safe_math";
 import { BaseFeeMode, type BaseFeeConfig } from "../types";
 import { validateFeeBounds } from "./fee_bounds";
 
@@ -63,9 +58,7 @@ function validateScheduler(inner: PodAlignedFeeTimeScheduler): void {
   if (inner.reductionFactor.isZero()) {
     throw PoolError.invalidParameters("reductionFactor must be non-zero");
   }
-  if (inner.padding.some((byte) => byte !== 0)) {
-    throw PoolError.invalidParameters("padding must be zero");
-  }
+  assertZeroPadding(inner.padding);
 }
 
 function getPassedPeriod(
@@ -100,15 +93,12 @@ export class FeeTimeScheduler {
   }
 
   getBaseFeeNumeratorByPeriod(period: number): BN {
-    const { cliffFeeNumerator, reductionFactor } = this.inner;
-    if (this.inner.baseFeeMode === BaseFeeMode.TimeSchedulerLinear) {
-      return safeSub(
-        cliffFeeNumerator,
-        safeMul(reductionFactor, new BN(period), U64_MAX),
-        U64_MAX,
-      );
-    }
-    return getFeeInPeriod(cliffFeeNumerator, reductionFactor, period);
+    return baseFeeNumeratorByPeriod(
+      this.inner.baseFeeMode === BaseFeeMode.TimeSchedulerLinear,
+      this.inner.cliffFeeNumerator,
+      this.inner.reductionFactor,
+      period,
+    );
   }
 
   validate(): void {

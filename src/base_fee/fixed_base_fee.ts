@@ -1,6 +1,6 @@
 import BN from "bn.js";
-import { PoolError } from "../errors";
 import { encodePodU64, toPodBuffer } from "../helpers/pod";
+import { assertZeroPadding } from "../helpers/validation";
 import type { BaseFeeConfig } from "../types";
 import { validateFeeBounds } from "./fee_bounds";
 
@@ -45,9 +45,7 @@ export class FixedBaseFeeHandler {
       this.inner.cliffFeeNumerator,
       this.inner.cliffFeeNumerator,
     );
-    if (this.inner.padding.some((byte) => byte !== 0)) {
-      throw PoolError.invalidParameters("padding must be zero");
-    }
+    assertZeroPadding(this.inner.padding);
   }
 
   getBaseFeeNumerator(

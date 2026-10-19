@@ -3,6 +3,7 @@ import BN from "bn.js";
 import { MAX_BASIS_POINT, MAX_TICK_ID } from "../constants";
 import { PoolError } from "../errors";
 import { encodePodU64, toPodBuffer } from "../helpers/pod";
+import { assertZeroPadding } from "../helpers/validation";
 import { alignTickDown } from "../helpers/tick_array";
 import { getSqrtPriceFromTickId } from "../math/tick_math";
 import { mulDivU192 } from "../math/safe_math";
@@ -63,9 +64,7 @@ export class ActivationBondingCurveHandler {
     if (this.inner.isReachTarget !== 0) {
       throw PoolError.invalidParameters("isReachTarget must be 0");
     }
-    if (this.inner.padding.some((byte) => byte !== 0)) {
-      throw PoolError.invalidParameters("padding must be zero");
-    }
+    assertZeroPadding(this.inner.padding);
     // Without a whitelisted depositor the pool can never be seeded, so it can
     // never reach the target price that opens up public deposits.
     if (whitelistedAddLiquidity.equals(PublicKey.default)) {

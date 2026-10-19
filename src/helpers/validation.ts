@@ -1,7 +1,25 @@
 import BN from "bn.js";
-import { MAX_BASIS_POINT } from "../constants";
+import { MAX_BASIS_POINT, MAX_TICK_SPACING } from "../constants";
 import { PoolError } from "../errors";
 import { I32_MAX, I32_MIN, U64_MAX, U128_MAX } from "../math/safe_math";
+
+export function assertTickSpacing(tickSpacing: number): void {
+  if (
+    !Number.isInteger(tickSpacing) ||
+    tickSpacing <= 0 ||
+    tickSpacing > MAX_TICK_SPACING
+  ) {
+    throw PoolError.invalidParameters(
+      "tickSpacing must be an integer in 1..=MAX_TICK_SPACING",
+    );
+  }
+}
+
+export function assertZeroPadding(padding: number[]): void {
+  if (padding.some((byte) => byte !== 0)) {
+    throw PoolError.invalidParameters("padding must be zero");
+  }
+}
 
 export function assertU8(value: number, name: string): void {
   if (!Number.isInteger(value) || value < 0 || value > 0xff) {

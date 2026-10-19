@@ -1,4 +1,3 @@
-import { PoolError } from "../errors";
 import type { TickRange } from "../types";
 import type { LiquidityRange } from "./shape";
 import type { TickWeight } from "./weights";
@@ -42,9 +41,6 @@ export function stackWeightLevels(
       ordered.filter((entry) => entry.weight > 0).map((entry) => entry.weight),
     ),
   ].sort((a, b) => a - b);
-  if (levels.length === 0) {
-    throw PoolError.invalidParameters("weights must include a positive weight");
-  }
 
   const ranges: LiquidityRange[] = [];
   let previousRuns = new Map<string, LiquidityRange>();

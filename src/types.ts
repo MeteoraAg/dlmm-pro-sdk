@@ -101,24 +101,10 @@ export type DecodedPoolRewardInfo = {
   rewardTokenFlag: number;
 };
 
-export type DecodedPoolActivationInfo = {
-  activationMode: number;
-  data: number[];
-};
-
-export type DecodedPoolActivation = {
-  whitelistedSwap: PublicKey;
-  whitelistedAddLiquidity: PublicKey;
-  whitelistedRemoveLiquidity: PublicKey;
-  activations: DecodedPoolActivationInfo[];
-};
-
 export type DecodedPoolExtensions = {
   extensions: number;
-  hasLiquidityMining: boolean;
-  hasActivationAccess: boolean;
   rewards?: DecodedPoolRewardInfo[];
-  activation?: DecodedPoolActivation;
+  activation?: PoolActivationParameters;
 };
 
 export type DecodedPosition = {

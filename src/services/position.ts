@@ -16,7 +16,6 @@ import {
   bitmapExtensionForTickArrays,
   derivePoolAuthority,
   derivePosition,
-  deriveReserve,
   findNftAccount,
   getFeeGrowthInside,
   getPendingFees,
@@ -28,6 +27,7 @@ import {
   positionTotalLiquidity,
   readClock,
   readTransferFeeMint,
+  reserveTransferLegs,
   resolveInstructionHooks,
   tickArrayIndexesForTickIds,
   tickArrayRemainingAccounts,
@@ -768,40 +768,24 @@ export class PositionService extends DlmmProProgram {
     pool?: Pool,
   ) {
     const deposit = flow === "deposit";
-    const reserveX = deriveReserve(
-      params.tokenXMint,
-      params.pool,
-      this.programId,
-    );
-    const reserveY = deriveReserve(
-      params.tokenYMint,
-      params.pool,
-      this.programId,
-    );
-    const authority = deposit
-      ? params.signer
-      : derivePoolAuthority(this.programId);
+    const { reserveX, reserveY, transferHookX, transferHookY } =
+      reserveTransferLegs({
+        pool: params.pool,
+        tokenXMint: params.tokenXMint,
+        tokenYMint: params.tokenYMint,
+        userTokenX: params.userTokenX,
+        userTokenY: params.userTokenY,
+        authority: deposit
+          ? params.signer
+          : derivePoolAuthority(this.programId),
+        deposit,
+        programId: this.programId,
+      });
     const [poolState, hooks] = await Promise.all([
       pool ?? this.state.fetchPool(params.pool),
       resolveInstructionHooks(this.connection, this.commitment, {
-        transferHookX: {
-          metas: params.transferHookX,
-          leg: {
-            mint: params.tokenXMint,
-            source: deposit ? params.userTokenX : reserveX,
-            destination: deposit ? reserveX : params.userTokenX,
-            authority,
-          },
-        },
-        transferHookY: {
-          metas: params.transferHookY,
-          leg: {
-            mint: params.tokenYMint,
-            source: deposit ? params.userTokenY : reserveY,
-            destination: deposit ? reserveY : params.userTokenY,
-            authority,
-          },
-        },
+        transferHookX: { metas: params.transferHookX, leg: transferHookX },
+        transferHookY: { metas: params.transferHookY, leg: transferHookY },
       }),
     ]);
     return {

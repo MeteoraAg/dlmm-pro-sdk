@@ -7,7 +7,6 @@ import {
   PoolExtension,
   type DecodedLimitOrderData,
   type DecodedObservation,
-  type DecodedPoolActivation,
   type DecodedPoolExtensions,
   type DecodedPoolRewardInfo,
   type DecodedPosition,
@@ -15,6 +14,7 @@ import {
   type DecodedTick,
   type DecodedTickWithReward,
   type Pool,
+  type PoolActivationParameters,
 } from "../types";
 import {
   LIMIT_ORDER_DATA_LAYOUT,
@@ -107,20 +107,12 @@ export function decodePoolExtensionsFromData(
     throw new Error("Account data shorter than Pool header size");
   }
   const { extensions } = coder.decode<Pool>("Pool", data);
-  const hasLiquidityMining = isSupportExtension(
-    extensions,
-    PoolExtension.LiquidityMining,
-  );
-  const hasActivationAccess = isSupportExtension(
-    extensions,
-    PoolExtension.ActivationAccess,
-  );
 
   let offset = POOL_HEADER_SIZE;
   let rewards: DecodedPoolRewardInfo[] | undefined;
-  let activation: DecodedPoolActivation | undefined;
+  let activation: PoolActivationParameters | undefined;
 
-  if (hasLiquidityMining) {
+  if (isSupportExtension(extensions, PoolExtension.LiquidityMining)) {
     if (data.length < offset + POOL_REWARD_LAYOUT.span) {
       throw new Error("Pool account missing liquidity mining extension data");
     }
@@ -132,23 +124,17 @@ export function decodePoolExtensionsFromData(
     offset += POOL_REWARD_LAYOUT.span;
   }
 
-  if (hasActivationAccess) {
+  if (isSupportExtension(extensions, PoolExtension.ActivationAccess)) {
     if (data.length < offset + POOL_ACTIVATION_LAYOUT.span) {
       throw new Error("Pool account missing activation access extension data");
     }
     activation = POOL_ACTIVATION_LAYOUT.decode(
       data,
       offset,
-    ) as DecodedPoolActivation;
+    ) as PoolActivationParameters;
   }
 
-  return {
-    extensions,
-    hasLiquidityMining,
-    hasActivationAccess,
-    rewards,
-    activation,
-  };
+  return { extensions, rewards, activation };
 }
 
 export function decodePositionsFromData(
