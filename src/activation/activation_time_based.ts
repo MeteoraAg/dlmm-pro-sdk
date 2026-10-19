@@ -18,14 +18,12 @@ export type PodAlignedActivationTimeBased = {
 };
 
 function readZ40(data: Buffer, offset: number): BN {
-  const buf = Buffer.alloc(8);
-  data.copy(buf, 0, offset, offset + 5);
-  return new BN(buf, "le");
+  return new BN(data.readUIntLE(offset, 5));
 }
 
-function writeZ40(buf: Buffer, offset: number, value: BN): void {
+function writeZ40(buf: Buffer, offset: number, value: BN, name: string): void {
   if (value.isNeg() || value.bitLength() > 40) {
-    throw PoolError.invalidParameters("value must fit in 40 bits");
+    throw PoolError.invalidParameters(`${name} must fit in 40 bits`);
   }
   buf.set(value.toArrayLike(Buffer, "le", 5), offset);
 }
@@ -52,9 +50,9 @@ export function encodeTimeBasedActivationData(
   params: TimeBasedActivationParams,
 ): number[] {
   const buf = Buffer.alloc(15, 0);
-  writeZ40(buf, 0, params.swapPoint);
-  writeZ40(buf, 5, params.addLiquidityPoint);
-  writeZ40(buf, 10, params.removeLiquidityPoint);
+  writeZ40(buf, 0, params.swapPoint, "swapPoint");
+  writeZ40(buf, 5, params.addLiquidityPoint, "addLiquidityPoint");
+  writeZ40(buf, 10, params.removeLiquidityPoint, "removeLiquidityPoint");
   return Array.from(buf);
 }
 

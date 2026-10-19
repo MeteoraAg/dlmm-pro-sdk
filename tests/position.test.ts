@@ -17,10 +17,6 @@ import {
   tickArraysForTickIds,
 } from "../src";
 import {
-  getBitmapSetIndicesFromPool,
-  getExtensionBitmapSetIndicesFromState,
-} from "../src/helpers/codec";
-import {
   getFeeGrowthInside,
   getPendingFees,
 } from "../src/helpers/position_fees";
@@ -29,6 +25,8 @@ import {
   big,
   createFundedMarket,
   createSvmConnection,
+  getBitmapSetIndicesFromPool,
+  getExtensionBitmapSetIndicesFromState,
   getPositionTotalLiquidity,
   getTokenAmount,
   gridWeights,

@@ -1,6 +1,6 @@
 import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
 import type { Layout } from "@coral-xyz/borsh";
-import { BITMAP_SIZE, POOL_EXTENSION_VARIANT_COUNT } from "../constants";
+import { POOL_EXTENSION_VARIANT_COUNT } from "../constants";
 import { PoolError } from "../errors";
 import DlmmProIDL from "../idl/dlmm-pro/dlmm_pro.json";
 import {
@@ -14,9 +14,7 @@ import {
   type DecodedPositionWithReward,
   type DecodedTick,
   type DecodedTickWithReward,
-  type BitmapExtensionState,
   type Pool,
-  type PoolBitmapState,
 } from "../types";
 import {
   LIMIT_ORDER_DATA_LAYOUT,
@@ -73,11 +71,10 @@ function decodeSeq<T>(
     );
   }
   const count = (data.length - offset) / layout.span;
-  const items: T[] = [];
-  for (let i = 0; i < count; i++) {
-    items.push(layout.decode(data, offset + i * layout.span) as T);
-  }
-  return items;
+  return Array.from(
+    { length: count },
+    (_, i) => layout.decode(data, offset + i * layout.span) as T,
+  );
 }
 
 export function isSupportExtension(
@@ -212,59 +209,4 @@ export function decodeObservationsFromData(data: Buffer): DecodedObservation[] {
     ORACLE_HEADER_SIZE,
     "Oracle",
   );
-}
-
-export function getBitmapSetIndicesFromPool(
-  pool: Pick<PoolBitmapState, "tickArrayBitmap">,
-): number[] {
-  const bitmap = pool.tickArrayBitmap;
-  const indices: number[] = [];
-
-  for (let chunk = 0; chunk < bitmap.length; chunk++) {
-    for (let bit = 0; bit < 64; bit++) {
-      if (bitmap[chunk].testn(bit)) {
-        indices.push(chunk * 64 + bit - BITMAP_SIZE);
-      }
-    }
-  }
-
-  return indices;
-}
-
-export function getExtensionBitmapSetIndicesFromState(
-  extension: BitmapExtensionState,
-): number[] {
-  const indices: number[] = [];
-
-  for (let offset = 0; offset < extension.positiveBitmap.length; offset++) {
-    for (
-      let chunk = 0;
-      chunk < extension.positiveBitmap[offset].length;
-      chunk++
-    ) {
-      for (let bit = 0; bit < 64; bit++) {
-        if (extension.positiveBitmap[offset][chunk].testn(bit)) {
-          indices.push(offset * BITMAP_SIZE + chunk * 64 + bit + BITMAP_SIZE);
-        }
-      }
-    }
-  }
-
-  for (let offset = 0; offset < extension.negativeBitmap.length; offset++) {
-    for (
-      let chunk = 0;
-      chunk < extension.negativeBitmap[offset].length;
-      chunk++
-    ) {
-      for (let bit = 0; bit < 64; bit++) {
-        if (extension.negativeBitmap[offset][chunk].testn(bit)) {
-          indices.push(
-            -(offset * BITMAP_SIZE + chunk * 64 + bit + 1) - BITMAP_SIZE,
-          );
-        }
-      }
-    }
-  }
-
-  return indices.sort((a, b) => a - b);
 }

@@ -968,9 +968,12 @@ export class PositionService extends DlmmProProgram {
         "maxAmountX and maxAmountY must not both be null",
       );
     }
-    for (const amount of [parameters.maxAmountX, parameters.maxAmountY]) {
+    for (const [name, amount] of [
+      ["maxAmountX", parameters.maxAmountX],
+      ["maxAmountY", parameters.maxAmountY],
+    ] as const) {
       if (amount !== null) {
-        assertU64(amount, "maxAmount");
+        assertU64(amount, name);
         if (amount.isZero()) {
           throw PoolError.amountIsZero();
         }

@@ -1,5 +1,6 @@
 export * from "./accessRegistry";
 export * from "./actions";
+export * from "./bitmap";
 export * from "./bn";
 export * from "./connection";
 export * from "./constants";

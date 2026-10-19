@@ -23,14 +23,6 @@ function fallWeight(distance: number, span: number, maxWeight: number): number {
   return Math.round(maxWeight - ((maxWeight - 1) * distance) / span);
 }
 
-function activeIndexOf(
-  minTickId: number,
-  currentTickId: number,
-  tickSpacing: number,
-): number {
-  return Math.floor((currentTickId - minTickId) / tickSpacing);
-}
-
 function toWeightSpot(
   minTickId: number,
   maxTickId: number,
@@ -42,86 +34,53 @@ function toWeightSpot(
   }));
 }
 
-function toWeightDescending(
+type WeightAt = (distance: number, span: number, maxWeight: number) => number;
+
+function toWeightLinear(
   minTickId: number,
   maxTickId: number,
   tickSpacing: number,
+  weightAt: WeightAt,
 ): TickWeight[] {
   const tickIds = tickIdsInRange(minTickId, maxTickId, tickSpacing);
   const last = tickIds.length - 1;
   const maxWeight = Math.min(tickIds.length, MAX_LIQUIDITY_WEIGHT);
   return tickIds.map((tickId, index) => ({
     tickId,
-    weight: fallWeight(index, last, maxWeight),
+    weight: weightAt(index, last, maxWeight),
   }));
 }
 
-function toWeightAscending(
-  minTickId: number,
-  maxTickId: number,
-  tickSpacing: number,
-): TickWeight[] {
-  const tickIds = tickIdsInRange(minTickId, maxTickId, tickSpacing);
-  const last = tickIds.length - 1;
-  const maxWeight = Math.min(tickIds.length, MAX_LIQUIDITY_WEIGHT);
-  return tickIds.map((tickId, index) => ({
-    tickId,
-    weight: riseWeight(index, last, maxWeight),
-  }));
-}
-
-function toWeightCurve(
+/**
+ * Curve (`fallWeight`) peaks and BidAsk (`riseWeight`) dips at the active
+ * tick; with the price outside the range the slope runs the whole range.
+ */
+function toWeightAroundActive(
   minTickId: number,
   maxTickId: number,
   currentTickId: number,
   tickSpacing: number,
+  weightAt: WeightAt,
 ): TickWeight[] {
+  const opposite = weightAt === fallWeight ? riseWeight : fallWeight;
   if (currentTickId < minTickId) {
-    return toWeightDescending(minTickId, maxTickId, tickSpacing);
+    return toWeightLinear(minTickId, maxTickId, tickSpacing, weightAt);
   }
   if (currentTickId > maxTickId) {
-    return toWeightAscending(minTickId, maxTickId, tickSpacing);
+    return toWeightLinear(minTickId, maxTickId, tickSpacing, opposite);
   }
   const tickIds = tickIdsInRange(minTickId, maxTickId, tickSpacing);
   const last = tickIds.length - 1;
-  const peakIndex = activeIndexOf(minTickId, currentTickId, tickSpacing);
-  const peak = Math.min(
-    Math.max(peakIndex, last - peakIndex) + 1,
-    MAX_LIQUIDITY_WEIGHT,
-  );
-  return tickIds.map((tickId, index) => {
-    const span = index <= peakIndex ? peakIndex : last - peakIndex;
-    return {
-      tickId,
-      weight: fallWeight(Math.abs(index - peakIndex), span, peak),
-    };
-  });
-}
-
-function toWeightBidAsk(
-  minTickId: number,
-  maxTickId: number,
-  currentTickId: number,
-  tickSpacing: number,
-): TickWeight[] {
-  if (currentTickId < minTickId) {
-    return toWeightAscending(minTickId, maxTickId, tickSpacing);
-  }
-  if (currentTickId > maxTickId) {
-    return toWeightDescending(minTickId, maxTickId, tickSpacing);
-  }
-  const tickIds = tickIdsInRange(minTickId, maxTickId, tickSpacing);
-  const last = tickIds.length - 1;
-  const valleyIndex = activeIndexOf(minTickId, currentTickId, tickSpacing);
+  const activeIndex = Math.floor((currentTickId - minTickId) / tickSpacing);
   const maxWeight = Math.min(
-    Math.max(valleyIndex, last - valleyIndex) + 1,
+    Math.max(activeIndex, last - activeIndex) + 1,
     MAX_LIQUIDITY_WEIGHT,
   );
   return tickIds.map((tickId, index) => {
-    const span = index <= valleyIndex ? valleyIndex : last - valleyIndex;
+    const span = index <= activeIndex ? activeIndex : last - activeIndex;
     return {
       tickId,
-      weight: riseWeight(Math.abs(index - valleyIndex), span, maxWeight),
+      weight: weightAt(Math.abs(index - activeIndex), span, maxWeight),
     };
   });
 }
@@ -139,12 +98,10 @@ export function quantizeWeights(
       "levels must be an integer in 1..=MAX_LIQUIDITY_WEIGHT",
     );
   }
-  let maxWeight = 0;
-  for (const entry of weights) {
-    if (entry.weight > maxWeight) {
-      maxWeight = entry.weight;
-    }
-  }
+  const maxWeight = weights.reduce(
+    (max, entry) => Math.max(max, entry.weight),
+    0,
+  );
   if (maxWeight <= 0) {
     throw PoolError.invalidParameters("weights must include a positive weight");
   }
@@ -192,18 +149,20 @@ export function toWeightsByStrategy(args: {
     case StrategyType.Spot:
       return toWeightSpot(args.minTickId, args.maxTickId, args.tickSpacing);
     case StrategyType.Curve:
-      return toWeightCurve(
+      return toWeightAroundActive(
         args.minTickId,
         args.maxTickId,
         currentTickId,
         args.tickSpacing,
+        fallWeight,
       );
     case StrategyType.BidAsk:
-      return toWeightBidAsk(
+      return toWeightAroundActive(
         args.minTickId,
         args.maxTickId,
         currentTickId,
         args.tickSpacing,
+        riseWeight,
       );
     case StrategyType.Custom:
       if (!args.weights) {

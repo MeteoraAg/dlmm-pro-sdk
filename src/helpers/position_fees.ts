@@ -109,17 +109,13 @@ export function getFeeGrowthInside(args: {
 
 /**
  * Fees a refresh would leave pending on one position slot: the amount already
- * pending plus `liquidity * (growthInside - checkpoint) >> 64`. A slot without
- * liquidity is not updated by the program, so only its pending amount counts.
+ * pending plus `liquidity * (growthInside - checkpoint) >> 64`.
  */
 export function getPendingFees(
   position: DecodedPosition,
   feeGrowthInside: FeeGrowthInside,
 ): PendingFees {
   const liquidity = positionTotalLiquidity(position);
-  if (liquidity.isZero()) {
-    return { feeX: position.feePendingX, feeY: position.feePendingY };
-  }
   const deltaX = liquidity
     .mul(
       wrappingSub(

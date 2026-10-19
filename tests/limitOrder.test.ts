@@ -17,7 +17,6 @@ import {
   tickArraysForTickIds,
   type DlmmProTypes,
 } from "../src";
-import { getExtensionBitmapSetIndicesFromState } from "../src/helpers/codec";
 import {
   accountExists,
   big,
@@ -25,6 +24,7 @@ import {
   createSvmConnection,
   defaultStaticConfigArgs,
   findEvent,
+  getExtensionBitmapSetIndicesFromState,
   getOrCreateAssociatedTokenAccount,
   getTokenAmount,
   gridWeights,

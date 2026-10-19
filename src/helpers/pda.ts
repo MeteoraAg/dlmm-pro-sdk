@@ -23,13 +23,6 @@ import { PoolError } from "../errors";
 import { encodePodU64 } from "./pod";
 import { assertI32 } from "./validation";
 
-function toI32Buffer(index: number): Buffer {
-  assertI32(index, "index");
-  const buf = Buffer.alloc(4);
-  buf.writeInt32LE(index, 0);
-  return buf;
-}
-
 function sortMints(a: PublicKey, b: PublicKey): [PublicKey, PublicKey] {
   return a.toBuffer().compare(b.toBuffer()) > 0 ? [a, b] : [b, a];
 }
@@ -149,12 +142,11 @@ export function deriveTickArray(
   tickArrayIndex: number,
   programId: PublicKey = DLMM_PRO_PROGRAM_ID,
 ): PublicKey {
+  assertI32(tickArrayIndex, "tickArrayIndex");
+  const index = Buffer.alloc(4);
+  index.writeInt32LE(tickArrayIndex, 0);
   return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from(TICK_ARRAY_PREFIX),
-      pool.toBuffer(),
-      toI32Buffer(tickArrayIndex),
-    ],
+    [Buffer.from(TICK_ARRAY_PREFIX), pool.toBuffer(), index],
     programId,
   )[0];
 }
