@@ -50,14 +50,14 @@ function orderTickArrayIndexes(
 
 function assertCancelTickIds(tickIds: number[]): void {
   if (tickIds.length === 0) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters("tickIds must not be empty");
   }
   for (const tickId of tickIds) {
-    assertI32(tickId);
+    assertI32(tickId, "tickIds");
   }
   for (let i = 1; i < tickIds.length; i++) {
     if (tickIds[i - 1] >= tickIds[i]) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters("tickIds must be strictly ascending");
     }
   }
 }
@@ -91,28 +91,40 @@ export class LimitOrderService extends DlmmProProgram {
     nftAccount: PublicKey;
   }> {
     const { maxAmount, relativeTick, ticks } = params.parameters;
-    assertU64(maxAmount);
+    assertU64(maxAmount, "maxAmount");
     if (ticks.length === 0 || ticks.length > LIMIT_ORDER_MAX_TICK) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters(
+        "ticks must have 1..=LIMIT_ORDER_MAX_TICK entries",
+      );
     }
     for (let index = 0; index < ticks.length; index++) {
-      assertI32(ticks[index].id);
-      assertU64(ticks[index].amount);
-      if (
-        ticks[index].amount.isZero() ||
-        (index > 0 && ticks[index - 1].id >= ticks[index].id)
-      ) {
-        throw PoolError.invalidParameters();
+      assertI32(ticks[index].id, "ticks.id");
+      assertU64(ticks[index].amount, "ticks.amount");
+      if (ticks[index].amount.isZero()) {
+        throw PoolError.invalidParameters("ticks.amount must be non-zero");
+      }
+      if (index > 0 && ticks[index - 1].id >= ticks[index].id) {
+        throw PoolError.invalidParameters(
+          "ticks.id must be strictly ascending",
+        );
       }
     }
     if (relativeTick !== null) {
-      assertI32(relativeTick.spacingAlignedMinTickId);
-      assertI32(relativeTick.spacingAlignedMaxTickId);
+      assertI32(
+        relativeTick.spacingAlignedMinTickId,
+        "spacingAlignedMinTickId",
+      );
+      assertI32(
+        relativeTick.spacingAlignedMaxTickId,
+        "spacingAlignedMaxTickId",
+      );
       if (
         relativeTick.spacingAlignedMinTickId >
         relativeTick.spacingAlignedMaxTickId
       ) {
-        throw PoolError.invalidParameters();
+        throw PoolError.invalidParameters(
+          "spacingAlignedMinTickId must not exceed spacingAlignedMaxTickId",
+        );
       }
     }
     const { isAskSide } = params.parameters;
@@ -141,10 +153,12 @@ export class LimitOrderService extends DlmmProProgram {
         relativeTick.spacingAlignedMinTickId % tickSpacing !== 0 ||
         relativeTick.spacingAlignedMaxTickId % tickSpacing !== 0
       ) {
-        throw PoolError.invalidParameters();
+        throw PoolError.invalidParameters(
+          "relativeTick tick ids must be multiples of the pool tickSpacing",
+        );
       }
     } else if (!ticks.every((tick) => isUsableTickId(tick.id, tickSpacing))) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters("ticks.id must be usable tick ids");
     }
     const tickArrayIndexes = orderTickArrayIndexes(
       params.parameters,
@@ -232,8 +246,8 @@ export class LimitOrderService extends DlmmProProgram {
   }): Promise<{ tx: Transaction }> {
     const minAmountX = params.minAmountX ?? new BN(0);
     const minAmountY = params.minAmountY ?? new BN(0);
-    assertU64(minAmountX);
-    assertU64(minAmountY);
+    assertU64(minAmountX, "minAmountX");
+    assertU64(minAmountY, "minAmountY");
     const limitOrder = deriveLimitOrder(params.nftMint, this.programId);
     const referralToken = params.referralToken;
     const tickIds =

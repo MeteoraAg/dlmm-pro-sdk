@@ -33,7 +33,7 @@ export class ActivationOpenHandler {
 
   validateInitialize(_context: ActivationInitializeContext): void {
     if (this.inner.padding.some((byte) => byte !== 0)) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters("padding must be zero");
     }
   }
 

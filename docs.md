@@ -4216,6 +4216,7 @@ enum PoolErrorCode {
 Builders and helpers throw `PoolError` for input they can reject before
 sending. `PoolErrorCode` has the program's error numbering, so the custom
 error code of a failed transaction maps to the same name.
+`PoolError.message` names the argument that failed and its constraint.
 
 ```typescript
 try {

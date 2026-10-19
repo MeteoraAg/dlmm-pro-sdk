@@ -21,22 +21,36 @@ export function relativeTickFromSlippage(args: {
   if (
     !Number.isInteger(args.tickSpacing) ||
     args.tickSpacing <= 0 ||
-    args.tickSpacing > MAX_TICK_SPACING ||
+    args.tickSpacing > MAX_TICK_SPACING
+  ) {
+    throw PoolError.invalidParameters(
+      "tickSpacing must be an integer in 1..=MAX_TICK_SPACING",
+    );
+  }
+  if (
     !Number.isInteger(args.currentTickId) ||
     args.currentTickId < I32_MIN ||
-    args.currentTickId > I32_MAX ||
+    args.currentTickId > I32_MAX
+  ) {
+    throw PoolError.invalidParameters("currentTickId must be an i32");
+  }
+  if (
     !Number.isInteger(args.slippageTicks) ||
     args.slippageTicks < 0 ||
     args.slippageTicks % args.tickSpacing !== 0
   ) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "slippageTicks must be a non-negative multiple of tickSpacing",
+    );
   }
 
   const aligned = alignTickDown(args.currentTickId, args.tickSpacing);
   const spacingAlignedMinTickId = aligned - args.slippageTicks;
   const spacingAlignedMaxTickId = aligned + args.slippageTicks;
   if (spacingAlignedMinTickId < I32_MIN || spacingAlignedMaxTickId > I32_MAX) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "slippageTicks must keep the tick range within i32",
+    );
   }
   return { spacingAlignedMinTickId, spacingAlignedMaxTickId };
 }
@@ -95,7 +109,9 @@ export function limitOrderTicksFromShape(args: {
   includeActiveTick?: boolean;
 }): ShapeLimitOrderTicks {
   if (args.unitAmount !== undefined && args.totalAmount !== undefined) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "unitAmount and totalAmount must not both be set",
+    );
   }
 
   const { currentTickId, tickSpacing } = args.shape;
@@ -111,17 +127,23 @@ export function limitOrderTicksFromShape(args: {
   );
 
   if (columns.length === 0) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "shape must have a column on the requested side",
+    );
   }
   if (columns.length > LIMIT_ORDER_MAX_TICK) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "shape must have at most LIMIT_ORDER_MAX_TICK columns on the requested side",
+    );
   }
 
   const totalWeight = columns.reduce((sum, column) => sum + column.weight, 0);
   const unitAmount =
     args.unitAmount ?? args.totalAmount?.div(new BN(totalWeight));
   if (!unitAmount || unitAmount.lte(new BN(0))) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "unitAmount or totalAmount must be positive",
+    );
   }
 
   const ticks: ShapeLimitOrderTick[] = [];

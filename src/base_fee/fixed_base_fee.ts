@@ -25,7 +25,7 @@ export function encodeFixedBaseFeeData(
   cliffFeeNumerator: BN | number,
 ): number[] {
   const buf = Buffer.alloc(31, 0);
-  buf.set(encodePodU64(cliffFeeNumerator), 0);
+  buf.set(encodePodU64(cliffFeeNumerator, "cliffFeeNumerator"), 0);
   return Array.from(buf);
 }
 
@@ -46,7 +46,7 @@ export class FixedBaseFeeHandler {
       this.inner.cliffFeeNumerator,
     );
     if (this.inner.padding.some((byte) => byte !== 0)) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters("padding must be zero");
     }
   }
 

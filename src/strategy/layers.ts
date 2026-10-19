@@ -43,7 +43,7 @@ export function stackWeightLevels(
     ),
   ].sort((a, b) => a - b);
   if (levels.length === 0) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters("weights must include a positive weight");
   }
 
   const ranges: LiquidityRange[] = [];

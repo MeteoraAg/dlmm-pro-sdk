@@ -204,7 +204,9 @@ function validatePoolCanSwap(
     return;
   }
   if (!poolActivation) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "poolActivation is required with the ActivationAccess extension",
+    );
   }
   const isWhitelisted =
     !!swapper && poolActivation.whitelistedSwap.equals(swapper);
@@ -358,7 +360,9 @@ export function quoteExactIn(params: QuoteExactInParams): QuoteExactInResult {
     (inputMint && !inputMint.address.equals(inputMintAddress)) ||
     (outputMint && !outputMint.address.equals(outputMintAddress))
   ) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "inputMint and outputMint must match the pool and be set for Token-2022 mints",
+    );
   }
 
   const currentPoint = getCurrentPoint(

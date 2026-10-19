@@ -36,7 +36,7 @@ export function encodeBondingCurveActivationData(
   params: BondingCurveActivationParams,
 ): number[] {
   const buf = Buffer.alloc(15, 0);
-  buf.set(encodePodU64(params.targetIncreaseBps), 7);
+  buf.set(encodePodU64(params.targetIncreaseBps, "targetIncreaseBps"), 7);
   return Array.from(buf);
 }
 
@@ -61,18 +61,22 @@ export class ActivationBondingCurveHandler {
     whitelistedAddLiquidity,
   }: ActivationInitializeContext): void {
     if (this.inner.isReachTarget !== 0) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters("isReachTarget must be 0");
     }
     if (this.inner.padding.some((byte) => byte !== 0)) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters("padding must be zero");
     }
     // Without a whitelisted depositor the pool can never be seeded, so it can
     // never reach the target price that opens up public deposits.
     if (whitelistedAddLiquidity.equals(PublicKey.default)) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters(
+        "whitelistedAddLiquidity must not be the default public key",
+      );
     }
     if (this.inner.targetIncreaseBps.lte(new BN(MAX_BASIS_POINT))) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters(
+        "targetIncreaseBps must be above MAX_BASIS_POINT",
+      );
     }
 
     const target = mulDivU192(
@@ -82,7 +86,9 @@ export class ActivationBondingCurveHandler {
     );
     const alignedMaxTickId = alignTickDown(MAX_TICK_ID, tickSpacing);
     if (target.gt(getSqrtPriceFromTickId(alignedMaxTickId))) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters(
+        "initSqrtPrice * targetIncreaseBps must not exceed the aligned max tick price",
+      );
     }
   }
 

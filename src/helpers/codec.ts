@@ -94,7 +94,9 @@ export function encodePoolExtensions(extensions: PoolExtension[]): number {
       extension < 0 ||
       extension >= POOL_EXTENSION_VARIANT_COUNT
     ) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters(
+        "extensions must be PoolExtension variants",
+      );
     }
   }
   return extensions.reduce((acc, extension) => acc | (1 << extension), 0);

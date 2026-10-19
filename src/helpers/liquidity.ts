@@ -111,7 +111,7 @@ export function getAmountsFromLiquidity(args: {
 
 export function liquidityBitmap(positionIndexes: number[]): BN {
   if (positionIndexes.length === 0) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters("positionIndexes must not be empty");
   }
   let bitmap = new BN(0);
   const seen = new Set<number>();
@@ -122,7 +122,9 @@ export function liquidityBitmap(positionIndexes: number[]): BN {
       index >= POSITION_MAX_RANGE ||
       seen.has(index)
     ) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters(
+        "positionIndexes must be unique integers in 0..POSITION_MAX_RANGE",
+      );
     }
     seen.add(index);
     bitmap = bitmap.or(new BN(1).shln(index));
@@ -136,7 +138,9 @@ export function positionIndexesFromBitmap(bitmap: BN): number[] {
     bitmap.isZero() ||
     bitmap.bitLength() > POSITION_MAX_RANGE
   ) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "bitmap must select at least one position below POSITION_MAX_RANGE",
+    );
   }
   const indexes: number[] = [];
   for (let index = 0; index < POSITION_MAX_RANGE; index++) {
@@ -157,10 +161,12 @@ export function isLiquidityWeight(weight: number): boolean {
 export function validateBitmapLiquidities(bitmap: BN, liquidities: BN[]): void {
   const selected = positionIndexesFromBitmap(bitmap);
   if (selected.length !== liquidities.length) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "liquidities must have one entry per bitmap slot",
+    );
   }
   for (const liquidity of liquidities) {
-    assertU128(liquidity);
+    assertU128(liquidity, "liquidities");
     if (liquidity.isZero()) {
       throw PoolError.liquidityIsZero();
     }
@@ -174,19 +180,23 @@ export function validateAddLiquidityByWeightParameters(
   parameters: AddLiquidityByWeightParameters,
 ): void {
   const { multiplier, liquidities: weights } = parameters;
-  assertU64(parameters.maxAmountX);
-  assertU64(parameters.maxAmountY);
-  assertOptionalU16(parameters.expectedLayoutVersion);
-  assertU128(multiplier);
+  assertU64(parameters.maxAmountX, "maxAmountX");
+  assertU64(parameters.maxAmountY, "maxAmountY");
+  assertOptionalU16(parameters.expectedLayoutVersion, "expectedLayoutVersion");
+  assertU128(multiplier, "multiplier");
   if (multiplier.isZero()) {
     throw PoolError.liquidityIsZero();
   }
   if (positionIndexesFromBitmap(parameters.bitmap).length !== weights.length) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "liquidities must have one entry per bitmap slot",
+    );
   }
   for (const weight of weights) {
     if (!isLiquidityWeight(weight)) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters(
+        "liquidities must be weights in 1..=MAX_LIQUIDITY_WEIGHT",
+      );
     }
     if (safeMul(multiplier, new BN(weight), U128_MAX).gt(I128_MAX)) {
       throw PoolError.liquidityIsTooHigh();

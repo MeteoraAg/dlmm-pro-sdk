@@ -46,23 +46,25 @@ export function encodeTimeSchedulerBaseFeeData(
   params: TimeSchedulerParams,
 ): number[] {
   const buf = Buffer.alloc(31, 0);
-  buf.set(encodePodU64(params.cliffFeeNumerator), 0);
-  buf.set(encodePodU64(params.periodFrequency), 8);
-  buf.set(encodePodU64(params.reductionFactor), 16);
-  buf.set(encodePodU16(params.numberOfPeriod), 24);
+  buf.set(encodePodU64(params.cliffFeeNumerator, "cliffFeeNumerator"), 0);
+  buf.set(encodePodU64(params.periodFrequency, "periodFrequency"), 8);
+  buf.set(encodePodU64(params.reductionFactor, "reductionFactor"), 16);
+  buf.set(encodePodU16(params.numberOfPeriod, "numberOfPeriod"), 24);
   return Array.from(buf);
 }
 
 function validateScheduler(inner: PodAlignedFeeTimeScheduler): void {
-  if (
-    inner.numberOfPeriod === 0 ||
-    inner.periodFrequency.isZero() ||
-    inner.reductionFactor.isZero()
-  ) {
-    throw PoolError.invalidParameters();
+  if (inner.numberOfPeriod === 0) {
+    throw PoolError.invalidParameters("numberOfPeriod must be non-zero");
+  }
+  if (inner.periodFrequency.isZero()) {
+    throw PoolError.invalidParameters("periodFrequency must be non-zero");
+  }
+  if (inner.reductionFactor.isZero()) {
+    throw PoolError.invalidParameters("reductionFactor must be non-zero");
   }
   if (inner.padding.some((byte) => byte !== 0)) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters("padding must be zero");
   }
 }
 

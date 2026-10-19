@@ -125,7 +125,7 @@ function mergeEqualWeightRanges(
 ): LiquidityRange[] {
   const funded = weights.filter((entry) => entry.weight > 0);
   if (funded.length === 0) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters("weights must include a positive weight");
   }
 
   const ranges: LiquidityRange[] = [];
@@ -175,13 +175,17 @@ export function encodeAddLiquidityByWeight(args: {
   expectedLayoutVersion?: number;
 }): AddLiquidityByWeightParameters {
   if (args.ranges.length === 0 || args.ranges.length > POSITION_MAX_RANGE) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "ranges must have 1..=POSITION_MAX_RANGE entries",
+    );
   }
   const positionIndexes =
     args.positionIndexes ??
     Array.from({ length: args.ranges.length }, (_, index) => index);
   if (positionIndexes.length !== args.ranges.length) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "positionIndexes must have one entry per range",
+    );
   }
   const bitmap = liquidityBitmap(positionIndexes);
   const weights = positionIndexes
@@ -192,7 +196,9 @@ export function encodeAddLiquidityByWeight(args: {
     .sort((a, b) => a.positionIndex - b.positionIndex)
     .map(({ weight }) => weight);
   if (!weights.every(isLiquidityWeight)) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "ranges.weight must be in 1..=MAX_LIQUIDITY_WEIGHT",
+    );
   }
   const parameters = {
     maxAmountX: args.maxAmountX,
@@ -252,15 +258,22 @@ export function multiplierFromAmounts(args: {
   mintY: Mint | null;
   epoch: bigint;
 }): BN {
+  if (args.ranges.length === 0) {
+    throw PoolError.invalidParameters("ranges must not be empty");
+  }
   if (
-    args.ranges.length === 0 ||
     !Number.isInteger(args.tickSpacing) ||
     args.tickSpacing < 1 ||
-    args.tickSpacing > MAX_TICK_SPACING ||
-    args.amountX.isNeg() ||
-    args.amountY.isNeg()
+    args.tickSpacing > MAX_TICK_SPACING
   ) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "tickSpacing must be an integer in 1..=MAX_TICK_SPACING",
+    );
+  }
+  if (args.amountX.isNeg() || args.amountY.isNeg()) {
+    throw PoolError.invalidParameters(
+      "amountX and amountY must not be negative",
+    );
   }
 
   // liquidity_gross per tick is capped on-chain at u128::MAX / tick_count
@@ -271,13 +284,19 @@ export function multiplierFromAmounts(args: {
 
   let upperBound = I128_MAX;
   for (const range of args.ranges) {
+    if (!isLiquidityWeight(range.weight)) {
+      throw PoolError.invalidParameters(
+        "ranges.weight must be in 1..=MAX_LIQUIDITY_WEIGHT",
+      );
+    }
     if (
-      !isLiquidityWeight(range.weight) ||
       range.tickLowerId >= range.tickUpperId ||
       !isUsableTickId(range.tickLowerId, args.tickSpacing) ||
       !isUsableTickId(range.tickUpperId, args.tickSpacing)
     ) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters(
+        "ranges must be usable tick ids with tickLowerId < tickUpperId",
+      );
     }
     for (const tickId of [range.tickLowerId, range.tickUpperId]) {
       tickGrossWeights.set(
@@ -370,7 +389,9 @@ export function multiplierFromAmounts(args: {
   }
 
   if (low.isZero()) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "amountX and amountY must fund non-zero liquidity",
+    );
   }
   return low;
 }
@@ -400,7 +421,7 @@ export function buildLiquidityShape(args: {
     layout !== LiquidityLayout.Vertical &&
     layout !== LiquidityLayout.Horizontal
   ) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters("layout must be Vertical or Horizontal");
   }
   if (
     args.maxRanges !== undefined &&
@@ -408,13 +429,17 @@ export function buildLiquidityShape(args: {
       args.maxRanges < 1 ||
       args.maxRanges > POSITION_MAX_RANGE)
   ) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "maxRanges must be an integer in 1..=POSITION_MAX_RANGE",
+    );
   }
   if (
     !isUsableTickId(args.minTickId, args.tickSpacing) ||
     !isUsableTickId(args.maxTickId, args.tickSpacing)
   ) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "minTickId and maxTickId must be usable tick ids",
+    );
   }
   if (
     args.strategy === StrategyType.Custom &&
@@ -422,7 +447,7 @@ export function buildLiquidityShape(args: {
       (entry) => !isUsableTickId(entry.tickId, args.tickSpacing),
     )
   ) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters("weights.tickId must be usable tick ids");
   }
 
   const weights = quantizeWeights(
@@ -430,7 +455,7 @@ export function buildLiquidityShape(args: {
     MAX_LIQUIDITY_WEIGHT,
   );
   if (weights[weights.length - 1].tickId + args.tickSpacing > MAX_TICK_ID) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters("weights must end below MAX_TICK_ID");
   }
 
   const toRanges = (entries: TickWeight[]) =>

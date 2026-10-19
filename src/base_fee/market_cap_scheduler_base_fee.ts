@@ -57,29 +57,37 @@ export function encodeMarketCapSchedulerBaseFeeData(
   params: MarketCapSchedulerParams,
 ): number[] {
   const buf = Buffer.alloc(31, 0);
-  buf.set(encodePodU64(params.cliffFeeNumerator), 0);
-  buf.set(encodePodU64(params.reductionFactor), 8);
-  buf.set(encodePodU32(params.sqrtPriceStepBps), 16);
-  buf.set(encodePodU32(params.schedulerExpirationDuration), 20);
-  buf.set(encodePodU16(params.numberOfPeriod), 24);
+  buf.set(encodePodU64(params.cliffFeeNumerator, "cliffFeeNumerator"), 0);
+  buf.set(encodePodU64(params.reductionFactor, "reductionFactor"), 8);
+  buf.set(encodePodU32(params.sqrtPriceStepBps, "sqrtPriceStepBps"), 16);
+  buf.set(
+    encodePodU32(
+      params.schedulerExpirationDuration,
+      "schedulerExpirationDuration",
+    ),
+    20,
+  );
+  buf.set(encodePodU16(params.numberOfPeriod, "numberOfPeriod"), 24);
   return Array.from(buf);
 }
 
 function validateScheduler(inner: PodAlignedFeeMarketCapScheduler): void {
   if (inner.reductionFactor.isZero()) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters("reductionFactor must be non-zero");
   }
   if (inner.sqrtPriceStepBps === 0) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters("sqrtPriceStepBps must be non-zero");
   }
   if (inner.schedulerExpirationDuration === 0) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "schedulerExpirationDuration must be non-zero",
+    );
   }
   if (inner.numberOfPeriod === 0) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters("numberOfPeriod must be non-zero");
   }
   if (inner.padding.some((byte) => byte !== 0)) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters("padding must be zero");
   }
 }
 

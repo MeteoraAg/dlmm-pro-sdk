@@ -29,7 +29,6 @@ export type BitmapExtensionState = Pick<
 >;
 
 export type TokenBadge = IdlAccounts<AccessRegistry>["tokenBadge"];
-export type AccessRegistryOperator = IdlAccounts<AccessRegistry>["operator"];
 
 export type TickRange = IdlTypes<DlmmPro>["tickRange"];
 export type RemainingAccountsInfo = IdlTypes<DlmmPro>["remainingAccountsInfo"];

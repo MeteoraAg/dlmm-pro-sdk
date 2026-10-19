@@ -71,12 +71,16 @@ export function validateActivationCombination(
       second === ActivationMode.TimeBased);
 
   if (!allowed) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "activationModes must be an allowed combination",
+    );
   }
 
   if (!activationModes.includes(ActivationMode.TimeBased)) {
     if (!activationPoint.eq(currentPoint)) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters(
+        "activationPoint must equal currentPoint without a TimeBased mode",
+      );
     }
   }
 }

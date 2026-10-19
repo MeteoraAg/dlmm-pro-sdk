@@ -10,6 +10,8 @@ export function validateFeeBounds(
     minFeeNumerator.lt(MIN_FEE_NUMERATOR) ||
     maxFeeNumerator.gt(MAX_FEE_NUMERATOR)
   ) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "fee numerators must be in MIN_FEE_NUMERATOR..=MAX_FEE_NUMERATOR",
+    );
   }
 }

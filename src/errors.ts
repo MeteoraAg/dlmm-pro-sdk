@@ -83,8 +83,11 @@ export class PoolError extends Error {
     );
   }
 
-  static invalidParameters(): PoolError {
-    return new PoolError(PoolErrorCode.InvalidParameters, "Invalid parameters");
+  static invalidParameters(detail?: string): PoolError {
+    return new PoolError(
+      PoolErrorCode.InvalidParameters,
+      detail ? `Invalid parameters: ${detail}` : "Invalid parameters",
+    );
   }
 
   static invalidAccount(): PoolError {

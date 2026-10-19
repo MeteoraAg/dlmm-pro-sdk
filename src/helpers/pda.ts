@@ -24,7 +24,7 @@ import { encodePodU64 } from "./pod";
 import { assertI32 } from "./validation";
 
 function toI32Buffer(index: number): Buffer {
-  assertI32(index);
+  assertI32(index, "index");
   const buf = Buffer.alloc(4);
   buf.writeInt32LE(index, 0);
   return buf;
@@ -58,7 +58,7 @@ export function deriveStaticConfig(
   programId: PublicKey = DLMM_PRO_PROGRAM_ID,
 ): PublicKey {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from(STATIC_CONFIG_PREFIX), encodePodU64(index)],
+    [Buffer.from(STATIC_CONFIG_PREFIX), encodePodU64(index, "index")],
     programId,
   )[0];
 }
@@ -72,7 +72,7 @@ export function deriveDynamicConfig(
     [
       Buffer.from(DYNAMIC_CONFIG_PREFIX),
       poolCreatorAuthority.toBuffer(),
-      encodePodU64(index),
+      encodePodU64(index, "index"),
     ],
     programId,
   )[0];

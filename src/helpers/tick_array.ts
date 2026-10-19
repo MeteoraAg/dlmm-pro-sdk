@@ -32,13 +32,17 @@ export function isUsableTickId(tickId: number, tickSpacing: number): boolean {
 }
 
 export function tickIndexFromId(tickId: number, tickSpacing: number): number {
+  if (!Number.isInteger(tickId)) {
+    throw PoolError.invalidParameters("tickId must be an integer");
+  }
   if (
-    !Number.isInteger(tickId) ||
     !Number.isInteger(tickSpacing) ||
     tickSpacing <= 0 ||
     tickSpacing > MAX_TICK_SPACING
   ) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "tickSpacing must be an integer in 1..=MAX_TICK_SPACING",
+    );
   }
   const scaled = Math.floor(tickId / tickSpacing);
   const index = Math.trunc(scaled / MAX_TICKS_PER_ARRAY);
@@ -57,12 +61,16 @@ export function tickIdsInRange(
   maxTickId: number,
   tickSpacing: number,
 ): number[] {
+  if (minTickId > maxTickId) {
+    throw PoolError.invalidParameters("minTickId must not exceed maxTickId");
+  }
   if (
-    minTickId > maxTickId ||
     !isUsableTickId(minTickId, tickSpacing) ||
     !isUsableTickId(maxTickId, tickSpacing)
   ) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "minTickId and maxTickId must be usable tick ids",
+    );
   }
 
   const tickIds: number[] = [];
@@ -74,7 +82,9 @@ export function tickIdsInRange(
 
 function validateTickRanges(ranges: TickRange[], tickSpacing: number): void {
   if (ranges.length === 0 || ranges.length > POSITION_MAX_RANGE) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "tickRanges must have 1..=POSITION_MAX_RANGE entries",
+    );
   }
   for (const range of ranges) {
     if (
@@ -82,7 +92,9 @@ function validateTickRanges(ranges: TickRange[], tickSpacing: number): void {
       !isUsableTickId(range.tickLowerId, tickSpacing) ||
       !isUsableTickId(range.tickUpperId, tickSpacing)
     ) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters(
+        "tickRanges must be usable tick ids with tickLowerId < tickUpperId",
+      );
     }
   }
 }

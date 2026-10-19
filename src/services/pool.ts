@@ -391,8 +391,8 @@ export class PoolService extends DlmmProProgram {
    * `amountLeft` is zero.
    */
   async swap(params: SwapParams): Promise<{ tx: Transaction }> {
-    assertU64(params.parameters.inputAmount);
-    assertU64(params.parameters.minimumOutputAmount);
+    assertU64(params.parameters.inputAmount, "inputAmount");
+    assertU64(params.parameters.minimumOutputAmount, "minimumOutputAmount");
     if (params.parameters.inputAmount.isZero()) {
       throw PoolError.amountIsZero();
     }
@@ -509,7 +509,7 @@ export class PoolService extends DlmmProProgram {
       params.lengthToAdd <= 0 ||
       params.lengthToAdd > 0xffff
     ) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters("lengthToAdd must be a non-zero u16");
     }
 
     const oracle = deriveOracle(params.pool, this.programId);
@@ -543,12 +543,12 @@ export class PoolService extends DlmmProProgram {
     transferHookX?: AccountMeta[];
     transferHookY?: AccountMeta[];
   }): Promise<{ tx: Transaction }> {
-    assertU64(params.maxAmountX);
-    assertU64(params.maxAmountY);
+    assertU64(params.maxAmountX, "maxAmountX");
+    assertU64(params.maxAmountY, "maxAmountY");
     const minAmountX = params.minAmountX ?? new BN(0);
     const minAmountY = params.minAmountY ?? new BN(0);
-    assertU64(minAmountX);
-    assertU64(minAmountY);
+    assertU64(minAmountX, "minAmountX");
+    assertU64(minAmountY, "minAmountY");
     const poolAuthority = derivePoolAuthority(this.programId);
     const reserveX = deriveReserve(
       params.tokenXMint,
@@ -626,7 +626,9 @@ export class PoolService extends DlmmProProgram {
 
   private assertDistinctMints(tokenXMint: PublicKey, tokenYMint: PublicKey) {
     if (tokenXMint.equals(tokenYMint)) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters(
+        "tokenXMint and tokenYMint must differ",
+      );
     }
   }
 

@@ -295,7 +295,9 @@ export function tickArraysForSwap(args: {
   const programId = args.programId ?? DLMM_PRO_PROGRAM_ID;
   const maxTickArrays = args.maxTickArrays ?? 3;
   if (!Number.isInteger(maxTickArrays) || maxTickArrays <= 0) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "maxTickArrays must be a positive integer",
+    );
   }
   const requiresBitmapExtension =
     args.poolState.isBitmapExtensionInitialized === 1;

@@ -88,11 +88,11 @@ export class RewardService extends DlmmProProgram {
     transferHookReward?: AccountMeta[];
   }): Promise<{ tx: Transaction; rewardVault: PublicKey }> {
     if (params.parameters.openTime !== null) {
-      assertU64(params.parameters.openTime);
+      assertU64(params.parameters.openTime, "openTime");
     }
-    assertU64(params.parameters.endTime);
-    assertU128(params.parameters.emissionPerSecond);
-    assertU64(params.parameters.maxAmount);
+    assertU64(params.parameters.endTime, "endTime");
+    assertU128(params.parameters.emissionPerSecond, "emissionPerSecond");
+    assertU64(params.parameters.maxAmount, "maxAmount");
     const rewardVault = deriveRewardVault(
       params.pool,
       params.parameters.index,
@@ -162,7 +162,7 @@ export class RewardService extends DlmmProProgram {
   }): Promise<{ tx: Transaction }> {
     positionIndexesFromBitmap(params.bitmap);
     const minAmount = params.minAmount ?? new BN(0);
-    assertU64(minAmount);
+    assertU64(minAmount, "minAmount");
     const rewardVault = deriveRewardVault(
       params.pool,
       params.rewardIndex,
@@ -232,7 +232,7 @@ export class RewardService extends DlmmProProgram {
     transferHookReward?: AccountMeta[];
   }): Promise<{ tx: Transaction }> {
     const minAmount = params.minAmount ?? new BN(0);
-    assertU64(minAmount);
+    assertU64(minAmount, "minAmount");
     const rewardVault = deriveRewardVault(
       params.pool,
       params.rewardIndex,

@@ -17,7 +17,9 @@ const LOG_B_P_ERR_MARGIN_UPPER_X64 = 15793534762490258745n;
 // find T to satisfy: getSqrtPriceFromTickId(T) ≤ p < getSqrtPriceFromTickId(T+1)
 export function tickIdFromSqrtPrice(sqrtPrice: BN): number {
   if (sqrtPrice.lt(MIN_SQRT_PRICE) || sqrtPrice.gt(MAX_SQRT_PRICE)) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "sqrtPrice must be in MIN_SQRT_PRICE..=MAX_SQRT_PRICE",
+    );
   }
 
   const sqrtPriceU128 = toBigInt(sqrtPrice);

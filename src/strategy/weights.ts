@@ -135,7 +135,9 @@ export function quantizeWeights(
   levels: number,
 ): TickWeight[] {
   if (!isLiquidityWeight(levels)) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters(
+      "levels must be an integer in 1..=MAX_LIQUIDITY_WEIGHT",
+    );
   }
   let maxWeight = 0;
   for (const entry of weights) {
@@ -144,7 +146,7 @@ export function quantizeWeights(
     }
   }
   if (maxWeight <= 0) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters("weights must include a positive weight");
   }
   if (maxWeight <= levels) {
     return weights;
@@ -160,16 +162,18 @@ export function quantizeWeights(
 
 function toWeightCustom(weights: TickWeight[]): TickWeight[] {
   if (weights.length === 0) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters("weights must not be empty");
   }
 
   const sorted = [...weights].sort((a, b) => a.tickId - b.tickId);
   for (let i = 0; i < sorted.length; i++) {
     if (!Number.isInteger(sorted[i].weight) || sorted[i].weight < 0) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters(
+        "weights.weight must be a non-negative integer",
+      );
     }
     if (i > 0 && sorted[i].tickId === sorted[i - 1].tickId) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters("weights.tickId must be unique");
     }
   }
   return sorted;
@@ -203,7 +207,9 @@ export function toWeightsByStrategy(args: {
       );
     case StrategyType.Custom:
       if (!args.weights) {
-        throw PoolError.invalidParameters();
+        throw PoolError.invalidParameters(
+          "weights is required for the Custom strategy",
+        );
       }
       return toWeightCustom(args.weights);
   }

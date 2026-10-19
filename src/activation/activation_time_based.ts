@@ -25,7 +25,7 @@ function readZ40(data: Buffer, offset: number): BN {
 
 function writeZ40(buf: Buffer, offset: number, value: BN): void {
   if (value.isNeg() || value.bitLength() > 40) {
-    throw PoolError.invalidParameters();
+    throw PoolError.invalidParameters("value must fit in 40 bits");
   }
   buf.set(value.toArrayLike(Buffer, "le", 5), offset);
 }
@@ -89,7 +89,7 @@ export class ActivationTimeBasedHandler {
     );
 
     if (!activationPoint.eq(this.inner.swapPoint)) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters("activationPoint must equal swapPoint");
     }
 
     if (
@@ -97,7 +97,9 @@ export class ActivationTimeBasedHandler {
       currentPoint.gt(this.inner.addLiquidityPoint) ||
       currentPoint.gt(this.inner.removeLiquidityPoint)
     ) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters(
+        "swapPoint, addLiquidityPoint and removeLiquidityPoint must not be before currentPoint",
+      );
     }
 
     if (
@@ -105,7 +107,9 @@ export class ActivationTimeBasedHandler {
       farthestFuture.lt(this.inner.addLiquidityPoint) ||
       farthestFuture.lt(this.inner.removeLiquidityPoint)
     ) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters(
+        "swapPoint, addLiquidityPoint and removeLiquidityPoint must be at most MAX_TIME_BUFFER or MAX_SLOT_BUFFER after currentPoint",
+      );
     }
   }
 

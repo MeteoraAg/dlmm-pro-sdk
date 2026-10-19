@@ -37,6 +37,7 @@ import {
 } from "../helpers";
 import {
   assertOptionalU16,
+  assertBps,
   assertU8,
   assertU16,
   assertU64,
@@ -293,9 +294,12 @@ export class PositionService extends DlmmProProgram {
   }
 
   async addLiquidity(params: AddLiquidityParams) {
-    assertU64(params.parameters.maxAmountX);
-    assertU64(params.parameters.maxAmountY);
-    assertOptionalU16(params.parameters.expectedLayoutVersion);
+    assertU64(params.parameters.maxAmountX, "maxAmountX");
+    assertU64(params.parameters.maxAmountY, "maxAmountY");
+    assertOptionalU16(
+      params.parameters.expectedLayoutVersion,
+      "expectedLayoutVersion",
+    );
     validateBitmapLiquidities(
       params.parameters.bitmap,
       params.parameters.liquidities,
@@ -335,9 +339,12 @@ export class PositionService extends DlmmProProgram {
   }
 
   async removeLiquidity(params: RemoveLiquidityParams) {
-    assertU64(params.parameters.minAmountX);
-    assertU64(params.parameters.minAmountY);
-    assertOptionalU16(params.parameters.expectedLayoutVersion);
+    assertU64(params.parameters.minAmountX, "minAmountX");
+    assertU64(params.parameters.minAmountY, "minAmountY");
+    assertOptionalU16(
+      params.parameters.expectedLayoutVersion,
+      "expectedLayoutVersion",
+    );
     validateBitmapLiquidities(
       params.parameters.bitmap,
       params.parameters.liquidities,
@@ -353,16 +360,13 @@ export class PositionService extends DlmmProProgram {
   }
 
   async removeLiquidityByBps(params: RemoveLiquidityByBpsParams) {
-    assertU64(params.parameters.minAmountX);
-    assertU64(params.parameters.minAmountY);
-    assertOptionalU16(params.parameters.expectedLayoutVersion);
-    if (
-      !Number.isInteger(params.parameters.bps) ||
-      params.parameters.bps <= 0 ||
-      params.parameters.bps > MAX_BASIS_POINT
-    ) {
-      throw PoolError.invalidParameters();
-    }
+    assertU64(params.parameters.minAmountX, "minAmountX");
+    assertU64(params.parameters.minAmountY, "minAmountY");
+    assertOptionalU16(
+      params.parameters.expectedLayoutVersion,
+      "expectedLayoutVersion",
+    );
+    assertBps(params.parameters.bps, "bps");
     if (params.parameters.bitmap !== null) {
       positionIndexesFromBitmap(params.parameters.bitmap);
     }
@@ -412,7 +416,7 @@ export class PositionService extends DlmmProProgram {
     );
     const target = claimable.slots[params.index];
     if (!target) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters("index must be a slot of the position");
     }
     let { maxAmountX, maxAmountY } = params;
     if (maxAmountX === undefined || maxAmountY === undefined) {
@@ -597,7 +601,10 @@ export class PositionService extends DlmmProProgram {
     params: RemovePositionRangesParams,
   ): Promise<{ tx: Transaction; position: PublicKey }> {
     positionIndexesFromBitmap(params.parameters.bitmap);
-    assertOptionalU16(params.parameters.expectedLayoutVersion);
+    assertOptionalU16(
+      params.parameters.expectedLayoutVersion,
+      "expectedLayoutVersion",
+    );
     if (
       !params.signer.equals(params.owner) &&
       !params.rentReceiver.equals(params.owner)
@@ -636,15 +643,9 @@ export class PositionService extends DlmmProProgram {
   async lockPermanentPosition(
     params: LockPermanentPositionParams,
   ): Promise<{ tx: Transaction }> {
-    if (
-      !Number.isInteger(params.bps) ||
-      params.bps <= 0 ||
-      params.bps > MAX_BASIS_POINT
-    ) {
-      throw PoolError.invalidParameters();
-    }
+    assertBps(params.bps, "bps");
     const expectedLayoutVersion = params.expectedLayoutVersion ?? null;
-    assertOptionalU16(expectedLayoutVersion);
+    assertOptionalU16(expectedLayoutVersion, "expectedLayoutVersion");
 
     const tx = await this.program.methods
       .lockPermanentPosition({ bps: params.bps, expectedLayoutVersion })
@@ -736,8 +737,8 @@ export class PositionService extends DlmmProProgram {
   ): Promise<TransactionInstruction[]> {
     const minAmountX = params.minAmountX ?? new BN(0);
     const minAmountY = params.minAmountY ?? new BN(0);
-    assertU64(minAmountX);
-    assertU64(minAmountY);
+    assertU64(minAmountX, "minAmountX");
+    assertU64(minAmountY, "minAmountY");
     positionIndexesFromBitmap(params.bitmap);
     const ctx = await this.tokenAccounts(params, "withdraw", pool);
     const refresh = await this.refreshFeesAndRewardsIx({
@@ -893,7 +894,9 @@ export class PositionService extends DlmmProProgram {
         ? positions.map((_, index) => index)
         : positionIndexesFromBitmap(bitmap);
     if (selected.some((index) => index >= positions.length)) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters(
+        "bitmap must select existing positions",
+      );
     }
     // The refresh updates only the selected slots that hold liquidity.
     const refreshed = selected.filter(
@@ -961,11 +964,13 @@ export class PositionService extends DlmmProProgram {
     parameters: AddLiquidityImbalanceParameters,
   ): void {
     if (parameters.maxAmountX === null && parameters.maxAmountY === null) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters(
+        "maxAmountX and maxAmountY must not both be null",
+      );
     }
     for (const amount of [parameters.maxAmountX, parameters.maxAmountY]) {
       if (amount !== null) {
-        assertU64(amount);
+        assertU64(amount, "maxAmount");
         if (amount.isZero()) {
           throw PoolError.amountIsZero();
         }
@@ -973,36 +978,46 @@ export class PositionService extends DlmmProProgram {
     }
     const sqrtPriceSlippage = parameters.slippage.sqrtPriceSlippage;
     if (sqrtPriceSlippage) {
-      assertU128(sqrtPriceSlippage.minSqrtPrice);
-      assertU128(sqrtPriceSlippage.maxSqrtPrice);
+      assertU128(sqrtPriceSlippage.minSqrtPrice, "minSqrtPrice");
+      assertU128(sqrtPriceSlippage.maxSqrtPrice, "maxSqrtPrice");
       if (
         sqrtPriceSlippage.minSqrtPrice.lt(MIN_SQRT_PRICE) ||
         sqrtPriceSlippage.maxSqrtPrice.gt(MAX_SQRT_PRICE) ||
         sqrtPriceSlippage.minSqrtPrice.gt(sqrtPriceSlippage.maxSqrtPrice)
       ) {
-        throw PoolError.invalidParameters();
+        throw PoolError.invalidParameters(
+          "sqrtPriceSlippage must be within MIN_SQRT_PRICE..=MAX_SQRT_PRICE with minSqrtPrice <= maxSqrtPrice",
+        );
       }
     }
     if (parameters.slippage.minLiquidity !== null) {
-      assertU128(parameters.slippage.minLiquidity);
+      assertU128(parameters.slippage.minLiquidity, "minLiquidity");
     }
-    assertOptionalU16(parameters.expectedLayoutVersion);
-    assertU8(parameters.index);
+    assertOptionalU16(
+      parameters.expectedLayoutVersion,
+      "expectedLayoutVersion",
+    );
+    assertU8(parameters.index, "index");
     if (parameters.index >= POSITION_MAX_RANGE) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters(
+        "index must be less than POSITION_MAX_RANGE",
+      );
     }
   }
 
   private validateLockVesting(parameters: LockVestingPositionParameters): void {
     if (parameters.cliffPoint !== null) {
-      assertU64(parameters.cliffPoint);
+      assertU64(parameters.cliffPoint, "cliffPoint");
     }
-    assertU16(parameters.cliffUnlockBps);
-    assertU16(parameters.bpsPerPeriod);
-    assertU64(parameters.periodFrequency);
-    assertU16(parameters.numberOfPeriod);
-    assertU16(parameters.bps);
-    assertOptionalU16(parameters.expectedLayoutVersion);
+    assertU16(parameters.cliffUnlockBps, "cliffUnlockBps");
+    assertU16(parameters.bpsPerPeriod, "bpsPerPeriod");
+    assertU64(parameters.periodFrequency, "periodFrequency");
+    assertU16(parameters.numberOfPeriod, "numberOfPeriod");
+    assertBps(parameters.bps, "bps");
+    assertOptionalU16(
+      parameters.expectedLayoutVersion,
+      "expectedLayoutVersion",
+    );
 
     // The periodic schedule is all set or all unset, and with the cliff it
     // releases exactly the whole position.
@@ -1011,15 +1026,19 @@ export class PositionService extends DlmmProProgram {
       parameters.bpsPerPeriod > 0,
       parameters.numberOfPeriod > 0,
     ];
+    if (periodic.some(Boolean) !== periodic.every(Boolean)) {
+      throw PoolError.invalidParameters(
+        "periodFrequency, bpsPerPeriod and numberOfPeriod must be all set or all zero",
+      );
+    }
     if (
-      periodic.some(Boolean) !== periodic.every(Boolean) ||
       parameters.cliffUnlockBps +
         parameters.bpsPerPeriod * parameters.numberOfPeriod !==
-        MAX_BASIS_POINT ||
-      parameters.bps === 0 ||
-      parameters.bps > MAX_BASIS_POINT
+      MAX_BASIS_POINT
     ) {
-      throw PoolError.invalidParameters();
+      throw PoolError.invalidParameters(
+        "cliffUnlockBps + bpsPerPeriod * numberOfPeriod must equal MAX_BASIS_POINT",
+      );
     }
   }
 }
