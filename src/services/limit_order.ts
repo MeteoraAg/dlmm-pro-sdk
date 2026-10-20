@@ -1,6 +1,6 @@
 import type { PublicKey, Transaction, AccountMeta } from "@solana/web3.js";
 import BN from "bn.js";
-import { LIMIT_ORDER_MAX_TICK } from "../constants";
+import { LIMIT_ORDER_MAX_TICK, MAX_TICK_ID, MIN_TICK_ID } from "../constants";
 import { PoolError } from "../errors";
 import {
   bitmapExtensionForTickArrays,
@@ -28,20 +28,27 @@ function orderTickArrayIndexes(
   tickSpacing: number,
 ): number[] {
   const indexes = new Set<number>();
+  const minUsableTickId = Math.ceil(MIN_TICK_ID / tickSpacing) * tickSpacing;
+  const maxUsableTickId = Math.floor(MAX_TICK_ID / tickSpacing) * tickSpacing;
   for (const tick of parameters.ticks) {
     if (parameters.relativeTick === null) {
       indexes.add(tickIndexFromId(tick.id, tickSpacing));
       continue;
     }
     const offset = tick.id * tickSpacing;
-    const lowest = tickIndexFromId(
+    const lowestTickId = Math.max(
       parameters.relativeTick.spacingAlignedMinTickId + offset,
-      tickSpacing,
+      minUsableTickId,
     );
-    const highest = tickIndexFromId(
+    const highestTickId = Math.min(
       parameters.relativeTick.spacingAlignedMaxTickId + offset,
-      tickSpacing,
+      maxUsableTickId,
     );
+    if (lowestTickId > highestTickId) {
+      continue;
+    }
+    const lowest = tickIndexFromId(lowestTickId, tickSpacing);
+    const highest = tickIndexFromId(highestTickId, tickSpacing);
     for (let index = lowest; index <= highest; index++) {
       indexes.add(index);
     }

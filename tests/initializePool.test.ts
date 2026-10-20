@@ -17,6 +17,8 @@ import {
   encodePoolExtensions,
   getLiquidityFromAmounts,
   getSqrtPriceFromTickId,
+  MAX_SQRT_PRICE,
+  MIN_SQRT_PRICE,
   openActivationParameters,
   OperatorPermission,
   PoolErrorCode,
@@ -157,6 +159,22 @@ describe("initialize pool", () => {
 
       const poolState = await client.state.fetchPool(pool);
       expect(poolState.isBitmapExtensionInitialized).toBe(1);
+    });
+
+    it.each([
+      { name: "below the minimum", initialSqrtPrice: MIN_SQRT_PRICE.subn(1) },
+      { name: "above the maximum", initialSqrtPrice: MAX_SQRT_PRICE.addn(1) },
+    ])("rejects an initial sqrt price $name", async ({ initialSqrtPrice }) => {
+      await expect(
+        client.pool.initializePoolWithStaticConfig({
+          config: await staticConfig(),
+          tokenXMint,
+          tokenYMint,
+          creator: creator.publicKey,
+          payer: payer.publicKey,
+          initialSqrtPrice,
+        }),
+      ).rejects.toMatchObject({ code: PoolErrorCode.InvalidParameters });
     });
 
     it("initializes a pool when the private config authority co-signs", async () => {

@@ -11,6 +11,7 @@ import {
   LimitOrderDelegatePermission,
   limitOrderDelegatePermissionMask,
   limitOrderTicksFromShape,
+  MAX_TICK_ID,
   PoolErrorCode,
   relativeTickFromSlippage,
   StrategyType,
@@ -495,6 +496,25 @@ describe("limit orders", () => {
     ).toThrow(
       expect.objectContaining({ code: PoolErrorCode.InvalidParameters }),
     );
+  });
+
+  it("accepts a relative order when an unused band edge exceeds the tick range", async () => {
+    const currentTickId = MAX_TICK_ID - 2;
+    const pool = await initializeStaticPool(svm, client, market, {
+      initialSqrtPrice: getSqrtPriceFromTickId(currentTickId),
+    });
+    const opened = await openOrder({
+      pool,
+      isAskSide: true,
+      relativeTick: {
+        spacingAlignedMinTickId: currentTickId,
+        spacingAlignedMaxTickId: MAX_TICK_ID,
+      },
+      ticks: [{ id: 1, amount: orderAmount }],
+    });
+
+    const legs = await client.state.decodeLimitOrderData(opened.limitOrder);
+    expect(legs.map((leg) => leg.tickId)).toEqual([currentTickId + 1]);
   });
 
   describe("strategy shapes", () => {

@@ -24,13 +24,18 @@ import {
 const helpersDir = path.dirname(fileURLToPath(import.meta.url));
 
 // tests/fixtures/dlmm_pro.so: dlmm-pro release 0.1.0 (4ac3a79), built with `--features local`.
-function programSoPath(): string {
+function programSoPath(
+  environmentVariable: string,
+  fixtureName: string,
+): string {
   const soPath =
-    process.env.DLMM_PRO_SO_PATH ??
-    path.resolve(helpersDir, "../fixtures/dlmm_pro.so");
+    process.env[environmentVariable] ??
+    path.resolve(helpersDir, `../fixtures/${fixtureName}`);
 
   if (!fs.existsSync(soPath)) {
-    throw new Error(`dlmm_pro.so not found at ${soPath}.`);
+    throw new Error(
+      `Program binary not found at ${soPath}. Set ${environmentVariable} to a built program binary.`,
+    );
   }
 
   return soPath;
@@ -38,12 +43,15 @@ function programSoPath(): string {
 
 export function initializeSVM(): LiteSVM {
   const svm = new LiteSVM();
-  svm.addProgramFromFile(DLMM_PRO_PROGRAM_ID, programSoPath());
+  svm.addProgramFromFile(
+    DLMM_PRO_PROGRAM_ID,
+    programSoPath("DLMM_PRO_SO_PATH", "dlmm_pro.so"),
+  );
   // access-registry d542263, built with `--features local`. It owns TokenBadge,
   // which `OnlyY` pool creation requires.
   svm.addProgramFromFile(
     ACCESS_REGISTRY_PROGRAM_ID,
-    path.resolve(helpersDir, "../fixtures/access_registry.so"),
+    programSoPath("ACCESS_REGISTRY_SO_PATH", "access_registry.so"),
   );
   return svm;
 }
