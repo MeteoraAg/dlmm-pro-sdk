@@ -54,26 +54,31 @@ export class StateService {
     this.connection = provider.connection;
   }
 
-  private async getAccountData(address: PublicKey): Promise<Buffer> {
+  private async getAccountData(
+    address: PublicKey,
+    owner = this.program.programId,
+  ): Promise<Buffer> {
     return this.ownedData(
       address,
       await this.connection.getAccountInfo(address, this.commitment),
+      owner,
     );
   }
 
   private ownedData(
     address: PublicKey,
     info: AccountInfo<Buffer> | null,
+    owner: PublicKey,
   ): Buffer {
     if (!info) {
       throw new Error(`Account not found: ${address.toBase58()}`);
     }
-    if (!info.owner.equals(this.program.programId)) {
+    if (!info.owner.equals(owner)) {
       throw new Error(
-        `Account ${address.toBase58()} is not owned by the DLMM Pro program`,
+        `Account ${address.toBase58()} is not owned by ${owner.toBase58()}`,
       );
     }
-    return Buffer.from(info.data);
+    return info.data;
   }
 
   private async fetchAccount<T>(
@@ -156,7 +161,11 @@ export class StateService {
       this.commitment,
     );
     return infos.map((info, index) => {
-      const data = this.ownedData(tickArrayAddresses[index], info);
+      const data = this.ownedData(
+        tickArrayAddresses[index],
+        info,
+        this.program.programId,
+      );
       return {
         tickArray: this.program.coder.accounts.decode<TickArray>(
           "tickArray",
@@ -174,18 +183,9 @@ export class StateService {
   }
 
   async fetchTokenBadge(address: PublicKey): Promise<TokenBadge> {
-    const info = await this.connection.getAccountInfo(address, this.commitment);
-    if (!info) {
-      throw new Error(`Account not found: ${address.toBase58()}`);
-    }
-    if (!info.owner.equals(ACCESS_REGISTRY_PROGRAM_ID)) {
-      throw new Error(
-        `Account ${address.toBase58()} is not owned by the access-registry program`,
-      );
-    }
     return this.accessRegistry.coder.accounts.decode<TokenBadge>(
       "tokenBadge",
-      info.data,
+      await this.getAccountData(address, ACCESS_REGISTRY_PROGRAM_ID),
     );
   }
 

@@ -116,26 +116,22 @@ export function getPendingFees(
   feeGrowthInside: FeeGrowthInside,
 ): PendingFees {
   const liquidity = positionTotalLiquidity(position);
-  const deltaX = liquidity
-    .mul(
-      wrappingSub(
-        feeGrowthInside.feeGrowthInsideX,
-        position.feeGrowthCheckpointX,
-        U128_MAX,
-      ),
-    )
-    .shrn(64);
-  const deltaY = liquidity
-    .mul(
-      wrappingSub(
-        feeGrowthInside.feeGrowthInsideY,
-        position.feeGrowthCheckpointY,
-        U128_MAX,
-      ),
-    )
-    .shrn(64);
+  const delta = (inside: BN, checkpoint: BN): BN =>
+    liquidity.mul(wrappingSub(inside, checkpoint, U128_MAX)).shrn(64);
   return {
-    feeX: safeAdd(position.feePendingX, tryCastU64(deltaX), U64_MAX),
-    feeY: safeAdd(position.feePendingY, tryCastU64(deltaY), U64_MAX),
+    feeX: safeAdd(
+      position.feePendingX,
+      tryCastU64(
+        delta(feeGrowthInside.feeGrowthInsideX, position.feeGrowthCheckpointX),
+      ),
+      U64_MAX,
+    ),
+    feeY: safeAdd(
+      position.feePendingY,
+      tryCastU64(
+        delta(feeGrowthInside.feeGrowthInsideY, position.feeGrowthCheckpointY),
+      ),
+      U64_MAX,
+    ),
   };
 }

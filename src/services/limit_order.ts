@@ -12,14 +12,13 @@ import {
   getTokenProgram,
   isUsableTickId,
   MAX_LIMIT_ORDER_DELEGATE_PERMISSION,
-  readTokenAccountMint,
   reserveTransferLegs,
   resolveInstructionHooks,
   tickArrayMetas,
   tickArraysForTickIds,
   tickIndexFromId,
 } from "../helpers";
-import { assertI32, assertU64 } from "../helpers/validation";
+import { assertI32, assertU64, isIntegerIn } from "../helpers/validation";
 import type { OpenLimitOrderParameters } from "../types";
 import { DlmmProProgram } from "./program";
 
@@ -255,11 +254,13 @@ export class LimitOrderService extends DlmmProProgram {
         .map((order) => order.tickId)
         .sort((a, b) => a - b);
     assertCancelTickIds(tickIds);
-    const [pool, referralMint] = await Promise.all([
+    const [pool, transferHookReferral] = await Promise.all([
       this.state.fetchPool(params.pool),
-      referralToken && params.transferHookReferral === undefined
-        ? readTokenAccountMint(this.connection, referralToken, this.commitment)
-        : null,
+      this.referralHook(
+        params.pool,
+        referralToken,
+        params.transferHookReferral,
+      ),
     ]);
     const tickArrays =
       params.tickArrays ??
@@ -296,22 +297,7 @@ export class LimitOrderService extends DlmmProProgram {
       {
         transferHookX: { metas: params.transferHookX, leg: transferHookX },
         transferHookY: { metas: params.transferHookY, leg: transferHookY },
-        transferHookReferral: {
-          metas: params.transferHookReferral,
-          leg:
-            referralToken && referralMint
-              ? {
-                  mint: referralMint,
-                  source: deriveReserve(
-                    referralMint,
-                    params.pool,
-                    this.programId,
-                  ),
-                  destination: referralToken,
-                  authority: poolAuthority,
-                }
-              : undefined,
-        },
+        transferHookReferral,
       },
     );
 
@@ -402,9 +388,7 @@ export class LimitOrderService extends DlmmProProgram {
     nftAccount?: PublicKey;
   }): Promise<{ tx: Transaction }> {
     if (
-      !Number.isInteger(params.permission) ||
-      params.permission < 0 ||
-      params.permission > MAX_LIMIT_ORDER_DELEGATE_PERMISSION
+      !isIntegerIn(params.permission, 0, MAX_LIMIT_ORDER_DELEGATE_PERMISSION)
     ) {
       throw PoolError.invalidPermission();
     }

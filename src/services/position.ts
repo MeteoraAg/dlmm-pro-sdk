@@ -38,10 +38,10 @@ import {
 import {
   assertOptionalU16,
   assertBps,
-  assertU8,
   assertU16,
   assertU64,
   assertU128,
+  isIntegerIn,
 } from "../helpers/validation";
 import { U64_MAX, safeAdd } from "../math";
 import { calculateTransferFeeExcludedAmount } from "../quote";
@@ -708,11 +708,7 @@ export class PositionService extends DlmmProProgram {
     permission: number;
     nftAccount?: PublicKey;
   }): Promise<{ tx: Transaction }> {
-    if (
-      !Number.isInteger(params.permission) ||
-      params.permission < 0 ||
-      params.permission > MAX_POSITION_DELEGATE_PERMISSION
-    ) {
+    if (!isIntegerIn(params.permission, 0, MAX_POSITION_DELEGATE_PERMISSION)) {
       throw PoolError.invalidPermission();
     }
 
@@ -984,10 +980,9 @@ export class PositionService extends DlmmProProgram {
       parameters.expectedLayoutVersion,
       "expectedLayoutVersion",
     );
-    assertU8(parameters.index, "index");
-    if (parameters.index >= POSITION_MAX_RANGE) {
+    if (!isIntegerIn(parameters.index, 0, POSITION_MAX_RANGE - 1)) {
       throw PoolError.invalidParameters(
-        "index must be less than POSITION_MAX_RANGE",
+        "index must be below POSITION_MAX_RANGE",
       );
     }
   }

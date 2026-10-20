@@ -2,9 +2,9 @@ import BN from "bn.js";
 import { LIMIT_ORDER_MAX_TICK } from "../constants";
 import { PoolError } from "../errors";
 import { alignTickDown } from "../helpers/tick_array";
-import { assertTickSpacing } from "../helpers/validation";
+import { assertI32, assertTickSpacing } from "../helpers/validation";
 import { I32_MAX, I32_MIN, safeAdd, safeMul, U64_MAX } from "../math/safe_math";
-import type { RelativeTick } from "../types";
+import type { RelativeTick, TickLimitOrderAmount } from "../types";
 import type { LiquidityColumn, LiquidityShape } from "./shape";
 
 export type LimitOrderSide = "bid" | "ask";
@@ -20,13 +20,7 @@ export function relativeTickFromSlippage(args: {
   slippageTicks: number;
 }): RelativeTick {
   assertTickSpacing(args.tickSpacing);
-  if (
-    !Number.isInteger(args.currentTickId) ||
-    args.currentTickId < I32_MIN ||
-    args.currentTickId > I32_MAX
-  ) {
-    throw PoolError.invalidParameters("currentTickId must be an i32");
-  }
+  assertI32(args.currentTickId, "currentTickId");
   if (
     !Number.isInteger(args.slippageTicks) ||
     args.slippageTicks < 0 ||
@@ -48,13 +42,8 @@ export function relativeTickFromSlippage(args: {
   return { spacingAlignedMinTickId, spacingAlignedMaxTickId };
 }
 
-export type ShapeLimitOrderTick = {
-  id: number;
-  amount: BN;
-};
-
 export type ShapeLimitOrderTicks = {
-  ticks: ShapeLimitOrderTick[];
+  ticks: TickLimitOrderAmount[];
   /** Sum of the tick amounts, the order's `maxAmount` before transfer fees. */
   amount: BN;
 };
@@ -131,15 +120,14 @@ export function limitOrderTicksFromShape(args: {
   }
 
   const totalWeight = columns.reduce((sum, column) => sum + column.weight, 0);
-  const unitAmount =
-    args.unitAmount ?? args.totalAmount?.div(new BN(totalWeight));
-  if (!unitAmount || unitAmount.lte(new BN(0))) {
+  const unitAmount = args.unitAmount ?? args.totalAmount?.divn(totalWeight);
+  if (!unitAmount || unitAmount.lten(0)) {
     throw PoolError.invalidParameters(
       "unitAmount or totalAmount must be positive",
     );
   }
 
-  const ticks: ShapeLimitOrderTick[] = [];
+  const ticks: TickLimitOrderAmount[] = [];
   let total = new BN(0);
   for (const column of columns) {
     const amount = safeMul(unitAmount, new BN(column.weight), U64_MAX);

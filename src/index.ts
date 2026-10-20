@@ -124,7 +124,6 @@ export {
   type LiquidityColumn,
   type LiquidityRange,
   type LiquidityShape,
-  type ShapeLimitOrderTick,
   type ShapeLimitOrderTicks,
   type TickWeight,
 } from "./strategy";

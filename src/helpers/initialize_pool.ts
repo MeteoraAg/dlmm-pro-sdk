@@ -24,7 +24,7 @@ import {
 } from "../types";
 import { isSupportExtension } from "./codec";
 import { validatePoolFeeParameters } from "./pool_fees";
-import { assertTickSpacing } from "./validation";
+import { assertTickSpacing, isIntegerIn } from "./validation";
 
 export async function validateInitializePoolWithDynamicParameters(
   connection: Connection,
@@ -47,11 +47,7 @@ export async function validateInitializePoolWithDynamicParameters(
   }
 
   const extensionMax = (1 << POOL_EXTENSION_VARIANT_COUNT) - 1;
-  if (
-    !Number.isInteger(parameters.extensions) ||
-    parameters.extensions < 0 ||
-    parameters.extensions > extensionMax
-  ) {
+  if (!isIntegerIn(parameters.extensions, 0, extensionMax)) {
     throw PoolError.invalidParameters(
       "extensions must be a bitmask of PoolExtension variants",
     );

@@ -6,9 +6,11 @@ import {
 import { PublicKey } from "@solana/web3.js";
 import { describe, expect, it } from "vitest";
 import {
+  ACCESS_REGISTRY_PROGRAM_ID,
   deriveOracle,
   derivePosition,
   deriveReserve,
+  DLMM_PRO_PROGRAM_ID,
   DlmmProClient,
   getAmountsFromLiquidity,
   getLiquidityFromAmounts,
@@ -50,10 +52,10 @@ describe("e2e", () => {
     expect(accountExists(svm, deriveOracle(pool))).toBe(true);
     await expect(
       client.state.fetchPool(market.payer.publicKey),
-    ).rejects.toThrow(/not owned by the DLMM Pro program/);
+    ).rejects.toThrow(`not owned by ${DLMM_PRO_PROGRAM_ID.toBase58()}`);
     await expect(
       client.state.fetchTokenBadge(market.payer.publicKey),
-    ).rejects.toThrow(/not owned by the access-registry program/);
+    ).rejects.toThrow(`not owned by ${ACCESS_REGISTRY_PROGRAM_ID.toBase58()}`);
   });
 
   it("opens a position", async () => {

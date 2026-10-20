@@ -17,8 +17,12 @@ export const I32_MIN = -2147483648;
 export const I32_MAX = 2147483647;
 export const I128_MAX = new BN(1).shln(127).subn(1);
 
+export function isUnsigned(value: BN, max: BN): boolean {
+  return !value.isNeg() && value.lte(max);
+}
+
 function assertUnsigned(value: BN, max: BN): BN {
-  if (value.isNeg() || value.gt(max)) {
+  if (!isUnsigned(value, max)) {
     throw PoolError.mathOverflow();
   }
   return value;
@@ -82,7 +86,7 @@ export function divCeil(lhs: BN, rhs: BN): BN {
 
 export function checkedMul(lhs: BN, rhs: BN, max: BN): BN | null {
   const product = lhs.mul(rhs);
-  if (product.isNeg() || product.gt(max)) {
+  if (!isUnsigned(product, max)) {
     return null;
   }
   return product;
@@ -93,35 +97,35 @@ export function checkedDiv(lhs: BN, rhs: BN, max: BN): BN | null {
     return null;
   }
   const result = lhs.div(rhs);
-  if (result.isNeg() || result.gt(max)) {
+  if (!isUnsigned(result, max)) {
     return null;
   }
   return result;
 }
 
 export function tryCastU16(value: BN): number {
-  if (value.isNeg() || value.gt(U16_MAX)) {
+  if (!isUnsigned(value, U16_MAX)) {
     throw PoolError.typeCastFailed();
   }
   return value.toNumber();
 }
 
 export function tryCastU32(value: BN): number {
-  if (value.isNeg() || value.gt(U32_MAX)) {
+  if (!isUnsigned(value, U32_MAX)) {
     throw PoolError.typeCastFailed();
   }
   return value.toNumber();
 }
 
 export function tryCastU64(value: BN): BN {
-  if (value.isNeg() || value.gt(U64_MAX)) {
+  if (!isUnsigned(value, U64_MAX)) {
     throw PoolError.typeCastFailed();
   }
   return value;
 }
 
 export function tryCastU128(value: BN): BN {
-  if (value.isNeg() || value.gt(U128_MAX)) {
+  if (!isUnsigned(value, U128_MAX)) {
     throw PoolError.typeCastFailed();
   }
   return value;

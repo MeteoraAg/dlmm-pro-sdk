@@ -1,5 +1,6 @@
 import type { Program } from "@coral-xyz/anchor";
 import type {
+  AccountMeta,
   Commitment,
   Connection,
   PublicKey,
@@ -7,24 +8,66 @@ import type {
 } from "@solana/web3.js";
 import type BN from "bn.js";
 import type { DlmmProClientContext } from "../dlmm_pro";
-import { derivePosition, tickArrayRemainingAccounts } from "../helpers";
+import {
+  derivePoolAuthority,
+  derivePosition,
+  deriveReserve,
+  readTokenAccountMint,
+  resolveTokenProgram,
+  tickArrayRemainingAccounts,
+  type TransferHookLeg,
+} from "../helpers";
 import type { DlmmPro } from "../idl/dlmm-pro/dlmm_pro";
 import type { TickRange } from "../types";
 import type { StateService } from "./state";
 
 export class DlmmProProgram {
   protected readonly program: Program<DlmmPro>;
-  protected readonly programId: PublicKey;
   protected readonly connection: Connection;
   protected readonly commitment: Commitment;
   protected readonly state: StateService;
 
+  protected get programId(): PublicKey {
+    return this.program.programId;
+  }
+
   constructor(client: DlmmProClientContext) {
     this.program = client.program;
-    this.programId = client.program.programId;
     this.connection = client.connection;
     this.commitment = client.commitment;
     this.state = client.state;
+  }
+
+  protected async tokenProgramFor(
+    mint: PublicKey,
+    explicit?: PublicKey,
+  ): Promise<PublicKey> {
+    return (
+      explicit ?? resolveTokenProgram(this.connection, mint, this.commitment)
+    );
+  }
+
+  protected async referralHook(
+    pool: PublicKey,
+    referral: PublicKey | null | undefined,
+    metas: AccountMeta[] | undefined,
+  ): Promise<{ metas?: AccountMeta[]; leg?: TransferHookLeg }> {
+    if (!referral || metas !== undefined) {
+      return { metas };
+    }
+    const mint = await readTokenAccountMint(
+      this.connection,
+      referral,
+      this.commitment,
+    );
+    return {
+      leg: {
+        mint,
+        source: deriveReserve(mint, pool, this.programId),
+        destination: referral,
+        authority: derivePoolAuthority(this.programId),
+      },
+    };
   }
 
   protected refreshFeesAndRewardsIx(params: {

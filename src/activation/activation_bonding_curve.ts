@@ -36,7 +36,7 @@ export type BondingCurveActivationParams = {
 export function encodeBondingCurveActivationData(
   params: BondingCurveActivationParams,
 ): number[] {
-  const buf = Buffer.alloc(15, 0);
+  const buf = Buffer.alloc(15);
   buf.set(encodePodU64(params.targetIncreaseBps, "targetIncreaseBps"), 7);
   return Array.from(buf);
 }

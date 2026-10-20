@@ -7,7 +7,6 @@ import {
   encodePodU64,
   toPodBuffer,
 } from "../helpers/pod";
-import { assertZeroPadding } from "../helpers/validation";
 import { baseFeeNumeratorByPeriod } from "../math/base_fee_math";
 import {
   safeAdd,
@@ -19,7 +18,7 @@ import {
   U256_MAX,
 } from "../math/safe_math";
 import { BaseFeeMode, type BaseFeeConfig } from "../types";
-import { validateFeeBounds } from "./fee_bounds";
+import { validateFeeBounds, validateSchedulerFields } from "./fee_bounds";
 
 export type PodAlignedFeeMarketCapScheduler = {
   baseFeeMode: number;
@@ -57,7 +56,7 @@ export type MarketCapSchedulerParams = {
 export function encodeMarketCapSchedulerBaseFeeData(
   params: MarketCapSchedulerParams,
 ): number[] {
-  const buf = Buffer.alloc(31, 0);
+  const buf = Buffer.alloc(31);
   buf.set(encodePodU64(params.cliffFeeNumerator, "cliffFeeNumerator"), 0);
   buf.set(encodePodU64(params.reductionFactor, "reductionFactor"), 8);
   buf.set(encodePodU32(params.sqrtPriceStepBps, "sqrtPriceStepBps"), 16);
@@ -70,24 +69,6 @@ export function encodeMarketCapSchedulerBaseFeeData(
   );
   buf.set(encodePodU16(params.numberOfPeriod, "numberOfPeriod"), 24);
   return Array.from(buf);
-}
-
-function validateScheduler(inner: PodAlignedFeeMarketCapScheduler): void {
-  if (inner.reductionFactor.isZero()) {
-    throw PoolError.invalidParameters("reductionFactor must be non-zero");
-  }
-  if (inner.sqrtPriceStepBps === 0) {
-    throw PoolError.invalidParameters("sqrtPriceStepBps must be non-zero");
-  }
-  if (inner.schedulerExpirationDuration === 0) {
-    throw PoolError.invalidParameters(
-      "schedulerExpirationDuration must be non-zero",
-    );
-  }
-  if (inner.numberOfPeriod === 0) {
-    throw PoolError.invalidParameters("numberOfPeriod must be non-zero");
-  }
-  assertZeroPadding(inner.padding);
 }
 
 function getPassedPeriod(
@@ -158,7 +139,15 @@ export class FeeMarketCapScheduler {
   }
 
   validate(): void {
-    validateScheduler(this.inner);
+    validateSchedulerFields(this.inner);
+    if (this.inner.sqrtPriceStepBps === 0) {
+      throw PoolError.invalidParameters("sqrtPriceStepBps must be non-zero");
+    }
+    if (this.inner.schedulerExpirationDuration === 0) {
+      throw PoolError.invalidParameters(
+        "schedulerExpirationDuration must be non-zero",
+      );
+    }
     validateFeeBounds(
       this.getBaseFeeNumeratorByPeriod(this.inner.numberOfPeriod),
       this.inner.cliffFeeNumerator,

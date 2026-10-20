@@ -10,15 +10,20 @@ import {
 import { I128_MAX, U128_MAX, safeMul } from "../math/safe_math";
 import { getSqrtPriceFromTickId } from "../math/tick_math";
 import { Rounding, type AddLiquidityByWeightParameters } from "../types";
-import { assertOptionalU16, assertU64, assertU128 } from "./validation";
+import {
+  assertOptionalU16,
+  assertU64,
+  assertU128,
+  isIntegerIn,
+} from "./validation";
 
 /**
  * Liquidity for depositing at most `maxTokenX`/`maxTokenY` into the range at
  * the current price. The budgets are pool-side amounts: for a Token-2022
  * transfer-fee mint pass what the pool receives
  * (`calculateTransferFeeExcludedAmount`), since `addLiquidity` compares its
- * fee-inclusive `maxAmount*` against the
- * deposit plus fee. `multiplierFromAmounts` does this when given the mints.
+ * fee-inclusive `maxAmount*` against the deposit plus fee.
+ * `multiplierFromAmounts` does this when given the mints.
  */
 export function getLiquidityFromAmounts(args: {
   maxTokenX: BN;
@@ -116,12 +121,7 @@ export function liquidityBitmap(positionIndexes: number[]): BN {
   let bitmap = new BN(0);
   const seen = new Set<number>();
   for (const index of positionIndexes) {
-    if (
-      !Number.isInteger(index) ||
-      index < 0 ||
-      index >= POSITION_MAX_RANGE ||
-      seen.has(index)
-    ) {
+    if (!isIntegerIn(index, 0, POSITION_MAX_RANGE - 1) || seen.has(index)) {
       throw PoolError.invalidParameters(
         "positionIndexes must be unique integers in 0..POSITION_MAX_RANGE",
       );
@@ -153,18 +153,19 @@ export function positionIndexesFromBitmap(bitmap: BN): number[] {
 
 /** Whether a position range can take `weight`: an integer in `1..=MAX_LIQUIDITY_WEIGHT`. */
 export function isLiquidityWeight(weight: number): boolean {
-  return (
-    Number.isInteger(weight) && weight >= 1 && weight <= MAX_LIQUIDITY_WEIGHT
-  );
+  return isIntegerIn(weight, 1, MAX_LIQUIDITY_WEIGHT);
 }
 
-export function validateBitmapLiquidities(bitmap: BN, liquidities: BN[]): void {
-  const selected = positionIndexesFromBitmap(bitmap);
-  if (selected.length !== liquidities.length) {
+function assertOnePerSlot(bitmap: BN, length: number): void {
+  if (positionIndexesFromBitmap(bitmap).length !== length) {
     throw PoolError.invalidParameters(
       "liquidities must have one entry per bitmap slot",
     );
   }
+}
+
+export function validateBitmapLiquidities(bitmap: BN, liquidities: BN[]): void {
+  assertOnePerSlot(bitmap, liquidities.length);
   for (const liquidity of liquidities) {
     assertU128(liquidity, "liquidities");
     if (liquidity.isZero()) {
@@ -187,11 +188,7 @@ export function validateAddLiquidityByWeightParameters(
   if (multiplier.isZero()) {
     throw PoolError.liquidityIsZero();
   }
-  if (positionIndexesFromBitmap(parameters.bitmap).length !== weights.length) {
-    throw PoolError.invalidParameters(
-      "liquidities must have one entry per bitmap slot",
-    );
-  }
+  assertOnePerSlot(parameters.bitmap, weights.length);
   for (const weight of weights) {
     if (!isLiquidityWeight(weight)) {
       throw PoolError.invalidParameters(

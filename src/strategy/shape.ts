@@ -17,8 +17,8 @@ import {
   liquidityBitmap,
   validateAddLiquidityByWeightParameters,
 } from "../helpers/liquidity";
-import { isUsableTickId } from "../helpers/tick_array";
-import { assertTickSpacing } from "../helpers/validation";
+import { isUsableTickId, validateTickRanges } from "../helpers/tick_array";
+import { assertTickSpacing, isIntegerIn } from "../helpers/validation";
 import { I128_MAX, U64_MAX, U128_MAX, safeMul } from "../math/safe_math";
 import { getSqrtPriceFromTickId } from "../math/tick_math";
 import { transferFeeIncludedAmountWithinU64 } from "../quote/transfer_fee";
@@ -41,8 +41,6 @@ export type LiquidityColumn = {
   tickUpperId: number;
   weight: number;
   side: LiquiditySide;
-  sqrtPriceLower: BN;
-  sqrtPriceUpper: BN;
   priceLower: Decimal;
   priceUpper: Decimal;
 };
@@ -111,8 +109,6 @@ function toLiquidityColumns(
       tickUpperId,
       weight: entry.weight,
       side: sideOfTick(entry.tickId, tickUpperId, currentTickId),
-      sqrtPriceLower: getSqrtPriceFromTickId(entry.tickId),
-      sqrtPriceUpper: getSqrtPriceFromTickId(tickUpperId),
       priceLower: tickPrice(entry.tickId),
       priceUpper: tickPrice(tickUpperId),
     };
@@ -255,10 +251,8 @@ export function multiplierFromAmounts(args: {
   mintY: Mint | null;
   epoch: bigint;
 }): BN {
-  if (args.ranges.length === 0) {
-    throw PoolError.invalidParameters("ranges must not be empty");
-  }
   assertTickSpacing(args.tickSpacing);
+  validateTickRanges(args.ranges, args.tickSpacing);
   if (args.amountX.isNeg() || args.amountY.isNeg()) {
     throw PoolError.invalidParameters(
       "amountX and amountY must not be negative",
@@ -276,15 +270,6 @@ export function multiplierFromAmounts(args: {
     if (!isLiquidityWeight(range.weight)) {
       throw PoolError.invalidParameters(
         "ranges.weight must be in 1..=MAX_LIQUIDITY_WEIGHT",
-      );
-    }
-    if (
-      range.tickLowerId >= range.tickUpperId ||
-      !isUsableTickId(range.tickLowerId, args.tickSpacing) ||
-      !isUsableTickId(range.tickUpperId, args.tickSpacing)
-    ) {
-      throw PoolError.invalidParameters(
-        "ranges must be usable tick ids with tickLowerId < tickUpperId",
       );
     }
     for (const tickId of [range.tickLowerId, range.tickUpperId]) {
@@ -368,7 +353,7 @@ export function multiplierFromAmounts(args: {
 
   let low = new BN(0);
   let high = upperBound;
-  for (let i = 0; i < 128 && low.lt(high); i++) {
+  while (low.lt(high)) {
     const mid = low.add(high.sub(low).addn(1).shrn(1));
     if (fits(mid)) {
       low = mid;
@@ -414,9 +399,7 @@ export function buildLiquidityShape(args: {
   }
   if (
     args.maxRanges !== undefined &&
-    (!Number.isInteger(args.maxRanges) ||
-      args.maxRanges < 1 ||
-      args.maxRanges > POSITION_MAX_RANGE)
+    !isIntegerIn(args.maxRanges, 1, POSITION_MAX_RANGE)
   ) {
     throw PoolError.invalidParameters(
       "maxRanges must be an integer in 1..=POSITION_MAX_RANGE",

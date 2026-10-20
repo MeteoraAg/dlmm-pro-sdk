@@ -3,6 +3,7 @@ import {
   PositionDelegatePermission,
 } from "../types";
 import { PoolError } from "../errors";
+import { isIntegerIn } from "./validation";
 
 const POSITION_DELEGATE_PERMISSION_COUNT =
   PositionDelegatePermission.UpdatePositionRange + 1;
@@ -23,7 +24,7 @@ export function permissionBitmask(
 ): number {
   let mask = 0;
   for (const flag of flags) {
-    if (!Number.isInteger(flag) || flag < 0 || flag >= variantCount) {
+    if (!isIntegerIn(flag, 0, variantCount - 1)) {
       throw PoolError.invalidPermission();
     }
     mask |= 1 << flag;

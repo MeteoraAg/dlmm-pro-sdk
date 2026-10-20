@@ -26,6 +26,7 @@ import {
   TICK_LAYOUT,
   TICK_WITH_REWARD_LAYOUT,
 } from "./layouts";
+import { isIntegerIn } from "./validation";
 
 const coder = new BorshAccountsCoder(DlmmProIDL as Idl);
 const POOL_HEADER_SIZE = coder.size("Pool");
@@ -34,22 +35,9 @@ const TICK_ARRAY_HEADER_SIZE = coder.size("TickArray");
 const LIMIT_ORDER_HEADER_SIZE = coder.size("LimitOrder");
 const ORACLE_HEADER_SIZE = coder.size("Oracle");
 
-const ACCOUNT_DISCRIMINATORS = new Map(
-  DlmmProIDL.accounts.map((account) => [
-    account.name,
-    Buffer.from(account.discriminator),
-  ]),
-);
-
 function assertAccountDiscriminator(data: Buffer, accountName: string): void {
-  const expected = ACCOUNT_DISCRIMINATORS.get(accountName);
-  if (!expected) {
-    throw new Error(`IDL account not found: ${accountName}`);
-  }
-  if (
-    data.length < expected.length ||
-    !data.subarray(0, expected.length).equals(expected)
-  ) {
+  const expected = coder.accountDiscriminator(accountName);
+  if (!data.subarray(0, expected.length).equals(expected)) {
     throw new Error(`Account data is not a ${accountName} account`);
   }
 }
@@ -86,11 +74,7 @@ export function isSupportExtension(
 
 export function encodePoolExtensions(extensions: PoolExtension[]): number {
   for (const extension of extensions) {
-    if (
-      !Number.isInteger(extension) ||
-      extension < 0 ||
-      extension >= POOL_EXTENSION_VARIANT_COUNT
-    ) {
+    if (!isIntegerIn(extension, 0, POOL_EXTENSION_VARIANT_COUNT - 1)) {
       throw PoolError.invalidParameters(
         "extensions must be PoolExtension variants",
       );
@@ -102,7 +86,6 @@ export function encodePoolExtensions(extensions: PoolExtension[]): number {
 export function decodePoolExtensionsFromData(
   data: Buffer,
 ): DecodedPoolExtensions {
-  assertAccountDiscriminator(data, "Pool");
   if (data.length < POOL_HEADER_SIZE) {
     throw new Error("Account data shorter than Pool header size");
   }

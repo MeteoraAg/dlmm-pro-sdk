@@ -8,7 +8,6 @@ import {
   findNftAccount,
   positionIndexesFromBitmap,
   resolveInstructionHooks,
-  resolveTokenProgram,
 } from "../helpers";
 import { assertU64, assertU128 } from "../helpers/validation";
 import type { SetRewardEmissionParameters, TickRange } from "../types";
@@ -30,13 +29,10 @@ export class RewardService extends DlmmProProgram {
       CREATOR_REWARD_INDEX,
       this.programId,
     );
-    const tokenProgram =
-      params.tokenProgram ??
-      (await resolveTokenProgram(
-        this.connection,
-        params.rewardMint,
-        this.commitment,
-      ));
+    const tokenProgram = await this.tokenProgramFor(
+      params.rewardMint,
+      params.tokenProgram,
+    );
 
     const tx = await this.program.methods
       .initializeReward(CREATOR_REWARD_INDEX)
@@ -99,12 +95,7 @@ export class RewardService extends DlmmProProgram {
       this.programId,
     );
     const [tokenProgram, hooks] = await Promise.all([
-      params.tokenProgram ??
-        resolveTokenProgram(
-          this.connection,
-          params.rewardMint,
-          this.commitment,
-        ),
+      this.tokenProgramFor(params.rewardMint, params.tokenProgram),
       resolveInstructionHooks(this.connection, this.commitment, {
         transferHookReward: {
           metas: params.transferHookReward,
@@ -170,12 +161,7 @@ export class RewardService extends DlmmProProgram {
     );
     const [{ tickSpacing }, tokenProgram, hooks] = await Promise.all([
       this.state.fetchPool(params.pool),
-      params.tokenProgram ??
-        resolveTokenProgram(
-          this.connection,
-          params.rewardMint,
-          this.commitment,
-        ),
+      this.tokenProgramFor(params.rewardMint, params.tokenProgram),
       resolveInstructionHooks(this.connection, this.commitment, {
         transferHookReward: {
           metas: params.transferHookReward,
@@ -239,12 +225,7 @@ export class RewardService extends DlmmProProgram {
       this.programId,
     );
     const [tokenProgram, hooks] = await Promise.all([
-      params.tokenProgram ??
-        resolveTokenProgram(
-          this.connection,
-          params.rewardMint,
-          this.commitment,
-        ),
+      this.tokenProgramFor(params.rewardMint, params.tokenProgram),
       resolveInstructionHooks(this.connection, this.commitment, {
         transferHookReward: {
           metas: params.transferHookReward,

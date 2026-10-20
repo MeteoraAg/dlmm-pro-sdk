@@ -49,7 +49,7 @@ export type TimeBasedActivationParams = {
 export function encodeTimeBasedActivationData(
   params: TimeBasedActivationParams,
 ): number[] {
-  const buf = Buffer.alloc(15, 0);
+  const buf = Buffer.alloc(15);
   writeZ40(buf, 0, params.swapPoint, "swapPoint");
   writeZ40(buf, 5, params.addLiquidityPoint, "addLiquidityPoint");
   writeZ40(buf, 10, params.removeLiquidityPoint, "removeLiquidityPoint");

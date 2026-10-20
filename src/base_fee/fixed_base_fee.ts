@@ -24,7 +24,7 @@ export function decodePodAlignedFixedFee(
 export function encodeFixedBaseFeeData(
   cliffFeeNumerator: BN | number,
 ): number[] {
-  const buf = Buffer.alloc(31, 0);
+  const buf = Buffer.alloc(31);
   buf.set(encodePodU64(cliffFeeNumerator, "cliffFeeNumerator"), 0);
   return Array.from(buf);
 }

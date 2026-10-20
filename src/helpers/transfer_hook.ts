@@ -2,8 +2,6 @@ import {
   createTransferCheckedInstruction,
   getTransferHook,
   TOKEN_2022_PROGRAM_ID,
-  TOKEN_PROGRAM_ID,
-  unpackMint,
   addExtraAccountMetasForExecute,
 } from "@solana/spl-token";
 import {
@@ -12,7 +10,7 @@ import {
   type Connection,
   PublicKey,
 } from "@solana/web3.js";
-import { readMintAccount } from "./account_reads";
+import { readTransferFeeMint } from "./account_reads";
 import { deriveReserve } from "./pda";
 import { remainingAccountsFromHooks, type HookKey } from "./remaining_accounts";
 
@@ -74,12 +72,10 @@ export async function getExtraAccountMetasForTransferHook(
   leg: TransferHookLeg,
   commitment?: Commitment,
 ): Promise<AccountMeta[]> {
-  const mintAccount = await readMintAccount(connection, leg.mint, commitment);
-  if (mintAccount.owner.equals(TOKEN_PROGRAM_ID)) {
+  const mint = await readTransferFeeMint(connection, leg.mint, commitment);
+  if (!mint) {
     return [];
   }
-
-  const mint = unpackMint(leg.mint, mintAccount, mintAccount.owner);
   const hook = getTransferHook(mint);
   if (!hook || hook.programId.equals(PublicKey.default)) {
     return [];

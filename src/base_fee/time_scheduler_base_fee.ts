@@ -1,11 +1,10 @@
 import BN from "bn.js";
 import { PoolError } from "../errors";
 import { encodePodU16, encodePodU64, toPodBuffer } from "../helpers/pod";
-import { assertZeroPadding } from "../helpers/validation";
 import { baseFeeNumeratorByPeriod } from "../math/base_fee_math";
 import { safeDiv, safeSub, tryCastU16, U64_MAX } from "../math/safe_math";
 import { BaseFeeMode, type BaseFeeConfig } from "../types";
-import { validateFeeBounds } from "./fee_bounds";
+import { validateFeeBounds, validateSchedulerFields } from "./fee_bounds";
 
 export type PodAlignedFeeTimeScheduler = {
   baseFeeMode: number;
@@ -40,25 +39,12 @@ export type TimeSchedulerParams = {
 export function encodeTimeSchedulerBaseFeeData(
   params: TimeSchedulerParams,
 ): number[] {
-  const buf = Buffer.alloc(31, 0);
+  const buf = Buffer.alloc(31);
   buf.set(encodePodU64(params.cliffFeeNumerator, "cliffFeeNumerator"), 0);
   buf.set(encodePodU64(params.periodFrequency, "periodFrequency"), 8);
   buf.set(encodePodU64(params.reductionFactor, "reductionFactor"), 16);
   buf.set(encodePodU16(params.numberOfPeriod, "numberOfPeriod"), 24);
   return Array.from(buf);
-}
-
-function validateScheduler(inner: PodAlignedFeeTimeScheduler): void {
-  if (inner.numberOfPeriod === 0) {
-    throw PoolError.invalidParameters("numberOfPeriod must be non-zero");
-  }
-  if (inner.periodFrequency.isZero()) {
-    throw PoolError.invalidParameters("periodFrequency must be non-zero");
-  }
-  if (inner.reductionFactor.isZero()) {
-    throw PoolError.invalidParameters("reductionFactor must be non-zero");
-  }
-  assertZeroPadding(inner.padding);
 }
 
 function getPassedPeriod(
@@ -102,7 +88,10 @@ export class FeeTimeScheduler {
   }
 
   validate(): void {
-    validateScheduler(this.inner);
+    validateSchedulerFields(this.inner);
+    if (this.inner.periodFrequency.isZero()) {
+      throw PoolError.invalidParameters("periodFrequency must be non-zero");
+    }
     validateFeeBounds(
       this.getBaseFeeNumeratorByPeriod(this.inner.numberOfPeriod),
       this.inner.cliffFeeNumerator,

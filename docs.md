@@ -2942,8 +2942,6 @@ type LiquidityColumn = {
   tickUpperId: number; // tickId + tickSpacing
   weight: number;
   side: LiquiditySide; // Bid below the current tick, Ask above, Active containing it
-  sqrtPriceLower: BN;
-  sqrtPriceUpper: BN;
   priceLower: Decimal; // tickPrice(tickId)
   priceUpper: Decimal; // tickPrice(tickUpperId)
 };

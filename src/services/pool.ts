@@ -1,4 +1,3 @@
-import { unpackMint, type Mint } from "@solana/spl-token";
 import { PublicKey, Transaction, type AccountMeta } from "@solana/web3.js";
 import BN from "bn.js";
 import { PoolError } from "../errors";
@@ -14,16 +13,14 @@ import {
   overflowsDefaultTickArrayBitmap,
   resolveInstructionHooks,
   tickIndexFromId,
-  resolveTokenProgram,
-  readTokenAccountMint,
   readClock,
-  readMintAccount,
+  readTransferFeeMint,
   reserveTransferLegs,
   tickArrayMetas,
   validateInitializePoolWithDynamicParameters,
 } from "../helpers";
 import { tickIdFromSqrtPrice } from "../math";
-import { assertU64 } from "../helpers/validation";
+import { assertNonZeroU16, assertU64 } from "../helpers/validation";
 import {
   quoteExactIn,
   tickArraysForSwap,
@@ -177,13 +174,15 @@ export class PoolService extends DlmmProProgram {
       this.state.fetchTickArraysWithTicks(selection.tickArrays, {
         withReward: extensions.rewards !== undefined,
       }),
-      this.unpackMintAccount(
+      readTransferFeeMint(
+        this.connection,
         swapForY ? pool.tokenXMint : pool.tokenYMint,
-        swapForY ? pool.tokenXFlag : pool.tokenYFlag,
+        this.commitment,
       ),
-      this.unpackMintAccount(
+      readTransferFeeMint(
+        this.connection,
         swapForY ? pool.tokenYMint : pool.tokenXMint,
-        swapForY ? pool.tokenYFlag : pool.tokenXFlag,
+        this.commitment,
       ),
       readClock(this.connection, this.commitment),
     ]);
@@ -422,11 +421,11 @@ export class PoolService extends DlmmProProgram {
       this.programId,
     );
     const xIsInput = params.swapForY;
-    const referral = params.referral;
-    const referralMint =
-      referral && params.transferHookReferral === undefined
-        ? await readTokenAccountMint(this.connection, referral, this.commitment)
-        : null;
+    const transferHookReferral = await this.referralHook(
+      params.pool,
+      params.referral,
+      params.transferHookReferral,
+    );
     const [pool, hooks] = await Promise.all([
       this.state.fetchPool(params.pool),
       resolveInstructionHooks(this.connection, this.commitment, {
@@ -448,22 +447,7 @@ export class PoolService extends DlmmProProgram {
             authority: xIsInput ? poolAuthority : params.user,
           },
         },
-        transferHookReferral: {
-          metas: params.transferHookReferral,
-          leg:
-            referral && referralMint
-              ? {
-                  mint: referralMint,
-                  source: deriveReserve(
-                    referralMint,
-                    params.pool,
-                    this.programId,
-                  ),
-                  destination: referral,
-                  authority: poolAuthority,
-                }
-              : undefined,
-        },
+        transferHookReferral,
       }),
     ]);
     const tickArrayBitmapExtension =
@@ -486,7 +470,7 @@ export class PoolService extends DlmmProProgram {
         reserveY,
         userTokenIn: params.userTokenIn,
         userTokenOut: params.userTokenOut,
-        referral: referral ?? null,
+        referral: params.referral ?? null,
         tokenXMint: params.tokenXMint,
         tokenYMint: params.tokenYMint,
         oracle: deriveOracle(params.pool, this.programId),
@@ -502,13 +486,7 @@ export class PoolService extends DlmmProProgram {
     payer: PublicKey;
     lengthToAdd: number;
   }): Promise<{ tx: Transaction; oracle: PublicKey }> {
-    if (
-      !Number.isInteger(params.lengthToAdd) ||
-      params.lengthToAdd <= 0 ||
-      params.lengthToAdd > 0xffff
-    ) {
-      throw PoolError.invalidParameters("lengthToAdd must be a non-zero u16");
-    }
+    assertNonZeroU16(params.lengthToAdd, "lengthToAdd");
 
     const oracle = deriveOracle(params.pool, this.programId);
     const tx = await this.program.methods
@@ -603,18 +581,6 @@ export class PoolService extends DlmmProProgram {
     }
   }
 
-  private async unpackMintAccount(
-    address: PublicKey,
-    tokenProgramFlag: number,
-  ): Promise<Mint> {
-    const info = await readMintAccount(
-      this.connection,
-      address,
-      this.commitment,
-    );
-    return unpackMint(address, info, getTokenProgram(tokenProgramFlag));
-  }
-
   private async initializePoolAccounts(
     pool: PublicKey,
     params: InitializePoolAccountParams,
@@ -655,18 +621,8 @@ export class PoolService extends DlmmProProgram {
     tokenYProgram?: PublicKey;
   }): Promise<[PublicKey, PublicKey]> {
     return Promise.all([
-      params.tokenXProgram ??
-        resolveTokenProgram(
-          this.connection,
-          params.tokenXMint,
-          this.commitment,
-        ),
-      params.tokenYProgram ??
-        resolveTokenProgram(
-          this.connection,
-          params.tokenYMint,
-          this.commitment,
-        ),
+      this.tokenProgramFor(params.tokenXMint, params.tokenXProgram),
+      this.tokenProgramFor(params.tokenYMint, params.tokenYProgram),
     ]);
   }
 }

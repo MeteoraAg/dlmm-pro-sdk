@@ -21,7 +21,7 @@ import {
 } from "../constants";
 import { PoolError } from "../errors";
 import { encodePodU64 } from "./pod";
-import { assertI32 } from "./validation";
+import { assertI32, isIntegerIn } from "./validation";
 
 function sortMints(a: PublicKey, b: PublicKey): [PublicKey, PublicKey] {
   return a.toBuffer().compare(b.toBuffer()) > 0 ? [a, b] : [b, a];
@@ -172,11 +172,7 @@ export function deriveLimitOrder(
 }
 
 function assertRewardIndex(rewardIndex: number): void {
-  if (
-    !Number.isInteger(rewardIndex) ||
-    rewardIndex < 0 ||
-    rewardIndex >= NUM_REWARDS
-  ) {
+  if (!isIntegerIn(rewardIndex, 0, NUM_REWARDS - 1)) {
     throw PoolError.invalidRewardIndex();
   }
 }

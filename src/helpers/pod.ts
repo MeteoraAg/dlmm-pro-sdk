@@ -1,6 +1,6 @@
 import BN from "bn.js";
 import { PoolError } from "../errors";
-import { U16_MAX, U32_MAX, U64_MAX } from "../math/safe_math";
+import { isUnsigned, U16_MAX, U32_MAX, U64_MAX } from "../math/safe_math";
 
 function encodePodUint(
   value: BN | number,
@@ -12,7 +12,7 @@ function encodePodUint(
     throw PoolError.invalidParameters(`${name} must be a safe integer`);
   }
   const bn = BN.isBN(value) ? value : new BN(value);
-  if (bn.isNeg() || bn.gt(max)) {
+  if (!isUnsigned(bn, max)) {
     throw PoolError.invalidParameters(`${name} must be a u${byteLength * 8}`);
   }
   return bn.toArrayLike(Buffer, "le", byteLength);

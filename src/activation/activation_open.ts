@@ -43,6 +43,6 @@ export class ActivationOpenHandler {
 export function openActivationParameters(): PoolActivationInfoParameters {
   return {
     activationMode: ActivationMode.Open,
-    data: Array.from(Buffer.alloc(15, 0)),
+    data: Array.from(Buffer.alloc(15)),
   };
 }

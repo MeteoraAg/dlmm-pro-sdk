@@ -11,7 +11,7 @@ import {
 import { PoolError } from "../errors";
 import { deriveTickArray, deriveTickArrayBitmapExtension } from "./pda";
 import type { TickRange } from "../types";
-import { assertTickSpacing } from "./validation";
+import { assertTickSpacing, isIntegerIn } from "./validation";
 
 /** The program's `align_id_to_spacing`: the spacing multiple at or below `tickId`. */
 export function alignTickDown(tickId: number, tickSpacing: number): number {
@@ -19,17 +19,11 @@ export function alignTickDown(tickId: number, tickSpacing: number): number {
 }
 
 export function isUsableTickId(tickId: number, tickSpacing: number): boolean {
-  if (
-    !Number.isInteger(tickId) ||
-    !Number.isInteger(tickSpacing) ||
-    tickSpacing <= 0 ||
-    tickSpacing > MAX_TICK_SPACING ||
-    tickId < MIN_TICK_ID ||
-    tickId > MAX_TICK_ID
-  ) {
-    return false;
-  }
-  return tickId % tickSpacing === 0;
+  return (
+    isIntegerIn(tickSpacing, 1, MAX_TICK_SPACING) &&
+    isIntegerIn(tickId, MIN_TICK_ID, MAX_TICK_ID) &&
+    tickId % tickSpacing === 0
+  );
 }
 
 export function tickIndexFromId(tickId: number, tickSpacing: number): number {
@@ -73,7 +67,10 @@ export function tickIdsInRange(
   return tickIds;
 }
 
-function validateTickRanges(ranges: TickRange[], tickSpacing: number): void {
+export function validateTickRanges(
+  ranges: TickRange[],
+  tickSpacing: number,
+): void {
   if (ranges.length === 0 || ranges.length > POSITION_MAX_RANGE) {
     throw PoolError.invalidParameters(
       "tickRanges must have 1..=POSITION_MAX_RANGE entries",
