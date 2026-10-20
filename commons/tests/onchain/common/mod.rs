@@ -145,17 +145,12 @@ fn get_liquidity_from_amounts(
 }
 
 /// `time_delta * emission_per_second >> 64`.
-fn calculate_reward_amount(
-    time_delta: u64,
-    emission_per_second: u128,
-    rounding: Rounding,
-) -> anchor_lang::Result<u64> {
-    let prod = U192::from(time_delta).safe_mul(U192::from(emission_per_second))?;
-    let reward_amount = match rounding {
-        Rounding::Up => down_scale_ceil(prod, 64),
-        Rounding::Down => prod >> 64,
-    };
-    Ok(reward_amount.safe_cast()?)
+fn calculate_reward_amount(time_delta: u64, emission_per_second: u128) -> anchor_lang::Result<u64> {
+    Ok(down_scale_ceil(
+        U192::from(time_delta).safe_mul(U192::from(emission_per_second))?,
+        64,
+    )
+    .safe_cast()?)
 }
 
 fn writable_metas(addresses: &[Pubkey]) -> Vec<AccountMeta> {
@@ -338,7 +333,7 @@ fn create_token_badge_y(market: &mut Market) -> Pubkey {
     const CREATE_TOKEN_BADGE_PERMISSION: u128 = 1;
 
     let registry_operator = Pubkey::find_program_address(
-        &[b"operator", market.operator.pubkey().as_ref()],
+        &[OPERATOR_PREFIX, market.operator.pubkey().as_ref()],
         &ACCESS_REGISTRY_ID,
     )
     .0;
@@ -450,6 +445,16 @@ fn encode_fixed_base_fee_data(cliff_fee_numerator: u64) -> [u8; 31] {
     data
 }
 
+fn fixed_pool_fees(dynamic_fee: Option<types::DynamicFeeParameters>) -> types::PoolFeeParameters {
+    types::PoolFeeParameters {
+        base_fee_parameter: types::BaseFeeConfigParameters {
+            base_fee_mode: BaseFeeMode::Fixed.into(),
+            data: encode_fixed_base_fee_data(1_000_000),
+        },
+        dynamic_fee_parameter: dynamic_fee,
+    }
+}
+
 pub fn initialize_static_pool(
     market: &mut Market,
     dynamic_fee: Option<types::DynamicFeeParameters>,
@@ -502,13 +507,7 @@ pub fn initialize_static_pool_with_options(
         data: args::CreateStaticConfig {
             index: config_index,
             config_parameters: types::StaticConfigParameters {
-                pool_fees: types::PoolFeeParameters {
-                    base_fee_parameter: types::BaseFeeConfigParameters {
-                        base_fee_mode: BaseFeeMode::Fixed.into(),
-                        data: encode_fixed_base_fee_data(1_000_000),
-                    },
-                    dynamic_fee_parameter: dynamic_fee,
-                },
+                pool_fees: fixed_pool_fees(dynamic_fee),
                 tick_spacing: TICK_SPACING,
                 collect_fee_mode: collect_fee_mode.into(),
                 activation_type: ActivationType::Timestamp.into(),
@@ -669,13 +668,7 @@ fn initialize_dynamic_pool(
         .to_account_metas(None),
         data: args::InitializePoolWithDynamicConfig {
             parameters: types::InitializePoolWithDynamicParameters {
-                pool_fees: types::PoolFeeParameters {
-                    base_fee_parameter: types::BaseFeeConfigParameters {
-                        base_fee_mode: BaseFeeMode::Fixed.into(),
-                        data: encode_fixed_base_fee_data(1_000_000),
-                    },
-                    dynamic_fee_parameter: None,
-                },
+                pool_fees: fixed_pool_fees(None),
                 tick_spacing: TICK_SPACING,
                 collect_fee_mode: CollectFeeMode::OutputToken.into(),
                 initial_sqrt_price: SQRT_PRICE_ONE,
@@ -1037,8 +1030,7 @@ pub fn set_reward_emission(
     end_time: u64,
     emission_per_second: u128,
 ) {
-    let max_amount =
-        calculate_reward_amount(end_time - open_time, emission_per_second, Rounding::Up).unwrap();
+    let max_amount = calculate_reward_amount(end_time - open_time, emission_per_second).unwrap();
     let emit = Instruction {
         program_id: dlmm_pro::ID,
         accounts: accounts::SetRewardEmission {
@@ -1333,7 +1325,7 @@ pub fn assert_quote_matches_execution_with_referral(
     let (in_account, out_account) = swapper_token_accounts(market, swap_for_y);
     let in_before = token_amount(&market.svm, &in_account);
     let out_before = token_amount(&market.svm, &out_account);
-    let referral_before = referral.map(|account| token_amount(&market.svm, &account));
+    let referral = referral.map(|account| (account, token_amount(&market.svm, &account)));
     let pool_before = load_pool(market, pool);
     let fee_setting = pool_before
         .pool
@@ -1348,7 +1340,7 @@ pub fn assert_quote_matches_execution_with_referral(
         swap_for_y,
         &tick_arrays,
         bitmap_extension,
-        referral,
+        referral.map(|(account, _)| account),
     );
 
     let paid = in_before - token_amount(&market.svm, &in_account);
@@ -1399,34 +1391,29 @@ pub fn assert_quote_matches_execution_with_referral(
     assert_eq!(pool_after.pool.liquidity, quote.next_liquidity);
 
     let (before, after) = (&pool_before.pool, &pool_after.pool);
-    let (protocol_delta_x, protocol_delta_y) = (
-        after.protocol_fee_x - before.protocol_fee_x,
-        after.protocol_fee_y - before.protocol_fee_y,
+    let on_fee_side = |fee: u64| if fees_on_token_x { (fee, 0) } else { (0, fee) };
+    assert_eq!(
+        (
+            after.protocol_fee_x - before.protocol_fee_x,
+            after.protocol_fee_y - before.protocol_fee_y,
+        ),
+        on_fee_side(quote.protocol_fee)
     );
-    let (partner_delta_x, partner_delta_y) = (
-        after.pool_partner.pending_fee_x - before.pool_partner.pending_fee_x,
-        after.pool_partner.pending_fee_y - before.pool_partner.pending_fee_y,
+    assert_eq!(
+        (
+            after.pool_partner.pending_fee_x - before.pool_partner.pending_fee_x,
+            after.pool_partner.pending_fee_y - before.pool_partner.pending_fee_y,
+        ),
+        on_fee_side(quote.partner_fee)
     );
-    let expected_protocol = if fees_on_token_x {
-        (quote.protocol_fee, 0)
-    } else {
-        (0, quote.protocol_fee)
-    };
-    let expected_partner = if fees_on_token_x {
-        (quote.partner_fee, 0)
-    } else {
-        (0, quote.partner_fee)
-    };
-    assert_eq!((protocol_delta_x, protocol_delta_y), expected_protocol);
-    assert_eq!((partner_delta_x, partner_delta_y), expected_partner);
     if fees_on_token_x {
         assert_eq!(after.fee_growth_global_y, before.fee_growth_global_y);
     } else {
         assert_eq!(after.fee_growth_global_x, before.fee_growth_global_x);
     }
 
-    match (referral, referral_before) {
-        (Some(account), Some(referral_before)) => {
+    match referral {
+        Some((account, referral_before)) => {
             // The host fee leaves the reserve as a transfer, so the referral
             // receives it net of that mint's transfer fee.
             let fee_mint = if fees_on_token_x {
@@ -1446,7 +1433,7 @@ pub fn assert_quote_matches_execution_with_referral(
                 expected_host_fee
             );
         }
-        _ => assert_eq!(quote.host_fee, 0),
+        None => assert_eq!(quote.host_fee, 0),
     }
     quote
 }

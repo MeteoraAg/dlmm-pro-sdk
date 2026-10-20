@@ -246,27 +246,19 @@ mod tests {
         let position = PositionWithReward {
             inner: Position {
                 unlocked_liquidity: 1 << 70,
-                permanent_locked_liquidity: 0,
-                vesting_liquidity: 0,
-                released_vesting_liquidity: 0,
-                fee_growth_checkpoint_x: 0,
-                fee_growth_checkpoint_y: 0,
-                fee_pending_x: 0,
-                fee_pending_y: 0,
-                tick_lower_id: 0,
                 tick_upper_id: 1,
-                _padding_0: 0,
+                ..Position::zeroed()
             },
             rewards: [
                 PositionRewardInfo {
                     growth_inside_checkpoint: 5,
                     pending_amount: u64::MAX - 1,
-                    _padding_0: [0; 8],
+                    ..PositionRewardInfo::zeroed()
                 },
                 PositionRewardInfo {
                     growth_inside_checkpoint: 0,
                     pending_amount: 1,
-                    _padding_0: [0; 8],
+                    ..PositionRewardInfo::zeroed()
                 },
             ],
         };

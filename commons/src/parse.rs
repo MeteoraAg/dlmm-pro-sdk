@@ -10,8 +10,7 @@ use bytemuck::AnyBitPattern;
 use crate::*;
 
 fn check_discriminator<T: Discriminator>(data: &[u8]) -> Result<()> {
-    let disc = T::DISCRIMINATOR;
-    if data.len() < disc.len() || &data[..disc.len()] != disc {
+    if !data.starts_with(T::DISCRIMINATOR) {
         return Err(anchor_lang::error::ErrorCode::AccountDiscriminatorMismatch.into());
     }
     Ok(())
@@ -54,10 +53,11 @@ impl DynamicPool {
         let mut offset = 8 + POOL_INIT_SPACE;
         let pool_reward = if pool.is_support_liquidity_mining() {
             let end = offset + POOL_REWARD_INIT_SPACE;
-            if account_data.len() < end {
-                return Err(PoolError::InvalidAccount.into());
-            }
-            let reward: PoolReward = bytemuck::pod_read_unaligned(&account_data[offset..end]);
+            let reward: PoolReward = bytemuck::pod_read_unaligned(
+                account_data
+                    .get(offset..end)
+                    .ok_or(PoolError::InvalidAccount)?,
+            );
             offset = end;
             Some(reward)
         } else {
@@ -66,10 +66,11 @@ impl DynamicPool {
 
         let pool_activation = if pool.is_support_activation_access() {
             let end = offset + POOL_ACTIVATION_INIT_SPACE;
-            if account_data.len() < end {
-                return Err(PoolError::InvalidAccount.into());
-            }
-            Some(bytemuck::pod_read_unaligned(&account_data[offset..end]))
+            Some(bytemuck::pod_read_unaligned(
+                account_data
+                    .get(offset..end)
+                    .ok_or(PoolError::InvalidAccount)?,
+            ))
         } else {
             None
         };
