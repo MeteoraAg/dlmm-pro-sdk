@@ -42,6 +42,16 @@ fn quote_exact_in_matches_onchain_swap_across_tick_arrays() {
 }
 
 #[test]
+fn quote_exact_in_matches_onchain_swap_with_liquidity_mining() {
+    let mut market = create_funded_market();
+    let pool = initialize_mining_pool(&mut market);
+    seed_liquidity(&mut market, pool, &seed_ranges(0), None, &SEED_DEPOSITS);
+
+    assert_quote_matches_execution(&mut market, pool, 50_000, true);
+    assert_quote_matches_execution(&mut market, pool, 30_000, false);
+}
+
+#[test]
 fn quote_exact_in_matches_onchain_swap_across_dynamic_fee_regimes() {
     const FILTER_PERIOD: u16 = 30;
     const DECAY_PERIOD: u16 = 600;
