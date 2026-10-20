@@ -6,9 +6,9 @@ pub use crate::dlmm_pro::constants::*;
 // Tick ids where 1.0001^tick_id reaches the max and min prices, 2^64 and 2^-64
 pub const MAX_TICK_ID: i32 = 443636;
 pub const MIN_TICK_ID: i32 = -443636;
-pub const MAX_TICKS_PER_ARRAY: usize = 128;
+pub const MAX_TICKS_PER_ARRAY: usize = MAX_TICKS_PER_ARRAY_U64 as usize;
 pub const NUMBER_OF_ACTIVATION_MODES: usize = 2;
-pub const NUM_REWARDS: usize = 2;
+pub const NUM_REWARDS: usize = NUM_REWARDS_U64 as usize;
 // If significant swaps are continuous for a long time, references are reset
 pub const MAX_REFERENCE_AGE: u64 = 3600; // 1 hour
 
