@@ -177,7 +177,7 @@ let extension = if pool_state.pool.is_bitmap_extension_initialized() {
 let tick_arrays =
     tick_arrays_for_swap(pool, &pool_state.pool, extension.as_ref(), swap_for_y, 3)?;
 // Fetch and parse the tick arrays and both mints, then:
-let quote = quote_exact_in(QuoteExactInParams { /* parsed accounts, mint data, clock */ })?;
+let quote = quote_exact_in(QuoteExactInParams { /* pool address, parsed accounts, mint data, clock */ })?;
 ```
 
 ## Program addresses

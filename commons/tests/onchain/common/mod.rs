@@ -1151,6 +1151,7 @@ fn try_quote(
         (market.token_y_mint, market.token_x_mint)
     };
     let quote = quote_exact_in(QuoteExactInParams {
+        pool_address: pool,
         pool: &pool_state,
         tick_arrays: &tick_arrays,
         bitmap_extension: bitmap_extension.as_ref(),

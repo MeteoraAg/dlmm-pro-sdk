@@ -9,6 +9,8 @@ use crate::*;
 
 #[derive(Debug, Clone, Copy)]
 pub struct QuoteExactInParams<'a> {
+    /// The pool account's address; reached tick arrays and the bitmap extension must belong to it.
+    pub pool_address: Pubkey,
     pub pool: &'a DynamicPool,
     /// Parsed tick arrays, ordered for the traversal like the swap
     /// instruction's remaining accounts: descending indices when
@@ -317,6 +319,7 @@ fn swap_with_tick(
 /// produces.
 pub fn quote_exact_in(params: QuoteExactInParams<'_>) -> Result<QuoteExactInResult> {
     let QuoteExactInParams {
+        pool_address,
         pool: dynamic_pool,
         tick_arrays,
         bitmap_extension,
@@ -330,6 +333,12 @@ pub fn quote_exact_in(params: QuoteExactInParams<'_>) -> Result<QuoteExactInResu
     } = params;
 
     require!(input_amount > 0, PoolError::AmountIsZero);
+    if let Some(bitmap_extension) = bitmap_extension {
+        require!(
+            bitmap_extension.pool == pool_address,
+            PoolError::InvalidAccount
+        );
+    }
 
     let mut pool = dynamic_pool.pool;
     let current_point = get_current_point(pool.activation_type, clock)?;
@@ -356,6 +365,10 @@ pub fn quote_exact_in(params: QuoteExactInParams<'_>) -> Result<QuoteExactInResu
         if tick_array.fixed.tick_index != current_tick_array_index {
             continue;
         }
+        require!(
+            tick_array.fixed.pool == pool_address,
+            PoolError::InvalidTickArray
+        );
         traversal.push(tick_array.ticks.base_ticks());
 
         // No next index is needed after the last supplied TickArray.

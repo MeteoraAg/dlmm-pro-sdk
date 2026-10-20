@@ -230,3 +230,61 @@ fn quote_exact_in_respects_time_based_activation() {
     set_unix_timestamp(&mut market.svm, swap_point as i64);
     assert_quote_matches_execution(&mut market, pool, 1_000, true);
 }
+
+#[test]
+fn quote_exact_in_rejects_accounts_of_another_pool() {
+    let mut market = create_funded_market();
+    let pool_a = initialize_static_pool(&mut market, None, SQRT_PRICE_ONE);
+    let pool_b = initialize_static_pool(&mut market, None, SQRT_PRICE_ONE);
+    for pool in [pool_a, pool_b] {
+        seed_liquidity(&mut market, pool, &seed_ranges(0), None, &SEED_DEPOSITS);
+    }
+
+    let state_a = load_pool(&market, pool_a);
+    let state_b = load_pool(&market, pool_b);
+    let arrays_of = |pool, state: &DynamicPool| -> Vec<DynamicTickArray> {
+        tick_arrays_for_swap(pool, &state.pool, None, true, 3)
+            .unwrap()
+            .iter()
+            .map(|address| {
+                DynamicTickArray::deserialize(
+                    &market.svm.get_account(address).unwrap().data,
+                    state.pool.is_support_liquidity_mining(),
+                )
+                .unwrap()
+            })
+            .collect()
+    };
+    let arrays_a = arrays_of(pool_a, &state_a);
+    let arrays_b = arrays_of(pool_b, &state_b);
+    let extension = TickArrayBitmapExtension {
+        pool: pool_b,
+        ..Default::default()
+    };
+
+    let try_quote = |tick_arrays: &[DynamicTickArray], bitmap_extension| {
+        quote_exact_in(QuoteExactInParams {
+            pool_address: pool_a,
+            pool: &state_a,
+            tick_arrays,
+            bitmap_extension,
+            input_amount: 1_000,
+            swap_for_y: true,
+            has_referral: false,
+            swapper: None,
+            clock: &market.svm.get_sysvar(),
+            input_mint_data: &market.svm.get_account(&market.token_x_mint).unwrap().data,
+            output_mint_data: &market.svm.get_account(&market.token_y_mint).unwrap().data,
+        })
+    };
+
+    assert!(try_quote(&arrays_a, None).is_ok());
+    assert_eq!(
+        try_quote(&arrays_b, None).unwrap_err(),
+        PoolError::InvalidTickArray.into()
+    );
+    assert_eq!(
+        try_quote(&arrays_a, Some(&extension)).unwrap_err(),
+        PoolError::InvalidAccount.into()
+    );
+}
