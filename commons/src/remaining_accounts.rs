@@ -1,6 +1,9 @@
 //! Remaining-accounts assembly for instructions that take
 //! `RemainingAccountsInfo` (transfer-hook slices first, then tick arrays).
 use anchor_lang::solana_program::instruction::AccountMeta;
+use anchor_lang::Result;
+
+use crate::PoolError;
 
 pub use crate::dlmm_pro::types::{AccountsType, RemainingAccountsInfo, RemainingAccountsSlice};
 
@@ -18,7 +21,7 @@ pub struct TransferHookAccounts {
 /// these accounts and are not described by a slice.
 pub fn remaining_accounts_from_hooks(
     hooks: &TransferHookAccounts,
-) -> (RemainingAccountsInfo, Vec<AccountMeta>) {
+) -> Result<(RemainingAccountsInfo, Vec<AccountMeta>)> {
     let mut slices = vec![];
     let mut remaining_accounts = vec![];
     for (accounts, accounts_type) in [
@@ -38,11 +41,12 @@ pub fn remaining_accounts_from_hooks(
         }
         slices.push(RemainingAccountsSlice {
             accounts_type,
-            length: accounts.len() as u8,
+            length: u8::try_from(accounts.len())
+                .map_err(|_| PoolError::InvalidRemainingAccountSlice)?,
         });
         remaining_accounts.extend_from_slice(accounts);
     }
-    (RemainingAccountsInfo { slices }, remaining_accounts)
+    Ok((RemainingAccountsInfo { slices }, remaining_accounts))
 }
 
 #[cfg(test)]
@@ -63,7 +67,7 @@ mod tests {
             transfer_hook_reward: accounts(1),
             ..Default::default()
         };
-        let (info, metas) = remaining_accounts_from_hooks(&hooks);
+        let (info, metas) = remaining_accounts_from_hooks(&hooks).unwrap();
         assert!(matches!(
             info.slices[..],
             [
