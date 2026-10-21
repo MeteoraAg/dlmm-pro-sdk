@@ -259,7 +259,7 @@ fn quote_exact_in_rejects_accounts_of_another_pool() {
             .map(|address| {
                 DynamicTickArray::deserialize(
                     &market.svm.get_account(address).unwrap().data,
-                    state.pool.is_support_liquidity_mining(),
+                    &state.pool,
                 )
                 .unwrap()
             })

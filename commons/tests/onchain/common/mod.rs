@@ -884,7 +884,7 @@ pub fn load_position_array(
 ) -> DynamicPositionArray {
     DynamicPositionArray::deserialize(
         &market.svm.get_account(&position).unwrap().data,
-        pool_state.pool.is_support_liquidity_mining(),
+        &pool_state.pool,
     )
     .unwrap()
 }
@@ -910,7 +910,7 @@ pub fn load_tick_arrays(
         .map(|address| {
             DynamicTickArray::deserialize(
                 &market.svm.get_account(address).unwrap().data,
-                pool_state.pool.is_support_liquidity_mining(),
+                &pool_state.pool,
             )
             .unwrap()
         })
@@ -1137,11 +1137,8 @@ fn try_quote(
     let tick_arrays: Vec<DynamicTickArray> = tick_array_addresses
         .iter()
         .map(|address| {
-            DynamicTickArray::deserialize(
-                &svm.get_account(address).unwrap().data,
-                pool_state.pool.is_support_liquidity_mining(),
-            )
-            .unwrap()
+            DynamicTickArray::deserialize(&svm.get_account(address).unwrap().data, &pool_state.pool)
+                .unwrap()
         })
         .collect();
 

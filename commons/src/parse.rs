@@ -108,11 +108,12 @@ pub struct DynamicTickArray {
 }
 
 impl DynamicTickArray {
-    pub fn deserialize(account_data: &[u8], is_support_liquidity_mining: bool) -> Result<Self> {
+    /// Parse the dynamic tail using the layout selected by the owning pool.
+    pub fn deserialize(account_data: &[u8], pool: &Pool) -> Result<Self> {
         check_discriminator::<TickArray>(account_data)?;
         let fixed: TickArray = pod_read_unaligned_skip_disc(account_data)?;
         let tail = &account_data[8 + TICK_ARRAY_INIT_SPACE..];
-        let ticks = if is_support_liquidity_mining {
+        let ticks = if pool.is_support_liquidity_mining() {
             Ticks::WithReward(pod_read_seq(tail)?)
         } else {
             Ticks::Base(pod_read_seq(tail)?)
@@ -180,11 +181,12 @@ pub struct DynamicPositionArray {
 }
 
 impl DynamicPositionArray {
-    pub fn deserialize(account_data: &[u8], is_support_liquidity_mining: bool) -> Result<Self> {
+    /// Parse the dynamic tail using the layout selected by the owning pool.
+    pub fn deserialize(account_data: &[u8], pool: &Pool) -> Result<Self> {
         check_discriminator::<PositionArray>(account_data)?;
         let fixed: PositionArray = pod_read_unaligned_skip_disc(account_data)?;
         let tail = &account_data[8 + POSITION_ARRAY_INIT_SPACE..];
-        let positions = if is_support_liquidity_mining {
+        let positions = if pool.is_support_liquidity_mining() {
             Positions::WithReward(pod_read_seq(tail)?)
         } else {
             Positions::Base(pod_read_seq(tail)?)
