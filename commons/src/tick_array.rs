@@ -13,6 +13,7 @@ pub fn tick_arrays_for_tick_ids(
     tick_ids: &[i32],
     tick_spacing: u16,
 ) -> Result<Vec<Pubkey>> {
+    require!(tick_spacing > 0, PoolError::InvalidParameters);
     let indexes = tick_ids
         .iter()
         .map(|&tick_id| TickArray::get_tick_index_from_tick_id(tick_id, tick_spacing))
@@ -108,6 +109,10 @@ mod tests {
         assert_eq!(
             tick_arrays_for_tick_ids(pool, &[300, -1, 5, 256], 2).unwrap(),
             tick_arrays(pool, &[-1, 0, 1])
+        );
+        assert_eq!(
+            tick_arrays_for_tick_ids(pool, &[0], 0).unwrap_err(),
+            PoolError::InvalidParameters.into()
         );
     }
 
