@@ -149,7 +149,7 @@ function isPoolStatusEnabled(poolStatus: number, status: PoolStatus): boolean {
   return (poolStatus & (1 << status)) === 0;
 }
 
-export function getFeeSetting(
+function getFeeSetting(
   pool: Pool,
   swapForY: boolean,
   hasReferral: boolean,
@@ -313,7 +313,11 @@ function isNextTickId(
   return swapForY ? tickCurrentId >= tickId : tickCurrentId < tickId;
 }
 
-/** When `amountLeft` is zero, the amounts match `swap` for the same accounts and clock. */
+/**
+ * Pure snapshot quote. When `amountLeft` is zero, the amounts match `swap`
+ * for the same accounts and clock. Inputs are not updated; quote a subsequent
+ * swap from fresh account state.
+ */
 export function quoteExactIn(params: QuoteExactInParams): QuoteExactInResult {
   const {
     poolAddress,

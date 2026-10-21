@@ -20,7 +20,6 @@ import {
   type QuoteExactInResult,
   type QuoteTickArray,
 } from "../src";
-import { getFeeSetting } from "../src/quote";
 import type { LiteSVM } from "litesvm";
 import {
   createAccessRegistryOperator,
@@ -81,11 +80,10 @@ async function assertQuoteMatchesExecution(
   const outBefore = getTokenAmount(svm, outAccount);
   const referralBefore = referral ? getTokenAmount(svm, referral) : null;
   const poolBefore = await client.state.fetchPool(pool);
-  const { feesOnInput, feesOnTokenX } = getFeeSetting(
-    poolBefore,
-    swapForY,
-    referral !== undefined,
-  );
+  const feesOnInput =
+    poolBefore.collectFeeMode === CollectFeeMode.OnlyY && !swapForY;
+  const feesOnTokenX =
+    poolBefore.collectFeeMode === CollectFeeMode.OutputToken && !swapForY;
 
   const { tx } = await client.pool.swap({
     pool,
