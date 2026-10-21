@@ -2,6 +2,8 @@
 //! parsed account state. [`quote_exact_in`] matches the on-chain `swap`
 //! instruction for the same inputs, including dynamic fee, MM liquidity,
 //! in-tick limit orders, collect-fee mode, and token-2022 transfer fees.
+//! It does not mutate its inputs or produce the program's post-swap account
+//! writes; reparse account state before quoting another swap.
 use anchor_lang::prelude::*;
 use std::cmp::{max, min};
 
@@ -21,8 +23,8 @@ pub struct QuoteExactInParams<'a> {
     pub input_amount: u64,
     pub swap_for_y: bool,
     pub has_referral: bool,
-    /// The swapping wallet; only used to honor the whitelisted-swap bypass
-    /// during pre-activation.
+    /// The swapping wallet, used only for the pre-activation whitelist.
+    /// `None` is conservative and does not bypass activation.
     pub swapper: Option<Pubkey>,
     pub clock: &'a Clock,
     /// Raw input mint account data, legacy SPL or Token-2022.
