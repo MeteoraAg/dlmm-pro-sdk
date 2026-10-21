@@ -72,7 +72,7 @@ export class ActivationBondingCurveHandler {
         "whitelistedAddLiquidity must not be the default public key",
       );
     }
-    if (this.inner.targetIncreaseBps.lte(new BN(MAX_BASIS_POINT))) {
+    if (this.inner.targetIncreaseBps.lten(MAX_BASIS_POINT)) {
       throw PoolError.invalidParameters(
         "targetIncreaseBps must be above MAX_BASIS_POINT",
       );

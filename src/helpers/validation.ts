@@ -27,12 +27,6 @@ export function assertZeroPadding(padding: number[]): void {
   }
 }
 
-export function assertU8(value: number, name: string): void {
-  if (!isIntegerIn(value, 0, 0xff)) {
-    throw PoolError.invalidParameters(`${name} must be a u8`);
-  }
-}
-
 export function assertU16(value: number, name: string): void {
   if (!isIntegerIn(value, 0, 0xffff)) {
     throw PoolError.invalidParameters(`${name} must be a u16`);

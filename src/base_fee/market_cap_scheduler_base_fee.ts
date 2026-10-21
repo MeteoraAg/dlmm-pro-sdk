@@ -109,7 +109,7 @@ function getPassedPeriod(
     U256_MAX,
   );
 
-  if (passedPeriod.gt(new BN(inner.numberOfPeriod))) {
+  if (passedPeriod.gtn(inner.numberOfPeriod)) {
     return inner.numberOfPeriod;
   }
 

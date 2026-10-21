@@ -76,13 +76,13 @@ export function updateReferences(
     variableFee.lastSignificantSwapTimestamp,
   );
   const elapsed = saturatingElapsed(currentTimestamp, maxTimestamp);
-  if (elapsed.lt(new BN(dynamicFeeConfig.filterPeriod))) {
+  if (elapsed.ltn(dynamicFeeConfig.filterPeriod)) {
     return;
   }
 
   variableFee.sqrtPriceReference = sqrtPriceCurrent.clone();
   variableFee.lastReferenceTimestamp = currentTimestamp.clone();
-  if (elapsed.lt(new BN(dynamicFeeConfig.decayPeriod))) {
+  if (elapsed.ltn(dynamicFeeConfig.decayPeriod)) {
     const volatilityReference = safeDiv(
       safeMul(
         new BN(variableFee.volatilityAccumulator),
@@ -106,12 +106,10 @@ export function updateVolatilityAccumulator(
   const deltaTick = getDeltaTick(sqrtPrice, variableFee.sqrtPriceReference);
 
   const volatilityAccumulator = deltaTick
-    .mul(new BN(MAX_BASIS_POINT))
-    .add(new BN(variableFee.volatilityReference));
+    .muln(MAX_BASIS_POINT)
+    .addn(variableFee.volatilityReference);
 
-  if (
-    volatilityAccumulator.gt(new BN(dynamicFeeConfig.maxVolatilityAccumulator))
-  ) {
+  if (volatilityAccumulator.gtn(dynamicFeeConfig.maxVolatilityAccumulator)) {
     variableFee.volatilityAccumulator =
       dynamicFeeConfig.maxVolatilityAccumulator;
   } else {

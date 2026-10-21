@@ -61,7 +61,7 @@ function getPassedPeriod(
     inner.periodFrequency,
     U64_MAX,
   );
-  if (period.gt(new BN(inner.numberOfPeriod))) {
+  if (period.gtn(inner.numberOfPeriod)) {
     return inner.numberOfPeriod;
   }
   return tryCastU16(period);

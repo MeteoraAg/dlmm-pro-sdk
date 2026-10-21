@@ -262,7 +262,7 @@ export function multiplierFromAmounts(args: {
   // liquidity_gross per tick is capped on-chain at u128::MAX / tick_count
   // (get_max_gross_liquidity_per_tick)
   const tickCount = 2 * Math.trunc(MAX_TICK_ID / args.tickSpacing) + 1;
-  const maxGrossLiquidityPerTick = U128_MAX.div(new BN(tickCount));
+  const maxGrossLiquidityPerTick = U128_MAX.divn(tickCount);
   const tickGrossWeights = new Map<number, number>();
 
   let upperBound = I128_MAX;
@@ -311,10 +311,7 @@ export function multiplierFromAmounts(args: {
   }
 
   for (const grossWeight of tickGrossWeights.values()) {
-    upperBound = BN.min(
-      upperBound,
-      maxGrossLiquidityPerTick.div(new BN(grossWeight)),
-    );
+    upperBound = BN.min(upperBound, maxGrossLiquidityPerTick.divn(grossWeight));
   }
 
   const fits = (multiplier: BN): boolean => {
