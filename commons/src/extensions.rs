@@ -444,6 +444,13 @@ const EXTENSION_BITMAP_SIZE: usize = 6;
 
 impl TickArrayBitmapExtension {
     pub fn get_bitmap_offset(index: i32) -> Result<usize> {
+        let (min_index, max_index) = Self::bitmap_range();
+        require!(
+            (min_index..=max_index).contains(&index)
+                && !(-BITMAP_SIZE..BITMAP_SIZE).contains(&index),
+            PoolError::InvalidTickArray
+        );
+
         // index starts from 512 in positive side and -513 in negative side
         let offset = if index > 0 {
             index / BITMAP_SIZE - 1
@@ -666,5 +673,37 @@ impl TickArrayBitmapExtension {
                 None => Ok((-BITMAP_SIZE, false)),
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod bitmap_extension_tests {
+    use super::*;
+
+    #[test]
+    fn bitmap_offsets_reject_inline_and_out_of_range_indexes() {
+        for index in [-3585, -512, 0, 511, 3584] {
+            assert_eq!(
+                TickArrayBitmapExtension::get_bitmap_offset(index),
+                Err(PoolError::InvalidTickArray.into())
+            );
+        }
+    }
+
+    #[test]
+    fn bitmap_offsets_cover_the_extension_boundaries() {
+        assert_eq!(
+            TickArrayBitmapExtension::get_bitmap_offset(-3584).unwrap(),
+            EXTENSION_BITMAP_SIZE - 1
+        );
+        assert_eq!(
+            TickArrayBitmapExtension::get_bitmap_offset(-513).unwrap(),
+            0
+        );
+        assert_eq!(TickArrayBitmapExtension::get_bitmap_offset(512).unwrap(), 0);
+        assert_eq!(
+            TickArrayBitmapExtension::get_bitmap_offset(3583).unwrap(),
+            EXTENSION_BITMAP_SIZE - 1
+        );
     }
 }
