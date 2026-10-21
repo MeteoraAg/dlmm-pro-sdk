@@ -56,6 +56,14 @@ function internalNextIndex(
 }
 
 function extensionBitmapOffset(index: number): number {
+  const [minIndex, maxIndex] = extensionBitmapRange();
+  if (
+    index < minIndex ||
+    index > maxIndex ||
+    (index >= MIN_BITMAP_INDEX && index <= MAX_BITMAP_INDEX)
+  ) {
+    throw PoolError.invalidTickArray();
+  }
   if (index > 0) {
     return Math.trunc(index / BITMAP_SIZE) - 1;
   }

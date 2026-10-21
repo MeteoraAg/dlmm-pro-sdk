@@ -216,6 +216,48 @@ describe("tickArraysForSwap", () => {
     expect(requiresBitmapExtension).toBe(true);
   });
 
+  it.each([
+    { index: -3584, swapForY: false },
+    { index: 3583, swapForY: true },
+  ])("accepts extension boundary index $index", ({ index, swapForY }) => {
+    const poolState = poolStateWith({
+      tickCurrentId: 0,
+      tickSpacing: 1,
+      setIndexes: [],
+      isBitmapExtensionInitialized: 1,
+    });
+    expect(
+      getNonZeroLiquidityNextIndex(
+        poolState,
+        swapForY,
+        index,
+        extensionStateWith([index]),
+      ),
+    ).toBe(index);
+  });
+
+  it.each([-3585, 3584])(
+    "rejects extension index %i outside the bitmap range",
+    (index) => {
+      const poolState = poolStateWith({
+        tickCurrentId: 0,
+        tickSpacing: 1,
+        setIndexes: [],
+        isBitmapExtensionInitialized: 1,
+      });
+      expect(() =>
+        getNonZeroLiquidityNextIndex(
+          poolState,
+          false,
+          index,
+          extensionStateWith([]),
+        ),
+      ).toThrow(
+        expect.objectContaining({ code: PoolErrorCode.InvalidTickArray }),
+      );
+    },
+  );
+
   it("requires an initialized extension even when every selected array is internal", () => {
     const poolState = poolStateWith({
       tickCurrentId: 0,
