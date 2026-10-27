@@ -8,14 +8,21 @@ import { Keypair, PublicKey } from "@solana/web3.js";
 import { describe, expect, it } from "vitest";
 import {
   AccessRegistryOperatorPermission,
+  ActivationType,
+  BaseFeeMode,
   calculateTransferFeeExcludedAmount,
   CollectFeeMode,
   DlmmProClient,
+  encodePoolExtensions,
+  encodeTimeSchedulerBaseFeeData,
   getLiquidityFromAmounts,
   liquidityBitmap,
+  openActivationParameters,
   PoolErrorCode,
+  PoolExtension,
   quoteExactIn,
   tickArraysForSwap,
+  timeBasedActivationParameters,
   type QuoteExactInParams,
   type QuoteExactInResult,
   type QuoteTickArray,
@@ -42,6 +49,7 @@ import {
   openPosition,
   seedCrossArrayLiquidity,
   sendTransaction,
+  sendTransactionExpectingError,
   SQRT_PRICE_ONE,
   warpToTime,
   type Market,
@@ -573,6 +581,213 @@ describe("quoteExactIn matches on-chain swap", () => {
       pool,
       new BN(30_000),
       false,
+    );
+  });
+
+  it("on a liquidity-mining pool", async () => {
+    const svm = initializeSVM();
+    const client = new DlmmProClient(createSvmConnection(svm));
+    const market = await createFundedMarket({ svm, client });
+    const configArgs = defaultStaticConfigArgs();
+    configArgs.extensions = encodePoolExtensions([
+      PoolExtension.LiquidityMining,
+    ]);
+    const pool = await initializeStaticPool(svm, client, market, {
+      configArgs,
+    });
+    await seedCrossArrayLiquidity(svm, client, market, pool);
+
+    const { extensions } = await client.state.fetchPoolWithExtensions(pool);
+    expect(extensions.rewards).toBeDefined();
+    await assertQuoteMatchesExecution(
+      svm,
+      client,
+      market,
+      pool,
+      new BN(50_000),
+      true,
+    );
+    await assertQuoteMatchesExecution(
+      svm,
+      client,
+      market,
+      pool,
+      new BN(30_000),
+      false,
+    );
+  });
+
+  it("rejects quoting until the time-based activation point", async () => {
+    const svm = initializeSVM();
+    warpToTime(svm, 1_700_000_000n);
+    const current = Number(svm.getClock().unixTimestamp);
+    const swapPoint = current + 60;
+    const client = new DlmmProClient(createSvmConnection(svm));
+    const market = await createFundedMarket({ svm, client });
+
+    const parameters = defaultDynamicPoolParameters(SQRT_PRICE_ONE);
+    parameters.extensions = encodePoolExtensions([
+      PoolExtension.ActivationAccess,
+    ]);
+    parameters.activationType = ActivationType.Timestamp;
+    parameters.activationPoint = new BN(swapPoint);
+    parameters.poolActivation = {
+      whitelistedSwap: PublicKey.default,
+      whitelistedAddLiquidity: PublicKey.default,
+      whitelistedRemoveLiquidity: PublicKey.default,
+      activations: [
+        openActivationParameters(),
+        timeBasedActivationParameters({
+          swapPoint: new BN(swapPoint),
+          addLiquidityPoint: new BN(current),
+          removeLiquidityPoint: new BN(swapPoint),
+        }),
+      ],
+    };
+    const config = await createDynamicConfig(
+      svm,
+      client.connection,
+      market.operator,
+      market.payer,
+      nextConfigIndex(),
+      market.creator.publicKey,
+    );
+    const { tx, pool } = await client.pool.initializePoolWithDynamicConfig({
+      config,
+      poolCreatorAuthority: market.creator.publicKey,
+      tokenXMint: market.tokenXMint,
+      tokenYMint: market.tokenYMint,
+      creator: market.creator.publicKey,
+      payer: market.payer.publicKey,
+      parameters,
+    });
+    sendTransaction(svm, tx, [market.payer, market.creator]);
+    await seedCrossArrayLiquidity(svm, client, market, pool);
+
+    const inputAmount = new BN(1_000);
+    await expect(
+      client.pool.quoteExactIn({
+        pool,
+        inputAmount,
+        swapForY: true,
+        swapper: market.swapper.publicKey,
+      }),
+    ).rejects.toMatchObject({ code: PoolErrorCode.InvalidActivationAccess });
+
+    const poolState = await client.state.fetchPool(pool);
+    const { tx: swapTx } = await client.pool.swap({
+      pool,
+      tokenXMint: market.tokenXMint,
+      tokenYMint: market.tokenYMint,
+      userTokenIn: market.swapperTokenX,
+      userTokenOut: market.swapperTokenY,
+      user: market.swapper.publicKey,
+      swapForY: true,
+      parameters: { inputAmount, minimumOutputAmount: new BN(0) },
+      tickArrays: tickArraysForSwap({
+        pool,
+        poolState,
+        swapForY: true,
+      }).tickArrays,
+    });
+    sendTransactionExpectingError(
+      svm,
+      swapTx,
+      [market.swapper],
+      "InvalidActivationAccess",
+    );
+
+    warpToTime(svm, BigInt(swapPoint));
+    await assertQuoteMatchesExecution(
+      svm,
+      client,
+      market,
+      pool,
+      inputAmount,
+      true,
+    );
+  });
+
+  it("reports amountLeft where the program rejects a partial fill", async () => {
+    const svm = initializeSVM();
+    const client = new DlmmProClient(createSvmConnection(svm));
+    const market = await createFundedMarket({ svm, client });
+    const pool = await initializeStaticPool(svm, client, market);
+    await seedCrossArrayLiquidity(svm, client, market, pool);
+
+    const inputAmount = new BN(100_000_000);
+    const { quote, tickArrays, tickArrayBitmapExtension } =
+      await client.pool.quoteExactIn({
+        pool,
+        inputAmount,
+        swapForY: true,
+        swapper: market.swapper.publicKey,
+      });
+    expect(quote.amountLeft.gtn(0)).toBe(true);
+
+    const { tx } = await client.pool.swap({
+      pool,
+      tokenXMint: market.tokenXMint,
+      tokenYMint: market.tokenYMint,
+      userTokenIn: market.swapperTokenX,
+      userTokenOut: market.swapperTokenY,
+      user: market.swapper.publicKey,
+      swapForY: true,
+      parameters: { inputAmount, minimumOutputAmount: new BN(0) },
+      tickArrays,
+      tickArrayBitmapExtension,
+    });
+    sendTransactionExpectingError(
+      svm,
+      tx,
+      [market.swapper],
+      "NotConsumingFullAmountIn",
+    );
+  });
+
+  it("with a time-scheduled base fee", async () => {
+    const svm = initializeSVM();
+    const start = 1_700_000_000n;
+    warpToTime(svm, start);
+    const client = new DlmmProClient(createSvmConnection(svm));
+    const market = await createFundedMarket({ svm, client });
+
+    const configArgs = defaultStaticConfigArgs();
+    configArgs.poolFees.baseFeeParameter = {
+      baseFeeMode: BaseFeeMode.TimeSchedulerLinear,
+      data: encodeTimeSchedulerBaseFeeData({
+        cliffFeeNumerator: 400_000_000,
+        periodFrequency: 60,
+        reductionFactor: 1_366_666,
+        numberOfPeriod: 120,
+      }),
+    };
+    const pool = await initializeStaticPool(svm, client, market, {
+      configArgs,
+    });
+    await seedCrossArrayLiquidity(svm, client, market, pool);
+
+    const inputAmount = new BN(50_000);
+    const atCliff = await client.pool.quoteExactIn({
+      pool,
+      inputAmount,
+      swapForY: true,
+      swapper: market.swapper.publicKey,
+    });
+    warpToTime(svm, start + 60n);
+    const afterPeriod = await assertQuoteMatchesExecution(
+      svm,
+      client,
+      market,
+      pool,
+      inputAmount,
+      true,
+    );
+    expect(afterPeriod.outAmount.toString()).not.toBe(
+      atCliff.quote.outAmount.toString(),
+    );
+    expect(afterPeriod.mmFee.toString()).not.toBe(
+      atCliff.quote.mmFee.toString(),
     );
   });
 });

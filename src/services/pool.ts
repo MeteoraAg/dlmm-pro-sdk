@@ -589,8 +589,7 @@ export class PoolService extends DlmmProProgram {
   ): Promise<InitializePoolAccounts> {
     const [tokenXProgram, tokenYProgram] = await this.tokenPrograms(params);
 
-    // The program initializes the extension in-place and requires it whenever
-    // the initial tick sits outside the pool's inline bitmap.
+    // Required when the initial tick sits outside the pool's inline bitmap.
     const initialTickIndex = tickIndexFromId(
       tickIdFromSqrtPrice(initialSqrtPrice),
       tickSpacing,
