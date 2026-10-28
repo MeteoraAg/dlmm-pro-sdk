@@ -1,17 +1,20 @@
+import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
 import type { Layout } from "@coral-xyz/borsh";
-import { PoolExtension } from "../constants";
-import type {
-  DecodedLimitOrderData,
-  DecodedObservation,
-  DecodedPoolActivation,
-  DecodedPoolExtensions,
-  DecodedPoolRewardInfo,
-  DecodedPosition,
-  DecodedPositionWithReward,
-  DecodedTick,
-  DecodedTickWithReward,
-  Pool,
-  TickArrayBitmapExtension,
+import { POOL_EXTENSION_VARIANT_COUNT } from "../constants";
+import { PoolError } from "../errors";
+import DlmmProIDL from "../idl/dlmm-pro/dlmm_pro.json";
+import {
+  PoolExtension,
+  type DecodedLimitOrderData,
+  type DecodedObservation,
+  type DecodedPoolExtensions,
+  type DecodedPoolRewardInfo,
+  type DecodedPosition,
+  type DecodedPositionWithReward,
+  type DecodedTick,
+  type DecodedTickWithReward,
+  type Pool,
+  type PoolActivationParameters,
 } from "../types";
 import {
   LIMIT_ORDER_DATA_LAYOUT,
@@ -23,53 +26,76 @@ import {
   TICK_LAYOUT,
   TICK_WITH_REWARD_LAYOUT,
 } from "./layouts";
+import { isIntegerIn } from "./validation";
+
+const coder = new BorshAccountsCoder(DlmmProIDL as Idl);
+const POOL_HEADER_SIZE = coder.size("Pool");
+const POSITION_ARRAY_HEADER_SIZE = coder.size("PositionArray");
+const TICK_ARRAY_HEADER_SIZE = coder.size("TickArray");
+const LIMIT_ORDER_HEADER_SIZE = coder.size("LimitOrder");
+const ORACLE_HEADER_SIZE = coder.size("Oracle");
+
+function assertAccountDiscriminator(data: Buffer, accountName: string): void {
+  const expected = coder.accountDiscriminator(accountName);
+  if (!data.subarray(0, expected.length).equals(expected)) {
+    throw new Error(`Account data is not a ${accountName} account`);
+  }
+}
 
 function decodeSeq<T>(
   layout: Layout<unknown>,
   data: Buffer,
+  // Includes the 8-byte account discriminator.
   offset: number,
+  accountName: string,
 ): T[] {
+  assertAccountDiscriminator(data, accountName);
   if (data.length < offset) {
-    throw new Error("Account data shorter than header size");
+    throw new Error(`Account data shorter than ${accountName} header size`);
   }
-  const count = Math.floor((data.length - offset) / layout.span);
-  const items: T[] = [];
-  for (let i = 0; i < count; i++) {
-    items.push(layout.decode(data, offset + i * layout.span) as T);
+  if ((data.length - offset) % layout.span !== 0) {
+    throw new Error(
+      `Account data length does not align to ${accountName} element size`,
+    );
   }
-  return items;
+  const count = (data.length - offset) / layout.span;
+  return Array.from(
+    { length: count },
+    (_, i) => layout.decode(data, offset + i * layout.span) as T,
+  );
 }
 
-function hasExtension(extensions: number, extension: PoolExtension): boolean {
+export function isSupportExtension(
+  extensions: number,
+  extension: PoolExtension,
+): boolean {
   return (extensions & (1 << extension)) !== 0;
 }
 
-/**
- * Decode pool trailing extension bytes after the fixed `Pool` header
- * @param data - The pool account data
- * @param poolHeaderSize - The pool header size
- * @param extensions - The pool extensions
- * @returns The decoded pool extensions
- */
+export function encodePoolExtensions(extensions: PoolExtension[]): number {
+  for (const extension of extensions) {
+    if (!isIntegerIn(extension, 0, POOL_EXTENSION_VARIANT_COUNT - 1)) {
+      throw PoolError.invalidParameters(
+        "extensions must be PoolExtension variants",
+      );
+    }
+  }
+  return extensions.reduce((acc, extension) => acc | (1 << extension), 0);
+}
+
 export function decodePoolExtensionsFromData(
   data: Buffer,
-  poolHeaderSize: number,
-  extensions: number,
 ): DecodedPoolExtensions {
-  const hasLiquidityMining = hasExtension(
-    extensions,
-    PoolExtension.LiquidityMining,
-  );
-  const hasActivationAccess = hasExtension(
-    extensions,
-    PoolExtension.ActivationAccess,
-  );
+  if (data.length < POOL_HEADER_SIZE) {
+    throw new Error("Account data shorter than Pool header size");
+  }
+  const { extensions } = coder.decode<Pool>("Pool", data);
 
-  let offset = poolHeaderSize;
+  let offset = POOL_HEADER_SIZE;
   let rewards: DecodedPoolRewardInfo[] | undefined;
-  let activation: DecodedPoolActivation | undefined;
+  let activation: PoolActivationParameters | undefined;
 
-  if (hasLiquidityMining) {
+  if (isSupportExtension(extensions, PoolExtension.LiquidityMining)) {
     if (data.length < offset + POOL_REWARD_LAYOUT.span) {
       throw new Error("Pool account missing liquidity mining extension data");
     }
@@ -81,164 +107,75 @@ export function decodePoolExtensionsFromData(
     offset += POOL_REWARD_LAYOUT.span;
   }
 
-  if (hasActivationAccess) {
+  if (isSupportExtension(extensions, PoolExtension.ActivationAccess)) {
     if (data.length < offset + POOL_ACTIVATION_LAYOUT.span) {
       throw new Error("Pool account missing activation access extension data");
     }
     activation = POOL_ACTIVATION_LAYOUT.decode(
       data,
       offset,
-    ) as DecodedPoolActivation;
+    ) as PoolActivationParameters;
   }
 
-  return {
-    extensions,
-    hasLiquidityMining,
-    hasActivationAccess,
-    rewards,
-    activation,
-  };
+  return { extensions, rewards, activation };
 }
 
-/**
- * Decode position array bytes after the fixed `PositionArray` header
- * @param data - The position array account data
- * @param positionArrayHeaderSize - The position array header size
- * @param withReward - Whether to decode with reward
- * @returns The decoded positions
- */
 export function decodePositionsFromData(
   data: Buffer,
-  positionArrayHeaderSize: number,
-  withReward = false,
+  withReward: boolean,
 ): DecodedPosition[] | DecodedPositionWithReward[] {
   if (withReward) {
     return decodeSeq<DecodedPositionWithReward>(
       POSITION_WITH_REWARD_LAYOUT,
       data,
-      positionArrayHeaderSize,
+      POSITION_ARRAY_HEADER_SIZE,
+      "PositionArray",
     );
   }
   return decodeSeq<DecodedPosition>(
     POSITION_LAYOUT,
     data,
-    positionArrayHeaderSize,
+    POSITION_ARRAY_HEADER_SIZE,
+    "PositionArray",
   );
 }
 
-/**
- * Decode tick array bytes after the fixed `TickArray` header
- * @param data - The tick array account data
- * @param tickArrayHeaderSize - The tick array header size
- * @param withReward - Whether to decode with reward
- * @returns The decoded ticks
- */
 export function decodeTicksFromData(
   data: Buffer,
-  tickArrayHeaderSize: number,
   withReward: boolean,
 ): DecodedTick[] | DecodedTickWithReward[] {
   if (withReward) {
     return decodeSeq<DecodedTickWithReward>(
       TICK_WITH_REWARD_LAYOUT,
       data,
-      tickArrayHeaderSize,
+      TICK_ARRAY_HEADER_SIZE,
+      "TickArray",
     );
   }
-  return decodeSeq<DecodedTick>(TICK_LAYOUT, data, tickArrayHeaderSize);
+  return decodeSeq<DecodedTick>(
+    TICK_LAYOUT,
+    data,
+    TICK_ARRAY_HEADER_SIZE,
+    "TickArray",
+  );
 }
 
-/**
- * Decode limit order data bytes after the fixed `LimitOrderData` header
- * @param data - The limit order data account data
- * @param limitOrderHeaderSize - The limit order data header size
- * @returns The decoded limit order data
- */
 export function decodeLimitOrderDataFromData(
   data: Buffer,
-  limitOrderHeaderSize: number,
 ): DecodedLimitOrderData[] {
   return decodeSeq<DecodedLimitOrderData>(
     LIMIT_ORDER_DATA_LAYOUT,
     data,
-    limitOrderHeaderSize,
+    LIMIT_ORDER_HEADER_SIZE,
+    "LimitOrder",
   );
 }
 
-/**
- * Decode observation bytes after the fixed `Observation` header
- * @param data - The observation account data
- * @param oracleHeaderSize - The observation header size
- * @returns The decoded observations
- */
-export function decodeObservationsFromData(
-  data: Buffer,
-  oracleHeaderSize: number,
-): DecodedObservation[] {
+export function decodeObservationsFromData(data: Buffer): DecodedObservation[] {
   return decodeSeq<DecodedObservation>(
     OBSERVATION_LAYOUT,
     data,
-    oracleHeaderSize,
+    ORACLE_HEADER_SIZE,
+    "Oracle",
   );
-}
-
-/**
- * Get the bitmap set indices from the pool
- * @param pool - The pool
- * @returns The bitmap set indices
- */
-export function getBitmapSetIndicesFromPool(pool: Pool): number[] {
-  const bitmap = pool.tickArrayBitmap;
-  const indices: number[] = [];
-
-  for (let chunk = 0; chunk < bitmap.length; chunk++) {
-    for (let bit = 0; bit < 64; bit++) {
-      if (bitmap[chunk].testn(bit)) {
-        indices.push(chunk * 64 + bit - 512);
-      }
-    }
-  }
-
-  return indices;
-}
-
-/**
- * Get the bitmap set indices from the extension
- * @param extension - The extension
- * @returns The bitmap set indices
- */
-export function getExtensionBitmapSetIndicesFromState(
-  extension: TickArrayBitmapExtension,
-): number[] {
-  const indices: number[] = [];
-
-  for (let offset = 0; offset < extension.positiveBitmap.length; offset++) {
-    for (
-      let chunk = 0;
-      chunk < extension.positiveBitmap[offset].length;
-      chunk++
-    ) {
-      for (let bit = 0; bit < 64; bit++) {
-        if (extension.positiveBitmap[offset][chunk].testn(bit)) {
-          indices.push(offset * 512 + chunk * 64 + bit + 512);
-        }
-      }
-    }
-  }
-
-  for (let offset = 0; offset < extension.negativeBitmap.length; offset++) {
-    for (
-      let chunk = 0;
-      chunk < extension.negativeBitmap[offset].length;
-      chunk++
-    ) {
-      for (let bit = 0; bit < 64; bit++) {
-        if (extension.negativeBitmap[offset][chunk].testn(bit)) {
-          indices.push(-(offset * 512 + chunk * 64 + bit + 1) - 512);
-        }
-      }
-    }
-  }
-
-  return indices.sort((a, b) => a - b);
 }

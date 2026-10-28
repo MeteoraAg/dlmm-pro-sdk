@@ -15,8 +15,6 @@ import { NUM_REWARDS, NUMBER_OF_ACTIVATION_MODES } from "../constants";
 const bytes = (length: number, property?: string) =>
   array(u8(), length, property);
 
-const z192 = (property?: string) => struct([bytes(24, "inner")], property);
-
 export const POOL_REWARD_INFO_LAYOUT = struct([
   publicKey("mint"),
   publicKey("vault"),
@@ -26,16 +24,16 @@ export const POOL_REWARD_INFO_LAYOUT = struct([
   u64("endTime"),
   u64("lastUpdateTime"),
   u64("cumulativeSecondsWithEmptyLiquidityReward"),
-  z192("rewardGrowthGlobal"),
+  u128("rewardGrowthGlobal"),
   u8("rewardTokenFlag"),
-  bytes(7),
+  bytes(15),
 ]);
 
 export const POOL_REWARD_LAYOUT = struct([
   array(POOL_REWARD_INFO_LAYOUT, NUM_REWARDS, "rewards"),
 ]);
 
-export const POOL_ACTIVATION_INFO_LAYOUT = struct([
+const POOL_ACTIVATION_INFO_LAYOUT = struct([
   u8("activationMode"),
   bytes(15, "data"),
 ]);
@@ -52,8 +50,8 @@ const POSITION_FIELDS: Layout<unknown>[] = [
   u128("permanentLockedLiquidity"),
   u128("vestingLiquidity"),
   u128("releasedVestingLiquidity"),
-  z192("feeGrowthCheckpointX"),
-  z192("feeGrowthCheckpointY"),
+  u128("feeGrowthCheckpointX"),
+  u128("feeGrowthCheckpointY"),
   u64("feePendingX"),
   u64("feePendingY"),
   i32("tickLowerId"),
@@ -63,9 +61,10 @@ const POSITION_FIELDS: Layout<unknown>[] = [
 
 export const POSITION_LAYOUT = struct(POSITION_FIELDS);
 
-export const POSITION_REWARD_INFO_LAYOUT = struct([
-  z192("growthInsideCheckpoint"),
+const POSITION_REWARD_INFO_LAYOUT = struct([
+  u128("growthInsideCheckpoint"),
   u64("pendingAmount"),
+  bytes(8),
 ]);
 
 export const POSITION_WITH_REWARD_LAYOUT = struct([
@@ -77,8 +76,8 @@ const TICK_FIELDS: Layout<unknown>[] = [
   u128("sqrtPrice"),
   i128("liquidityNet"),
   u128("liquidityGross"),
-  z192("feeGrowthOutsideX"),
-  z192("feeGrowthOutsideY"),
+  u128("feeGrowthOutsideX"),
+  u128("feeGrowthOutsideY"),
   u64("refCount"),
   i32("tickId"),
   bytes(3),
@@ -97,7 +96,7 @@ export const TICK_LAYOUT = struct(TICK_FIELDS);
 
 export const TICK_WITH_REWARD_LAYOUT = struct([
   ...TICK_FIELDS,
-  array(z192(), NUM_REWARDS, "rewardGrowthsOutside"),
+  array(u128(), NUM_REWARDS, "rewardGrowthsOutside"),
 ]);
 
 export const LIMIT_ORDER_DATA_LAYOUT = struct([

@@ -1,5 +1,5 @@
 {
-    "address": "dLmmthrtCtGNx512fjkTsWx7otWdv1SKrbQDR8dbffA",
+    "address": "dPro1D5wiqnGMH8vMDG23jh35btTHoWdyqXjqkqxe8n",
     "metadata": {
         "name": "dlmm_pro",
         "version": "0.1.0",
@@ -348,7 +348,7 @@
                 },
                 {
                     "name": "pool_authority",
-                    "address": "A7Fp7eGFn4eHjyoxanRvFPaBMcJMDDzkfSS5JMqwGKeo"
+                    "address": "FSUXyUKbTJ4A5Ccz5M6Uo4J2myc3RsDKTPU9vZwyeXru"
                 },
                 {
                     "name": "tick_array_bitmap_extension",
@@ -394,7 +394,7 @@
                 {
                     "name": "user_token_x",
                     "docs": [
-                        "When dont set it tokenAccount to prevent unnecessary create token account (rent fee) when user only withdraw token y"
+                        "We dont set it to TokenAccount to prevent unnecessary create token account (rent fee) when user only withdraw token y"
                     ],
                     "writable": true
                 },
@@ -430,9 +430,11 @@
             ],
             "args": [
                 {
-                    "name": "tick_ids",
+                    "name": "parameters",
                     "type": {
-                        "vec": "i32"
+                        "defined": {
+                            "name": "CancelLimitOrderParameters"
+                        }
                     }
                 },
                 {
@@ -460,14 +462,13 @@
             "accounts": [
                 {
                     "name": "pool",
-                    "writable": true,
                     "relations": [
                         "position"
                     ]
                 },
                 {
                     "name": "pool_authority",
-                    "address": "A7Fp7eGFn4eHjyoxanRvFPaBMcJMDDzkfSS5JMqwGKeo"
+                    "address": "FSUXyUKbTJ4A5Ccz5M6Uo4J2myc3RsDKTPU9vZwyeXru"
                 },
                 {
                     "name": "position",
@@ -499,6 +500,9 @@
                 },
                 {
                     "name": "user_token_x",
+                    "docs": [
+                        "We dont set it to TokenAccount to prevent unnecessary create token account (rent fee) when user only withdraw token y"
+                    ],
                     "writable": true
                 },
                 {
@@ -535,6 +539,14 @@
                 }
             ],
             "args": [
+                {
+                    "name": "min_amount_x",
+                    "type": "u64"
+                },
+                {
+                    "name": "min_amount_y",
+                    "type": "u64"
+                },
                 {
                     "name": "remaining_account_info",
                     "type": {
@@ -605,7 +617,7 @@
                 },
                 {
                     "name": "pool_authority",
-                    "address": "A7Fp7eGFn4eHjyoxanRvFPaBMcJMDDzkfSS5JMqwGKeo"
+                    "address": "FSUXyUKbTJ4A5Ccz5M6Uo4J2myc3RsDKTPU9vZwyeXru"
                 },
                 {
                     "name": "token_x_program"
@@ -626,12 +638,12 @@
             ],
             "args": [
                 {
-                    "name": "max_amount_x",
-                    "type": "u64"
-                },
-                {
-                    "name": "max_amount_y",
-                    "type": "u64"
+                    "name": "parameters",
+                    "type": {
+                        "defined": {
+                            "name": "ClaimPartnerFeeParameters"
+                        }
+                    }
                 },
                 {
                     "name": "remaining_accounts_info",
@@ -703,12 +715,16 @@
                 },
                 {
                     "name": "pool_authority",
-                    "address": "A7Fp7eGFn4eHjyoxanRvFPaBMcJMDDzkfSS5JMqwGKeo"
+                    "address": "FSUXyUKbTJ4A5Ccz5M6Uo4J2myc3RsDKTPU9vZwyeXru"
                 }
             ],
             "args": [
                 {
                     "name": "max_amount",
+                    "type": "u64"
+                },
+                {
+                    "name": "min_amount",
                     "type": "u64"
                 },
                 {
@@ -736,14 +752,13 @@
             "accounts": [
                 {
                     "name": "pool",
-                    "writable": true,
                     "relations": [
                         "position"
                     ]
                 },
                 {
                     "name": "pool_authority",
-                    "address": "A7Fp7eGFn4eHjyoxanRvFPaBMcJMDDzkfSS5JMqwGKeo"
+                    "address": "FSUXyUKbTJ4A5Ccz5M6Uo4J2myc3RsDKTPU9vZwyeXru"
                 },
                 {
                     "name": "position",
@@ -788,6 +803,10 @@
                 {
                     "name": "reward_index",
                     "type": "u8"
+                },
+                {
+                    "name": "min_amount",
+                    "type": "u64"
                 },
                 {
                     "name": "remaining_account_info",
@@ -863,7 +882,7 @@
                 },
                 {
                     "name": "pool_authority",
-                    "address": "A7Fp7eGFn4eHjyoxanRvFPaBMcJMDDzkfSS5JMqwGKeo"
+                    "address": "FSUXyUKbTJ4A5Ccz5M6Uo4J2myc3RsDKTPU9vZwyeXru"
                 },
                 {
                     "name": "limit_order",
@@ -986,7 +1005,7 @@
                 },
                 {
                     "name": "pool_authority",
-                    "address": "A7Fp7eGFn4eHjyoxanRvFPaBMcJMDDzkfSS5JMqwGKeo"
+                    "address": "FSUXyUKbTJ4A5Ccz5M6Uo4J2myc3RsDKTPU9vZwyeXru"
                 },
                 {
                     "name": "rent_receiver",
@@ -1005,43 +1024,6 @@
                         "Program to create NFT mint/token account and transfer for token22 account"
                     ],
                     "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
-                },
-                {
-                    "name": "event_authority"
-                },
-                {
-                    "name": "program"
-                }
-            ],
-            "args": []
-        },
-        {
-            "name": "close_token_badge",
-            "discriminator": [
-                108,
-                146,
-                86,
-                110,
-                179,
-                254,
-                10,
-                104
-            ],
-            "accounts": [
-                {
-                    "name": "token_badge",
-                    "writable": true
-                },
-                {
-                    "name": "operator"
-                },
-                {
-                    "name": "signer",
-                    "signer": true
-                },
-                {
-                    "name": "rent_receiver",
-                    "writable": true
                 },
                 {
                     "name": "event_authority"
@@ -1286,78 +1268,9 @@
             ]
         },
         {
-            "name": "create_token_badge",
-            "discriminator": [
-                88,
-                206,
-                0,
-                91,
-                60,
-                175,
-                151,
-                118
-            ],
-            "accounts": [
-                {
-                    "name": "token_badge",
-                    "writable": true,
-                    "pda": {
-                        "seeds": [
-                            {
-                                "kind": "const",
-                                "value": [
-                                    116,
-                                    111,
-                                    107,
-                                    101,
-                                    110,
-                                    95,
-                                    98,
-                                    97,
-                                    100,
-                                    103,
-                                    101
-                                ]
-                            },
-                            {
-                                "kind": "account",
-                                "path": "token_mint"
-                            }
-                        ]
-                    }
-                },
-                {
-                    "name": "token_mint"
-                },
-                {
-                    "name": "operator"
-                },
-                {
-                    "name": "signer",
-                    "signer": true
-                },
-                {
-                    "name": "payer",
-                    "writable": true,
-                    "signer": true
-                },
-                {
-                    "name": "system_program",
-                    "address": "11111111111111111111111111111111"
-                },
-                {
-                    "name": "event_authority"
-                },
-                {
-                    "name": "program"
-                }
-            ],
-            "args": []
-        },
-        {
             "name": "expand_position",
             "docs": [
-                "BELOW ARE INSTRUCTIONS FOP ADVANCED LP"
+                "BELOW ARE INSTRUCTIONS FOR ADVANCED LP"
             ],
             "discriminator": [
                 225,
@@ -1421,6 +1334,25 @@
             ]
         },
         {
+            "name": "for_idl_type_generation_do_not_call",
+            "discriminator": [
+                180,
+                105,
+                69,
+                80,
+                95,
+                50,
+                73,
+                108
+            ],
+            "accounts": [
+                {
+                    "name": "tick_array"
+                }
+            ],
+            "args": []
+        },
+        {
             "name": "increase_oracle_length",
             "discriminator": [
                 190,
@@ -1455,7 +1387,7 @@
             ],
             "args": [
                 {
-                    "name": "lenght_to_add",
+                    "name": "length_to_add",
                     "type": "u16"
                 }
             ]
@@ -1544,7 +1476,7 @@
                 },
                 {
                     "name": "pool_authority",
-                    "address": "A7Fp7eGFn4eHjyoxanRvFPaBMcJMDDzkfSS5JMqwGKeo"
+                    "address": "FSUXyUKbTJ4A5Ccz5M6Uo4J2myc3RsDKTPU9vZwyeXru"
                 },
                 {
                     "name": "reserve_x",
@@ -1691,16 +1623,10 @@
                     "writable": true
                 },
                 {
-                    "name": "token_x_mint",
-                    "docs": [
-                        "Token x mint"
-                    ]
+                    "name": "token_x_mint"
                 },
                 {
-                    "name": "token_y_mint",
-                    "docs": [
-                        "Token y mint"
-                    ]
+                    "name": "token_y_mint"
                 },
                 {
                     "name": "config",
@@ -1760,7 +1686,7 @@
                 },
                 {
                     "name": "pool_authority",
-                    "address": "A7Fp7eGFn4eHjyoxanRvFPaBMcJMDDzkfSS5JMqwGKeo"
+                    "address": "FSUXyUKbTJ4A5Ccz5M6Uo4J2myc3RsDKTPU9vZwyeXru"
                 },
                 {
                     "name": "reserve_x",
@@ -1980,7 +1906,7 @@
                 },
                 {
                     "name": "pool_authority",
-                    "address": "A7Fp7eGFn4eHjyoxanRvFPaBMcJMDDzkfSS5JMqwGKeo"
+                    "address": "FSUXyUKbTJ4A5Ccz5M6Uo4J2myc3RsDKTPU9vZwyeXru"
                 },
                 {
                     "name": "reserve_x",
@@ -2121,7 +2047,7 @@
                 },
                 {
                     "name": "pool_authority",
-                    "address": "A7Fp7eGFn4eHjyoxanRvFPaBMcJMDDzkfSS5JMqwGKeo"
+                    "address": "FSUXyUKbTJ4A5Ccz5M6Uo4J2myc3RsDKTPU9vZwyeXru"
                 },
                 {
                     "name": "reward_vault",
@@ -2358,8 +2284,12 @@
             ],
             "args": [
                 {
-                    "name": "bps",
-                    "type": "u16"
+                    "name": "parameters",
+                    "type": {
+                        "defined": {
+                            "name": "LockPermanentPositionParameters"
+                        }
+                    }
                 }
             ]
         },
@@ -2439,7 +2369,7 @@
                 },
                 {
                     "name": "pool_authority",
-                    "address": "A7Fp7eGFn4eHjyoxanRvFPaBMcJMDDzkfSS5JMqwGKeo"
+                    "address": "FSUXyUKbTJ4A5Ccz5M6Uo4J2myc3RsDKTPU9vZwyeXru"
                 },
                 {
                     "name": "nft_mint",
@@ -2631,7 +2561,7 @@
                 },
                 {
                     "name": "pool_authority",
-                    "address": "A7Fp7eGFn4eHjyoxanRvFPaBMcJMDDzkfSS5JMqwGKeo"
+                    "address": "FSUXyUKbTJ4A5Ccz5M6Uo4J2myc3RsDKTPU9vZwyeXru"
                 },
                 {
                     "name": "nft_mint",
@@ -2844,7 +2774,12 @@
                     "name": "program"
                 }
             ],
-            "args": []
+            "args": [
+                {
+                    "name": "bitmap",
+                    "type": "u64"
+                }
+            ]
         },
         {
             "name": "remove_liquidity",
@@ -2869,7 +2804,7 @@
                 },
                 {
                     "name": "pool_authority",
-                    "address": "A7Fp7eGFn4eHjyoxanRvFPaBMcJMDDzkfSS5JMqwGKeo"
+                    "address": "FSUXyUKbTJ4A5Ccz5M6Uo4J2myc3RsDKTPU9vZwyeXru"
                 },
                 {
                     "name": "position",
@@ -2888,6 +2823,9 @@
                 },
                 {
                     "name": "user_token_x",
+                    "docs": [
+                        "We dont set it to TokenAccount to prevent unnecessary create token account (rent fee) when user only withdraw token y"
+                    ],
                     "writable": true
                 },
                 {
@@ -2983,7 +2921,7 @@
                 },
                 {
                     "name": "pool_authority",
-                    "address": "A7Fp7eGFn4eHjyoxanRvFPaBMcJMDDzkfSS5JMqwGKeo"
+                    "address": "FSUXyUKbTJ4A5Ccz5M6Uo4J2myc3RsDKTPU9vZwyeXru"
                 },
                 {
                     "name": "position",
@@ -3002,6 +2940,9 @@
                 },
                 {
                     "name": "user_token_x",
+                    "docs": [
+                        "We dont set it to TokenAccount to prevent unnecessary create token account (rent fee) when user only withdraw token y"
+                    ],
                     "writable": true
                 },
                 {
@@ -3255,7 +3196,7 @@
                 },
                 {
                     "name": "pool_authority",
-                    "address": "A7Fp7eGFn4eHjyoxanRvFPaBMcJMDDzkfSS5JMqwGKeo"
+                    "address": "FSUXyUKbTJ4A5Ccz5M6Uo4J2myc3RsDKTPU9vZwyeXru"
                 },
                 {
                     "name": "tick_array_bitmap_extension",
@@ -3492,7 +3433,7 @@
                 {
                     "name": "new_authority",
                     "docs": [
-                        "CHECK, new authority, can be any one"
+                        "CHECK, new authority, can be anyone"
                     ]
                 },
                 {
@@ -3532,7 +3473,7 @@
                 },
                 {
                     "name": "pool_authority",
-                    "address": "A7Fp7eGFn4eHjyoxanRvFPaBMcJMDDzkfSS5JMqwGKeo"
+                    "address": "FSUXyUKbTJ4A5Ccz5M6Uo4J2myc3RsDKTPU9vZwyeXru"
                 },
                 {
                     "name": "reward_vault",
@@ -3542,12 +3483,11 @@
                     "name": "reward_mint"
                 },
                 {
-                    "name": "funder_token_account",
+                    "name": "receiver_token_account",
+                    "docs": [
+                        "Destination for the ineligible reward. The authority chooses this account, it does not need to belong to the wallet that funded the reward."
+                    ],
                     "writable": true
-                },
-                {
-                    "name": "funder",
-                    "signer": true
                 },
                 {
                     "name": "authority",
@@ -3571,6 +3511,10 @@
                 {
                     "name": "index",
                     "type": "u8"
+                },
+                {
+                    "name": "min_amount",
+                    "type": "u64"
                 },
                 {
                     "name": "remaining_accounts_info",
@@ -3700,19 +3644,6 @@
                 139,
                 153
             ]
-        },
-        {
-            "name": "TokenBadge",
-            "discriminator": [
-                116,
-                219,
-                204,
-                229,
-                249,
-                116,
-                255,
-                150
-            ]
         }
     ],
     "events": [
@@ -3834,19 +3765,6 @@
             ]
         },
         {
-            "name": "EvtCloseTokenBadge",
-            "discriminator": [
-                60,
-                217,
-                34,
-                82,
-                183,
-                10,
-                89,
-                188
-            ]
-        },
-        {
             "name": "EvtCreateDynamicConfig",
             "discriminator": [
                 231,
@@ -3870,19 +3788,6 @@
                 10,
                 35,
                 56
-            ]
-        },
-        {
-            "name": "EvtCreateTokenBadge",
-            "discriminator": [
-                141,
-                120,
-                134,
-                116,
-                34,
-                28,
-                114,
-                160
             ]
         },
         {
@@ -4169,18 +4074,18 @@
         },
         {
             "code": 6004,
-            "name": "CannotCreateTokenBadgeOnSupportedMint",
-            "msg": "Cannot create token badge on supported mint"
-        },
-        {
-            "code": 6005,
             "name": "UnsupportNativeMintToken2022",
             "msg": "Unsupported native mint token2022"
         },
         {
-            "code": 6006,
+            "code": 6005,
             "name": "InvalidTokenBadge",
             "msg": "Invalid token badge"
+        },
+        {
+            "code": 6006,
+            "name": "UnsupportedMint",
+            "msg": "Unsupported mint"
         },
         {
             "code": 6007,
@@ -4299,98 +4204,108 @@
         },
         {
             "code": 6030,
+            "name": "InvalidRewardMint",
+            "msg": "Invalid reward mint"
+        },
+        {
+            "code": 6031,
             "name": "InvalidRewardVault",
             "msg": "Invalid reward vault"
         },
         {
-            "code": 6031,
+            "code": 6032,
             "name": "IdenticalFunder",
             "msg": "Identical funder"
         },
         {
-            "code": 6032,
+            "code": 6033,
             "name": "PositionIsNotEmpty",
             "msg": "Position is not empty"
         },
         {
-            "code": 6033,
+            "code": 6034,
             "name": "LimitOrderIsNotEmpty",
             "msg": "Limit order is not empty"
         },
         {
-            "code": 6034,
+            "code": 6035,
             "name": "InvalidActivationType",
             "msg": "Invalid activation type"
         },
         {
-            "code": 6035,
+            "code": 6036,
             "name": "InvalidBaseFeeMode",
             "msg": "Invalid base fee mode"
         },
         {
-            "code": 6036,
+            "code": 6037,
             "name": "InvalidParameters",
             "msg": "Invalid parameters"
         },
         {
-            "code": 6037,
+            "code": 6038,
             "name": "InvalidAccount",
             "msg": "Invalid account in instruction"
         },
         {
-            "code": 6038,
+            "code": 6039,
             "name": "AmountIsZero",
             "msg": "Amount is zero"
         },
         {
-            "code": 6039,
+            "code": 6040,
             "name": "InvalidActivationAccess",
             "msg": "Invalid activation access"
         },
         {
-            "code": 6040,
+            "code": 6041,
             "name": "InvalidRewardState",
             "msg": "Invalid reward state"
         },
         {
-            "code": 6041,
+            "code": 6042,
             "name": "PositionAlreadyHadVesting",
             "msg": "Position already had vesting"
         },
         {
-            "code": 6042,
+            "code": 6043,
             "name": "InsufficientLiquidity",
             "msg": "Liquidity is insufficient"
         },
         {
-            "code": 6043,
+            "code": 6044,
             "name": "BitmapExtensionAccountIsNotProvided",
             "msg": "Bitmap extension account is not provided"
         },
         {
-            "code": 6044,
+            "code": 6045,
             "name": "CannotModifyAccount",
             "msg": "Cannot modify account"
         },
         {
-            "code": 6045,
+            "code": 6046,
             "name": "InvalidPoolCreatorAuthority",
             "msg": "Invalid pool creator authority"
         },
         {
-            "code": 6046,
+            "code": 6047,
             "name": "InvalidAuthority",
             "msg": "Invalid authority"
         },
         {
-            "code": 6047,
+            "code": 6048,
             "name": "DelegatedAmountNonZero",
             "msg": "Delegated amount is not zero"
         },
         {
-            "code": 6048,
+            "code": 6049,
             "name": "IncorrectATA",
             "msg": "Incorrect ATA"
+        },
+        {
+            "code": 6050,
+            "name": "InvalidLayoutVersion",
+            "msg": "Position layout version mismatch"
         }
     ],
     "types": [
@@ -4428,6 +4343,12 @@
                         "type": "u64"
                     },
                     {
+                        "name": "expected_layout_version",
+                        "type": {
+                            "option": "u16"
+                        }
+                    },
+                    {
                         "name": "bitmap",
                         "type": "u64"
                     },
@@ -4448,43 +4369,57 @@
                 "kind": "struct",
                 "fields": [
                     {
-                        "name": "max_amount_x_and_fee_bps",
+                        "name": "max_amount_x",
                         "type": {
-                            "option": {
-                                "defined": {
-                                    "name": "MaxAmountAndFeeBps"
-                                }
+                            "option": "u64"
+                        }
+                    },
+                    {
+                        "name": "max_amount_y",
+                        "type": {
+                            "option": "u64"
+                        }
+                    },
+                    {
+                        "name": "slippage",
+                        "type": {
+                            "defined": {
+                                "name": "AddLiquidityImbalanceSlippage"
                             }
                         }
                     },
                     {
-                        "name": "max_amount_y_and_fee_bps",
+                        "name": "expected_layout_version",
                         "type": {
-                            "option": {
-                                "defined": {
-                                    "name": "MaxAmountAndFeeBps"
-                                }
-                            }
+                            "option": "u16"
                         }
-                    },
-                    {
-                        "name": "observed_tick_id",
-                        "type": "i32"
-                    },
-                    {
-                        "name": "max_tick_slippage",
-                        "type": "u32"
                     },
                     {
                         "name": "index",
                         "type": "u8"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "AddLiquidityImbalanceSlippage",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "sqrt_price_slippage",
+                        "type": {
+                            "option": {
+                                "defined": {
+                                    "name": "SqrtPriceSlippage"
+                                }
+                            }
+                        }
                     },
                     {
-                        "name": "expected_tick_range",
+                        "name": "min_liquidity",
                         "type": {
-                            "defined": {
-                                "name": "TickRange"
-                            }
+                            "option": "u128"
                         }
                     }
                 ]
@@ -4502,6 +4437,12 @@
                     {
                         "name": "max_amount_y",
                         "type": "u64"
+                    },
+                    {
+                        "name": "expected_layout_version",
+                        "type": {
+                            "option": "u16"
+                        }
                     },
                     {
                         "name": "bitmap",
@@ -4558,6 +4499,52 @@
                                 31
                             ]
                         }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "CancelLimitOrderParameters",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "tick_ids",
+                        "type": {
+                            "vec": "i32"
+                        }
+                    },
+                    {
+                        "name": "min_amount_x",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "min_amount_y",
+                        "type": "u64"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "ClaimPartnerFeeParameters",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "max_amount_x",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "max_amount_y",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "min_amount_x",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "min_amount_y",
+                        "type": "u64"
                     }
                 ]
             }
@@ -4661,12 +4648,21 @@
                         "type": "u16"
                     },
                     {
+                        "name": "min_delta_tick_for_significant_swap",
+                        "type": "u16"
+                    },
+                    {
                         "name": "initialized",
                         "type": "u8"
                     },
                     {
-                        "name": "_padding",
-                        "type": "u8"
+                        "name": "_padding_0",
+                        "type": {
+                            "array": [
+                                "u8",
+                                15
+                            ]
+                        }
                     }
                 ]
             }
@@ -4694,6 +4690,10 @@
                     },
                     {
                         "name": "reduction_factor",
+                        "type": "u16"
+                    },
+                    {
+                        "name": "min_delta_tick_for_significant_swap",
                         "type": "u16"
                     }
                 ]
@@ -4751,9 +4751,6 @@
         },
         {
             "name": "EvtCancelLimitOrder",
-            "docs": [
-                "Close config"
-            ],
             "type": {
                 "kind": "struct",
                 "fields": [
@@ -4763,6 +4760,10 @@
                     },
                     {
                         "name": "owner",
+                        "type": "pubkey"
+                    },
+                    {
+                        "name": "referral",
                         "type": "pubkey"
                     },
                     {
@@ -4778,22 +4779,20 @@
                         "type": "pubkey"
                     },
                     {
-                        "name": "amount_x",
+                        "name": "owner_amount_x",
                         "type": "u64"
                     },
                     {
-                        "name": "amount_y",
+                        "name": "owner_amount_y",
                         "type": "u64"
                     },
                     {
-                        "name": "tick_ids",
-                        "type": {
-                            "vec": "i32"
-                        }
+                        "name": "owner_fee_x",
+                        "type": "u64"
                     },
                     {
-                        "name": "referral",
-                        "type": "pubkey"
+                        "name": "owner_fee_y",
+                        "type": "u64"
                     },
                     {
                         "name": "referral_fee",
@@ -4802,6 +4801,12 @@
                     {
                         "name": "referral_fees_on_token_x",
                         "type": "bool"
+                    },
+                    {
+                        "name": "tick_ids",
+                        "type": {
+                            "vec": "i32"
+                        }
                     }
                 ]
             }
@@ -5007,22 +5012,6 @@
             }
         },
         {
-            "name": "EvtCloseTokenBadge",
-            "type": {
-                "kind": "struct",
-                "fields": [
-                    {
-                        "name": "token_badge",
-                        "type": "pubkey"
-                    },
-                    {
-                        "name": "signer",
-                        "type": "pubkey"
-                    }
-                ]
-            }
-        },
-        {
             "name": "EvtCreateDynamicConfig",
             "type": {
                 "kind": "struct",
@@ -5098,22 +5087,6 @@
                     {
                         "name": "extensions",
                         "type": "u8"
-                    }
-                ]
-            }
-        },
-        {
-            "name": "EvtCreateTokenBadge",
-            "type": {
-                "kind": "struct",
-                "fields": [
-                    {
-                        "name": "token_mint",
-                        "type": "pubkey"
-                    },
-                    {
-                        "name": "signer",
-                        "type": "pubkey"
                     }
                 ]
             }
@@ -5628,11 +5601,19 @@
                         "type": "pubkey"
                     },
                     {
-                        "name": "start_sqrt_price",
+                        "name": "pre_tick_id",
+                        "type": "i32"
+                    },
+                    {
+                        "name": "post_tick_id",
+                        "type": "i32"
+                    },
+                    {
+                        "name": "pre_sqrt_price",
                         "type": "u128"
                     },
                     {
-                        "name": "end_sqrt_price",
+                        "name": "post_sqrt_price",
                         "type": "u128"
                     },
                     {
@@ -5649,6 +5630,14 @@
                     },
                     {
                         "name": "amount_out",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "transfer_fee_in",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "transfer_fee_out",
                         "type": "u64"
                     },
                     {
@@ -5921,6 +5910,33 @@
                                 4
                             ]
                         }
+                    },
+                    {
+                        "name": "_padding_1",
+                        "type": {
+                            "array": [
+                                "u8",
+                                32
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "LockPermanentPositionParameters",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "bps",
+                        "type": "u16"
+                    },
+                    {
+                        "name": "expected_layout_version",
+                        "type": {
+                            "option": "u16"
+                        }
                     }
                 ]
             }
@@ -5955,22 +5971,12 @@
                     {
                         "name": "bps",
                         "type": "u16"
-                    }
-                ]
-            }
-        },
-        {
-            "name": "MaxAmountAndFeeBps",
-            "type": {
-                "kind": "struct",
-                "fields": [
-                    {
-                        "name": "max_amount",
-                        "type": "u64"
                     },
                     {
-                        "name": "max_fee_bps",
-                        "type": "u16"
+                        "name": "expected_layout_version",
+                        "type": {
+                            "option": "u16"
+                        }
                     }
                 ]
             }
@@ -5983,6 +5989,10 @@
                     {
                         "name": "is_ask_side",
                         "type": "bool"
+                    },
+                    {
+                        "name": "max_amount",
+                        "type": "u64"
                     },
                     {
                         "name": "relative_tick",
@@ -6162,7 +6172,7 @@
                     {
                         "name": "liquidity",
                         "docs": [
-                            "current pool liquidity"
+                            "current pool liquidity, unscaled integer"
                         ],
                         "type": "u128"
                     },
@@ -6176,19 +6186,11 @@
                     },
                     {
                         "name": "fee_growth_global_x",
-                        "type": {
-                            "defined": {
-                                "name": "Z192"
-                            }
-                        }
+                        "type": "u128"
                     },
                     {
                         "name": "fee_growth_global_y",
-                        "type": {
-                            "defined": {
-                                "name": "Z192"
-                            }
-                        }
+                        "type": "u128"
                     },
                     {
                         "name": "tick_array_bitmap",
@@ -6228,7 +6230,7 @@
                     {
                         "name": "pool_status",
                         "docs": [
-                            "pool status"
+                            "pool status, see [PoolStatus]"
                         ],
                         "type": "u16"
                     },
@@ -6284,7 +6286,7 @@
                     {
                         "name": "is_bitmap_extension_initialized",
                         "docs": [
-                            "flag to know if bitmap extensions is initalized"
+                            "flag to know if bitmap extensions is initialized"
                         ],
                         "type": "u8"
                     },
@@ -6297,6 +6299,24 @@
                             "array": [
                                 "u8",
                                 7
+                            ]
+                        }
+                    },
+                    {
+                        "name": "_padding_1",
+                        "type": {
+                            "array": [
+                                "u8",
+                                32
+                            ]
+                        }
+                    },
+                    {
+                        "name": "_padding_2",
+                        "type": {
+                            "array": [
+                                "u8",
+                                32
                             ]
                         }
                     }
@@ -6438,11 +6458,24 @@
                         "type": "u32"
                     },
                     {
+                        "name": "layout_version",
+                        "type": "u16"
+                    },
+                    {
                         "name": "_padding_0",
                         "type": {
                             "array": [
                                 "u8",
-                                12
+                                10
+                            ]
+                        }
+                    },
+                    {
+                        "name": "_padding_1",
+                        "type": {
+                            "array": [
+                                "u8",
+                                32
                             ]
                         }
                     },
@@ -6503,18 +6536,12 @@
                 "kind": "struct",
                 "fields": [
                     {
-                        "name": "active_id",
-                        "docs": [
-                            "Active tick that integrator observe off-chain"
-                        ],
+                        "name": "spacing_aligned_min_tick_id",
                         "type": "i32"
                     },
                     {
-                        "name": "max_slippage",
-                        "docs": [
-                            "max active tick slippage allowed"
-                        ],
-                        "type": "u32"
+                        "name": "spacing_aligned_max_tick_id",
+                        "type": "i32"
                     }
                 ]
             }
@@ -6571,8 +6598,20 @@
                         "type": "u64"
                     },
                     {
+                        "name": "expected_layout_version",
+                        "type": {
+                            "option": "u16"
+                        }
+                    },
+                    {
                         "name": "bps",
                         "type": "u16"
+                    },
+                    {
+                        "name": "bitmap",
+                        "type": {
+                            "option": "u64"
+                        }
                     }
                 ]
             }
@@ -6589,6 +6628,12 @@
                     {
                         "name": "min_amount_y",
                         "type": "u64"
+                    },
+                    {
+                        "name": "expected_layout_version",
+                        "type": {
+                            "option": "u16"
+                        }
                     },
                     {
                         "name": "bitmap",
@@ -6608,6 +6653,12 @@
             "type": {
                 "kind": "struct",
                 "fields": [
+                    {
+                        "name": "expected_layout_version",
+                        "type": {
+                            "option": "u16"
+                        }
+                    },
                     {
                         "name": "bitmap",
                         "type": "u64"
@@ -6636,6 +6687,26 @@
                     },
                     {
                         "name": "emission_per_second",
+                        "type": "u128"
+                    },
+                    {
+                        "name": "max_amount",
+                        "type": "u64"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "SqrtPriceSlippage",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "min_sqrt_price",
+                        "type": "u128"
+                    },
+                    {
+                        "name": "max_sqrt_price",
                         "type": "u128"
                     }
                 ]
@@ -6766,10 +6837,6 @@
                 "kind": "struct",
                 "fields": [
                     {
-                        "name": "swap_mode",
-                        "type": "u8"
-                    },
-                    {
                         "name": "input_amount",
                         "type": "u64"
                     },
@@ -6897,10 +6964,20 @@
                 "fields": [
                     {
                         "name": "token_mint",
-                        "docs": [
-                            "token mint"
-                        ],
                         "type": "pubkey"
+                    },
+                    {
+                        "name": "mint_score",
+                        "type": "u8"
+                    },
+                    {
+                        "name": "_padding",
+                        "type": {
+                            "array": [
+                                "u8",
+                                31
+                            ]
+                        }
                     }
                 ]
             }
@@ -6922,9 +6999,16 @@
                         "type": "u128"
                     },
                     {
-                        "name": "last_update_timestamp",
+                        "name": "last_significant_swap_timestamp",
                         "docs": [
-                            "Last timestamp the variable parameters was updated"
+                            "Last significant timestamp"
+                        ],
+                        "type": "u64"
+                    },
+                    {
+                        "name": "last_reference_timestamp",
+                        "docs": [
+                            "Last reference timestamp"
                         ],
                         "type": "u64"
                     },
@@ -6935,27 +7019,10 @@
                     {
                         "name": "volatility_reference",
                         "type": "u32"
-                    }
-                ]
-            }
-        },
-        {
-            "name": "Z192",
-            "serialization": "bytemuck",
-            "repr": {
-                "kind": "c"
-            },
-            "type": {
-                "kind": "struct",
-                "fields": [
+                    },
                     {
-                        "name": "inner",
-                        "type": {
-                            "array": [
-                                "u8",
-                                24
-                            ]
-                        }
+                        "name": "_padding_0",
+                        "type": "u64"
                     }
                 ]
             }
@@ -6983,7 +7050,7 @@
         {
             "name": "LIMIT_ORDER_MAX_TICK_U64",
             "type": "u64",
-            "value": "30"
+            "value": "25"
         },
         {
             "name": "LIMIT_ORDER_PROTOCOL_FEE_BPS",
@@ -6996,7 +7063,7 @@
             "value": "2000"
         },
         {
-            "name": "MAX_BASIC_POINT",
+            "name": "MAX_BASIS_POINT",
             "type": "u16",
             "value": "10000"
         },
@@ -7014,6 +7081,16 @@
             "name": "MAX_REWARD_DURATION",
             "type": "u64",
             "value": "31536000"
+        },
+        {
+            "name": "MAX_REWARD_START_DELAY",
+            "type": "u64",
+            "value": "2592000"
+        },
+        {
+            "name": "MAX_SQRT_PRICE",
+            "type": "u128",
+            "value": "79226673515401279992447579055"
         },
         {
             "name": "MAX_TICKS_PER_ARRAY_U64",
@@ -7034,6 +7111,11 @@
             "name": "MIN_REWARD_DURATION",
             "type": "u64",
             "value": "86400"
+        },
+        {
+            "name": "MIN_SQRT_PRICE",
+            "type": "u128",
+            "value": "4295048016"
         },
         {
             "name": "MM_LAUNCH_POOL_PROTOCOL_FEE_BPS",

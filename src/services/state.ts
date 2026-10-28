@@ -1,269 +1,242 @@
-import { Program } from "@coral-xyz/anchor";
-import { Commitment, Connection, PublicKey } from "@solana/web3.js";
-import { DlmmPro } from "../idl/dlmm_pro";
-import { createDlmmProProgram } from "../helpers/create_program";
+import type { Program } from "@coral-xyz/anchor";
+import {
+  PublicKey,
+  type AccountInfo,
+  type Commitment,
+  type Connection,
+} from "@solana/web3.js";
+import { ACCESS_REGISTRY_PROGRAM_ID } from "../constants";
+import type { DlmmProProvider } from "../dlmm_pro";
+import { createAccessRegistryProgram } from "../helpers/create_program";
+import type { AccessRegistry } from "../idl/access-registry/access_registry";
+import type { DlmmPro } from "../idl/dlmm-pro/dlmm_pro";
 import {
   decodeLimitOrderDataFromData,
   decodeObservationsFromData,
   decodePoolExtensionsFromData,
   decodePositionsFromData,
   decodeTicksFromData,
-  getBitmapSetIndicesFromPool,
-  getExtensionBitmapSetIndicesFromState,
+  isSupportExtension,
 } from "../helpers/codec";
-import type {
-  DecodePositionsOpts,
-  DecodeTicksOpts,
-  DecodedLimitOrderData,
-  DecodedObservation,
-  DecodedPoolExtensions,
-  DecodedPosition,
-  DecodedPositionWithReward,
-  DecodedTick,
-  DecodedTickWithReward,
-  DynamicConfig,
-  LimitOrder,
-  Operator,
-  Oracle,
-  Pool,
-  PositionArray,
-  StaticConfig,
-  TickArray,
-  TickArrayBitmapExtension,
-  TokenBadge,
+import {
+  PoolExtension,
+  type DecodePositionsOpts,
+  type DecodeTicksOpts,
+  type DecodedLimitOrderData,
+  type DecodedObservation,
+  type DecodedPoolExtensions,
+  type DecodedPosition,
+  type DecodedPositionWithReward,
+  type DecodedTick,
+  type DecodedTickWithReward,
+  type DynamicConfig,
+  type LimitOrder,
+  type Operator,
+  type Oracle,
+  type Pool,
+  type PositionArray,
+  type StaticConfig,
+  type TickArray,
+  type TickArrayBitmapExtension,
+  type TokenBadge,
 } from "../types";
 
 export class StateService {
-  program: Program<DlmmPro>;
-  private commitment: Commitment;
-  private connection: Connection;
+  private readonly program: Program<DlmmPro>;
+  private readonly accessRegistry: Program<AccessRegistry>;
+  private readonly commitment: Commitment;
+  private readonly connection: Connection;
 
-  constructor(connection: Connection, commitment: Commitment) {
-    const { program } = createDlmmProProgram(connection, commitment);
-    this.program = program;
-    this.commitment = commitment;
-    this.connection = connection;
+  constructor(provider: DlmmProProvider) {
+    this.program = provider.program;
+    this.accessRegistry = createAccessRegistryProgram(provider.connection);
+    this.commitment = provider.commitment;
+    this.connection = provider.connection;
   }
 
-  private async getAccountData(address: PublicKey): Promise<Buffer> {
-    const info = await this.connection.getAccountInfo(address, this.commitment);
+  private async getAccountData(
+    address: PublicKey,
+    owner = this.program.programId,
+  ): Promise<Buffer> {
+    return this.ownedData(
+      address,
+      await this.connection.getAccountInfo(address, this.commitment),
+      owner,
+    );
+  }
+
+  private ownedData(
+    address: PublicKey,
+    info: AccountInfo<Buffer> | null,
+    owner: PublicKey,
+  ): Buffer {
     if (!info) {
       throw new Error(`Account not found: ${address.toBase58()}`);
     }
-    return Buffer.from(info.data);
+    if (!info.owner.equals(owner)) {
+      throw new Error(
+        `Account ${address.toBase58()} is not owned by ${owner.toBase58()}`,
+      );
+    }
+    return info.data;
   }
 
-  /**
-   * Fetch the pool account.
-   * @param poolAddress - The address of the pool account.
-   * @returns The pool account.
-   */
+  private async fetchAccount<T>(
+    address: PublicKey,
+    accountName: string,
+  ): Promise<T> {
+    const data = await this.getAccountData(address);
+    return this.program.coder.accounts.decode<T>(accountName, data);
+  }
+
   async fetchPool(poolAddress: PublicKey): Promise<Pool> {
-    return this.program.account.pool.fetch(poolAddress, this.commitment);
+    return this.fetchAccount(poolAddress, "pool");
   }
 
-  /**
-   * Fetch the static config account.
-   * @param configAddress - The address of the static config account.
-   * @returns The static config account.
-   */
+  async fetchPoolWithExtensions(poolAddress: PublicKey): Promise<{
+    pool: Pool;
+    extensions: DecodedPoolExtensions;
+  }> {
+    const data = await this.getAccountData(poolAddress);
+    return {
+      pool: this.program.coder.accounts.decode<Pool>("pool", data),
+      extensions: decodePoolExtensionsFromData(data),
+    };
+  }
+
   async fetchStaticConfig(configAddress: PublicKey): Promise<StaticConfig> {
-    return this.program.account.staticConfig.fetch(
-      configAddress,
-      this.commitment,
-    );
+    return this.fetchAccount(configAddress, "staticConfig");
   }
 
-  /**
-   * Fetch the dynamic config account.
-   * @param configAddress - The address of the dynamic config account.
-   * @returns The dynamic config account.
-   */
   async fetchDynamicConfig(configAddress: PublicKey): Promise<DynamicConfig> {
-    return this.program.account.dynamicConfig.fetch(
-      configAddress,
-      this.commitment,
-    );
+    return this.fetchAccount(configAddress, "dynamicConfig");
   }
 
-  /**
-   * Fetch the position array account.
-   * @param positionArrayAddress - The address of the position array account.
-   * @returns The position array account.
-   */
   async fetchPositionArray(
     positionArrayAddress: PublicKey,
   ): Promise<PositionArray> {
-    return this.program.account.positionArray.fetch(
-      positionArrayAddress,
-      this.commitment,
-    );
+    return this.fetchAccount(positionArrayAddress, "positionArray");
   }
 
-  /**
-   * Fetch the limit order account.
-   * @param limitOrderAddress - The address of the limit order account.
-   * @returns The limit order account.
-   */
+  /** `withReward` must match the pool's liquidity-mining extension bit. */
+  async fetchPositionArrayWithPositions(
+    positionArrayAddress: PublicKey,
+    opts: { withReward: boolean },
+  ): Promise<{
+    positionArray: PositionArray;
+    positions: DecodedPosition[] | DecodedPositionWithReward[];
+  }> {
+    const data = await this.getAccountData(positionArrayAddress);
+    return {
+      positionArray: this.program.coder.accounts.decode<PositionArray>(
+        "positionArray",
+        data,
+      ),
+      positions: decodePositionsFromData(data, opts.withReward),
+    };
+  }
+
   async fetchLimitOrder(limitOrderAddress: PublicKey): Promise<LimitOrder> {
-    return this.program.account.limitOrder.fetch(
-      limitOrderAddress,
-      this.commitment,
-    );
+    return this.fetchAccount(limitOrderAddress, "limitOrder");
   }
 
-  /**
-   * Fetch the tick array account.
-   * @param tickArrayAddress - The address of the tick array account.
-   * @returns The tick array account.
-   */
   async fetchTickArray(tickArrayAddress: PublicKey): Promise<TickArray> {
-    return this.program.account.tickArray.fetch(
-      tickArrayAddress,
-      this.commitment,
-    );
+    return this.fetchAccount(tickArrayAddress, "tickArray");
   }
 
-  /**
-   * Fetch the tick array bitmap extension account.
-   * @param extensionAddress - The address of the tick array bitmap extension account.
-   * @returns The tick array bitmap extension account.
-   */
+  async fetchTickArraysWithTicks(
+    tickArrayAddresses: PublicKey[],
+    opts: DecodeTicksOpts,
+  ): Promise<
+    {
+      tickArray: TickArray;
+      ticks: DecodedTick[] | DecodedTickWithReward[];
+    }[]
+  > {
+    if (tickArrayAddresses.length === 0) {
+      return [];
+    }
+    const infos = await this.connection.getMultipleAccountsInfo(
+      tickArrayAddresses,
+      this.commitment,
+    );
+    return infos.map((info, index) => {
+      const data = this.ownedData(
+        tickArrayAddresses[index],
+        info,
+        this.program.programId,
+      );
+      return {
+        tickArray: this.program.coder.accounts.decode<TickArray>(
+          "tickArray",
+          data,
+        ),
+        ticks: decodeTicksFromData(data, opts.withReward),
+      };
+    });
+  }
+
   async fetchTickArrayBitmapExtension(
     extensionAddress: PublicKey,
   ): Promise<TickArrayBitmapExtension> {
-    return this.program.account.tickArrayBitmapExtension.fetch(
-      extensionAddress,
-      this.commitment,
+    return this.fetchAccount(extensionAddress, "tickArrayBitmapExtension");
+  }
+
+  async fetchTokenBadge(address: PublicKey): Promise<TokenBadge> {
+    return this.accessRegistry.coder.accounts.decode<TokenBadge>(
+      "tokenBadge",
+      await this.getAccountData(address, ACCESS_REGISTRY_PROGRAM_ID),
     );
   }
 
-  /**
-   * Fetch the operator account.
-   * @param operatorAddress - The address of the operator account.
-   * @returns The operator account.
-   */
   async fetchOperator(operatorAddress: PublicKey): Promise<Operator> {
-    return this.program.account.operator.fetch(
-      operatorAddress,
-      this.commitment,
-    );
+    return this.fetchAccount(operatorAddress, "operator");
   }
 
-  /**
-   * Fetch the token badge account.
-   * @param tokenBadgeAddress - The address of the token badge account.
-   * @returns The token badge account.
-   */
-  async fetchTokenBadge(tokenBadgeAddress: PublicKey): Promise<TokenBadge> {
-    return this.program.account.tokenBadge.fetch(
-      tokenBadgeAddress,
-      this.commitment,
-    );
-  }
-
-  /**
-   * Fetch the oracle account.
-   * @param oracleAddress - The address of the oracle account.
-   * @returns The oracle account.
-   */
   async fetchOracle(oracleAddress: PublicKey): Promise<Oracle> {
-    return this.program.account.oracle.fetch(oracleAddress, this.commitment);
+    return this.fetchAccount(oracleAddress, "oracle");
   }
 
-  /**
-   * Decode pool trailing extensions (rewards / activation) by fetching the pool account.
-   * For already-loaded bytes, use `decodePoolExtensionsFromData` from helpers/codec.
-   */
-  async decodePoolExtensions(
-    poolAddress: PublicKey,
-  ): Promise<DecodedPoolExtensions> {
-    const data = await this.getAccountData(poolAddress);
-    const poolState = this.program.coder.accounts.decode<Pool>("pool", data);
-    return decodePoolExtensionsFromData(
-      data,
-      this.program.account.pool.size,
-      poolState.extensions,
-    );
-  }
-
-  /**
-   * Decode position slots after the fixed `PositionArray` header.
-   * For already-loaded bytes, use `decodePositionsFromData` from helpers/codec.
-   */
   async decodePositions(
     positionArrayAddress: PublicKey,
     opts: DecodePositionsOpts = {},
   ): Promise<DecodedPosition[] | DecodedPositionWithReward[]> {
     const data = await this.getAccountData(positionArrayAddress);
-    return decodePositionsFromData(
-      data,
-      this.program.account.positionArray.size,
-      opts.withReward ?? false,
-    );
+    let withReward = opts.withReward;
+    if (withReward === undefined) {
+      const positionArray = this.program.coder.accounts.decode<PositionArray>(
+        "positionArray",
+        data,
+      );
+      const pool = await this.fetchPool(positionArray.pool);
+      withReward = isSupportExtension(
+        pool.extensions,
+        PoolExtension.LiquidityMining,
+      );
+    }
+    return decodePositionsFromData(data, withReward);
   }
 
-  /**
-   * Decode tick slots after the fixed `TickArray` header.
-   * `withReward` must match the pool's liquidity-mining extension bit.
-   * For already-loaded bytes, use `decodeTicksFromData` from helpers/codec.
-   */
+  /** `withReward` must match the pool's liquidity-mining extension bit. */
   async decodeTicks(
     tickArrayAddress: PublicKey,
     opts: DecodeTicksOpts,
   ): Promise<DecodedTick[] | DecodedTickWithReward[]> {
     const data = await this.getAccountData(tickArrayAddress);
-    return decodeTicksFromData(
-      data,
-      this.program.account.tickArray.size,
-      opts.withReward,
-    );
+    return decodeTicksFromData(data, opts.withReward);
   }
 
-  /**
-   * Decode `LimitOrderData` entries after the fixed `LimitOrder` header.
-   * For already-loaded bytes, use `decodeLimitOrderDataFromData` from helpers/codec.
-   */
   async decodeLimitOrderData(
     limitOrderAddress: PublicKey,
   ): Promise<DecodedLimitOrderData[]> {
     const data = await this.getAccountData(limitOrderAddress);
-    return decodeLimitOrderDataFromData(
-      data,
-      this.program.account.limitOrder.size,
-    );
+    return decodeLimitOrderDataFromData(data);
   }
 
-  /**
-   * Decode oracle observation ring-buffer entries after the fixed `Oracle` header.
-   * For already-loaded bytes, use `decodeObservationsFromData` from helpers/codec.
-   */
   async decodeObservations(
     oracleAddress: PublicKey,
   ): Promise<DecodedObservation[]> {
     const data = await this.getAccountData(oracleAddress);
-    return decodeObservationsFromData(data, this.program.account.oracle.size);
-  }
-
-  /**
-   * Tick-array indices set in the pool's default bitmap (-512..511).
-   * If you already have a `Pool`, use `getBitmapSetIndicesFromPool` from helpers/codec.
-   */
-  async getBitmapSetIndices(poolAddress: PublicKey): Promise<number[]> {
-    const poolState = await this.fetchPool(poolAddress);
-    return getBitmapSetIndicesFromPool(poolState);
-  }
-
-  /**
-   * Tick-array indices set in the bitmap extension account.
-   * If you already have extension state, use `getExtensionBitmapSetIndicesFromState`
-   * from helpers/codec.
-   */
-  async getExtensionBitmapSetIndices(
-    extensionAddress: PublicKey,
-  ): Promise<number[]> {
-    const extensionState =
-      await this.fetchTickArrayBitmapExtension(extensionAddress);
-    return getExtensionBitmapSetIndicesFromState(extensionState);
+    return decodeObservationsFromData(data);
   }
 }

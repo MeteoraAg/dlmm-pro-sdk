@@ -1,4 +1,7 @@
-import { Commitment, Connection } from "@solana/web3.js";
+import type { Program } from "@coral-xyz/anchor";
+import type { Commitment, Connection, PublicKey } from "@solana/web3.js";
+import { createDlmmProProgram } from "./helpers/create_program";
+import type { DlmmPro } from "./idl/dlmm-pro/dlmm_pro";
 import {
   LimitOrderService,
   PoolService,
@@ -7,32 +10,38 @@ import {
   StateService,
 } from "./services";
 
-export class DlmmProClient {
-  public limitOrder: LimitOrderService;
-  public pool: PoolService;
-  public position: PositionService;
-  public reward: RewardService;
-  public state: StateService;
-  public commitment: Commitment;
-  public connection: Connection;
+export interface DlmmProProvider {
+  readonly connection: Connection;
+  readonly commitment: Commitment;
+  readonly program: Program<DlmmPro>;
+}
 
-  constructor(connection: Connection, commitment: Commitment) {
-    this.limitOrder = new LimitOrderService(connection, commitment);
-    this.pool = new PoolService(connection, commitment);
-    this.position = new PositionService(connection, commitment);
-    this.reward = new RewardService(connection, commitment);
-    this.state = new StateService(connection, commitment);
-    this.commitment = commitment;
-    this.connection = connection;
-  }
+export interface DlmmProClientContext extends DlmmProProvider {
+  readonly state: StateService;
+}
 
-  /**
-   * Create a client with all DlmmPro services.
-   */
-  static create(
+export class DlmmProClient implements DlmmProClientContext {
+  readonly connection: Connection;
+  readonly commitment: Commitment;
+  readonly program: Program<DlmmPro>;
+  readonly state: StateService;
+  readonly limitOrder: LimitOrderService;
+  readonly pool: PoolService;
+  readonly position: PositionService;
+  readonly reward: RewardService;
+
+  constructor(
     connection: Connection,
     commitment: Commitment = "confirmed",
-  ): DlmmProClient {
-    return new DlmmProClient(connection, commitment);
+    programId?: PublicKey,
+  ) {
+    this.connection = connection;
+    this.commitment = commitment;
+    this.program = createDlmmProProgram(connection, programId);
+    this.state = new StateService(this);
+    this.limitOrder = new LimitOrderService(this);
+    this.pool = new PoolService(this);
+    this.position = new PositionService(this);
+    this.reward = new RewardService(this);
   }
 }

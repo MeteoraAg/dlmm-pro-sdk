@@ -1,10 +1,12 @@
 import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
 import {
+  ACCESS_REGISTRY_PROGRAM_ID,
   DLMM_PRO_PROGRAM_ID,
   DYNAMIC_CONFIG_PREFIX,
   LAUNCH_POOL_PREFIX,
   LIMIT_ORDER_PREFIX,
+  NUM_REWARDS,
   OPERATOR_PREFIX,
   ORACLE_PREFIX,
   POOL_AUTHORITY_PREFIX,
@@ -17,18 +19,10 @@ import {
   TICK_ARRAY_PREFIX,
   TOKEN_BADGE_PREFIX,
 } from "../constants";
+import { PoolError } from "../errors";
+import { encodePodU64 } from "./pod";
+import { assertI32, isIntegerIn } from "./validation";
 
-function toU64Buffer(index: BN | number): Buffer {
-  return new BN(index).toArrayLike(Buffer, "le", 8);
-}
-
-function toI32Buffer(index: number): Buffer {
-  const buf = Buffer.alloc(4);
-  buf.writeInt32LE(index, 0);
-  return buf;
-}
-
-// Lexicographic max/min of two pubkeys
 function sortMints(a: PublicKey, b: PublicKey): [PublicKey, PublicKey] {
   return a.toBuffer().compare(b.toBuffer()) > 0 ? [a, b] : [b, a];
 }
@@ -57,7 +51,7 @@ export function deriveStaticConfig(
   programId: PublicKey = DLMM_PRO_PROGRAM_ID,
 ): PublicKey {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from(STATIC_CONFIG_PREFIX), toU64Buffer(index)],
+    [Buffer.from(STATIC_CONFIG_PREFIX), encodePodU64(index, "index")],
     programId,
   )[0];
 }
@@ -71,7 +65,7 @@ export function deriveDynamicConfig(
     [
       Buffer.from(DYNAMIC_CONFIG_PREFIX),
       poolCreatorAuthority.toBuffer(),
-      toU64Buffer(index),
+      encodePodU64(index, "index"),
     ],
     programId,
   )[0];
@@ -79,7 +73,7 @@ export function deriveDynamicConfig(
 
 export function deriveTokenBadge(
   tokenMint: PublicKey,
-  programId: PublicKey = DLMM_PRO_PROGRAM_ID,
+  programId: PublicKey = ACCESS_REGISTRY_PROGRAM_ID,
 ): PublicKey {
   return PublicKey.findProgramAddressSync(
     [Buffer.from(TOKEN_BADGE_PREFIX), tokenMint.toBuffer()],
@@ -87,7 +81,6 @@ export function deriveTokenBadge(
   )[0];
 }
 
-// Static/dynamic config pool: `["pool", config, max(mintX,mintY), min(mintX,mintY)]`
 export function derivePool(
   config: PublicKey,
   tokenXMint: PublicKey,
@@ -101,7 +94,6 @@ export function derivePool(
   )[0];
 }
 
-// Launch pool: `["l_pool", max(mintX,mintY), min(mintX,mintY)]`
 export function deriveLaunchPool(
   tokenXMint: PublicKey,
   tokenYMint: PublicKey,
@@ -145,29 +137,18 @@ export function deriveTickArrayBitmapExtension(
   )[0];
 }
 
-export const deriveBitmapExtension = deriveTickArrayBitmapExtension;
-
 export function deriveTickArray(
   pool: PublicKey,
   tickArrayIndex: number,
   programId: PublicKey = DLMM_PRO_PROGRAM_ID,
 ): PublicKey {
-  return deriveTickArrayWithBump(pool, tickArrayIndex, programId)[0];
-}
-
-export function deriveTickArrayWithBump(
-  pool: PublicKey,
-  tickArrayIndex: number,
-  programId: PublicKey = DLMM_PRO_PROGRAM_ID,
-): [PublicKey, number] {
+  assertI32(tickArrayIndex, "tickArrayIndex");
+  const index = Buffer.alloc(4);
+  index.writeInt32LE(tickArrayIndex, 0);
   return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from(TICK_ARRAY_PREFIX),
-      pool.toBuffer(),
-      toI32Buffer(tickArrayIndex),
-    ],
+    [Buffer.from(TICK_ARRAY_PREFIX), pool.toBuffer(), index],
     programId,
-  );
+  )[0];
 }
 
 export function derivePosition(
@@ -190,12 +171,19 @@ export function deriveLimitOrder(
   )[0];
 }
 
-// Reward vault PDA — `reward_index` is `u8` on-chain (`to_le_bytes()` = 1 byte)
+function assertRewardIndex(rewardIndex: number): void {
+  if (!isIntegerIn(rewardIndex, 0, NUM_REWARDS - 1)) {
+    throw PoolError.invalidRewardIndex();
+  }
+}
+
+// `reward_index` is a u8 seed: one byte.
 export function deriveRewardVault(
   pool: PublicKey,
   rewardIndex: number,
   programId: PublicKey = DLMM_PRO_PROGRAM_ID,
 ): PublicKey {
+  assertRewardIndex(rewardIndex);
   return PublicKey.findProgramAddressSync(
     [
       Buffer.from(REWARD_VAULT_PREFIX),
