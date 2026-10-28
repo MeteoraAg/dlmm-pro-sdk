@@ -78,7 +78,8 @@ export class LimitOrderService extends DlmmProProgram {
     owner: PublicKey;
     payer: PublicKey;
     tokenMint: PublicKey;
-    userToken: PublicKey;
+    /** Defaults to the owner's associated token account, created when missing. */
+    userToken?: PublicKey;
     parameters: OpenLimitOrderParameters;
     /**
      * Defaults to the arrays holding the order's ticks; for a relative order,
@@ -136,25 +137,7 @@ export class LimitOrderService extends DlmmProProgram {
       }
     }
     const { isAskSide } = params.parameters;
-    const hookKey = isAskSide ? "transferHookX" : "transferHookY";
-    const [pool, hooks] = await Promise.all([
-      this.state.fetchPool(params.pool),
-      resolveInstructionHooks(this.connection, this.commitment, {
-        [hookKey]: {
-          metas: params.transferHook,
-          leg: {
-            mint: params.tokenMint,
-            source: params.userToken,
-            destination: deriveReserve(
-              params.tokenMint,
-              params.pool,
-              this.programId,
-            ),
-            authority: params.owner,
-          },
-        },
-      }),
-    ]);
+    const pool = await this.state.fetchPool(params.pool);
     const { tickSpacing } = pool;
     if (relativeTick !== null) {
       if (
@@ -168,6 +151,45 @@ export class LimitOrderService extends DlmmProProgram {
     } else if (!ticks.every((tick) => isUsableTickId(tick.id, tickSpacing))) {
       throw PoolError.invalidParameters("ticks.id must be usable tick ids");
     }
+    const tokenProgram =
+      params.tokenProgram ??
+      getTokenProgram(isAskSide ? pool.tokenXFlag : pool.tokenYFlag);
+    const {
+      accounts: [userToken],
+      preInstructions,
+      postInstructions,
+    } = await this.prepareTokenAccounts({
+      payer: params.payer,
+      owner: params.owner,
+      tokens: [
+        {
+          mint: params.tokenMint,
+          tokenProgram,
+          account: params.userToken,
+          wrapAmount: maxAmount,
+        },
+      ],
+    });
+    const reserve = deriveReserve(
+      params.tokenMint,
+      params.pool,
+      this.programId,
+    );
+    const hooks = await resolveInstructionHooks(
+      this.connection,
+      this.commitment,
+      {
+        [isAskSide ? "transferHookX" : "transferHookY"]: {
+          metas: params.transferHook,
+          leg: {
+            mint: params.tokenMint,
+            source: userToken,
+            destination: reserve,
+            authority: params.owner,
+          },
+        },
+      },
+    );
     const tickArrayIndexes = orderTickArrayIndexes(
       params.parameters,
       tickSpacing,
@@ -196,21 +218,21 @@ export class LimitOrderService extends DlmmProProgram {
         nftMint: params.nftMint,
         nftAccount,
         tickArrayBitmapExtension,
-        reserve: deriveReserve(params.tokenMint, params.pool, this.programId),
+        reserve,
         tokenMint: params.tokenMint,
         limitOrder,
-        userToken: params.userToken,
+        userToken,
         referral: params.referral ?? null,
         payer: params.payer,
         owner: params.owner,
-        tokenProgram:
-          params.tokenProgram ??
-          getTokenProgram(isAskSide ? pool.tokenXFlag : pool.tokenYFlag),
+        tokenProgram,
       })
       .remainingAccounts([
         ...hooks.remainingAccounts,
         ...tickArrayMetas(tickArrays),
       ])
+      .preInstructions(preInstructions)
+      .postInstructions(postInstructions)
       .transaction();
 
     tx.feePayer = params.payer;
@@ -228,8 +250,10 @@ export class LimitOrderService extends DlmmProProgram {
     signer: PublicKey;
     tokenXMint: PublicKey;
     tokenYMint: PublicKey;
-    userTokenX: PublicKey;
-    userTokenY: PublicKey;
+    /** Defaults to the owner's associated token account, created when missing. */
+    userTokenX?: PublicKey;
+    /** Defaults to the owner's associated token account, created when missing. */
+    userTokenY?: PublicKey;
     /** Strictly ascending. Defaults to every tick of the order not yet canceled. */
     tickIds?: number[];
     /** Minimum token X to receive after transfer fees; defaults to no minimum. */
@@ -286,15 +310,39 @@ export class LimitOrderService extends DlmmProProgram {
             tickIds.map((tickId) => tickIndexFromId(tickId, pool.tickSpacing)),
             this.programId,
           );
-    const poolAuthority = derivePoolAuthority(this.programId);
+    const tokenXProgram =
+      params.tokenXProgram ?? getTokenProgram(pool.tokenXFlag);
+    const tokenYProgram =
+      params.tokenYProgram ?? getTokenProgram(pool.tokenYFlag);
+    const {
+      accounts: [userTokenX, userTokenY],
+      preInstructions,
+      postInstructions,
+    } = await this.prepareTokenAccounts({
+      payer: params.signer,
+      owner: params.owner,
+      ownerSigns: params.signer.equals(params.owner),
+      tokens: [
+        {
+          mint: params.tokenXMint,
+          tokenProgram: tokenXProgram,
+          account: params.userTokenX,
+        },
+        {
+          mint: params.tokenYMint,
+          tokenProgram: tokenYProgram,
+          account: params.userTokenY,
+        },
+      ],
+    });
     const { reserveX, reserveY, transferHookX, transferHookY } =
       reserveTransferLegs({
         pool: params.pool,
         tokenXMint: params.tokenXMint,
         tokenYMint: params.tokenYMint,
-        userTokenX: params.userTokenX,
-        userTokenY: params.userTokenY,
-        authority: poolAuthority,
+        userTokenX,
+        userTokenY,
+        authority: derivePoolAuthority(this.programId),
         deposit: false,
         programId: this.programId,
       });
@@ -327,17 +375,19 @@ export class LimitOrderService extends DlmmProProgram {
         limitOrder,
         nftAccount:
           params.nftAccount ?? findNftAccount(params.nftMint, params.owner),
-        userTokenX: params.userTokenX,
-        userTokenY: params.userTokenY,
+        userTokenX,
+        userTokenY,
         referralToken: referralToken ?? null,
         signer: params.signer,
-        tokenXProgram: params.tokenXProgram ?? getTokenProgram(pool.tokenXFlag),
-        tokenYProgram: params.tokenYProgram ?? getTokenProgram(pool.tokenYFlag),
+        tokenXProgram,
+        tokenYProgram,
       })
       .remainingAccounts([
         ...hooks.remainingAccounts,
         ...tickArrayMetas(tickArrays),
       ])
+      .preInstructions(preInstructions)
+      .postInstructions(postInstructions)
       .transaction();
 
     tx.feePayer = params.signer;

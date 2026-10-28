@@ -1,9 +1,18 @@
 import {
+  createCloseAccountInstruction,
+  createSyncNativeInstruction,
   getAssociatedTokenAddressSync,
+  NATIVE_MINT,
   TOKEN_2022_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { PublicKey, type Commitment, type Connection } from "@solana/web3.js";
+import {
+  PublicKey,
+  SystemProgram,
+  type Commitment,
+  type Connection,
+  type TransactionInstruction,
+} from "@solana/web3.js";
 import { PoolError } from "../errors";
 import { TokenProgramFlags } from "../types";
 import { readMintAccount } from "./account_reads";
@@ -50,4 +59,38 @@ export async function resolveTokenProgram(
   commitment?: Commitment,
 ): Promise<PublicKey> {
   return (await readMintAccount(connection, tokenMint, commitment)).owner;
+}
+
+export function isNativeSol(mint: PublicKey): boolean {
+  return mint.equals(NATIVE_MINT);
+}
+
+/** Transfer lamports into an existing wrapped SOL account and sync its balance. */
+export function wrapSOLInstruction(
+  from: PublicKey,
+  to: PublicKey,
+  amount: bigint,
+): TransactionInstruction[] {
+  return [
+    SystemProgram.transfer({
+      fromPubkey: from,
+      toPubkey: to,
+      lamports: amount,
+    }),
+    createSyncNativeInstruction(to, TOKEN_PROGRAM_ID),
+  ];
+}
+
+/** Close the owner's wrapped SOL account and send the lamports to receiver. */
+export function unwrapSOLInstruction(
+  owner: PublicKey,
+  receiver: PublicKey = owner,
+): TransactionInstruction {
+  return createCloseAccountInstruction(
+    getAssociatedTokenAddressSync(NATIVE_MINT, owner, true, TOKEN_PROGRAM_ID),
+    receiver,
+    owner,
+    [],
+    TOKEN_PROGRAM_ID,
+  );
 }

@@ -71,8 +71,10 @@ export type SwapParams = {
   pool: PublicKey;
   tokenXMint: PublicKey;
   tokenYMint: PublicKey;
-  userTokenIn: PublicKey;
-  userTokenOut: PublicKey;
+  /** Defaults to the user's associated token account, created when missing. */
+  userTokenIn?: PublicKey;
+  /** Defaults to the user's associated token account, created when missing. */
+  userTokenOut?: PublicKey;
   user: PublicKey;
   swapForY: boolean;
   /** In the program's traversal order — take these from `quoteExactIn`. */
@@ -133,8 +135,10 @@ export type InitializeLaunchPoolParams = {
   creator: PublicKey;
   payer: PublicKey;
   parameters: InitializePoolWithDynamicParameters;
-  userTokenX: PublicKey;
-  userTokenY: PublicKey;
+  /** Payer's token X account. Defaults to its associated token account. */
+  userTokenX?: PublicKey;
+  /** Payer's token Y account. Defaults to its associated token account. */
+  userTokenY?: PublicKey;
   tokenXProgram?: PublicKey;
   tokenYProgram?: PublicKey;
   tokenBadgeX?: PublicKey | null;
@@ -323,6 +327,29 @@ export class PoolService extends DlmmProProgram {
       params.parameters.initialSqrtPrice,
       params.parameters.tickSpacing,
     );
+    // The program requires a non-zero balance in both accounts.
+    const {
+      accounts: [userTokenX, userTokenY],
+      preInstructions,
+      postInstructions,
+    } = await this.prepareTokenAccounts({
+      payer: params.payer,
+      owner: params.payer,
+      tokens: [
+        {
+          mint: params.tokenXMint,
+          tokenProgram: accounts.tokenXProgram,
+          account: params.userTokenX,
+          wrapAmount: new BN(1),
+        },
+        {
+          mint: params.tokenYMint,
+          tokenProgram: accounts.tokenYProgram,
+          account: params.userTokenY,
+          wrapAmount: new BN(1),
+        },
+      ],
+    });
 
     const tx = await this.program.methods
       .initializeLaunchPool(params.parameters)
@@ -332,9 +359,11 @@ export class PoolService extends DlmmProProgram {
         tokenYMint: params.tokenYMint,
         creator: params.creator,
         payer: params.payer,
-        userTokenX: params.userTokenX,
-        userTokenY: params.userTokenY,
+        userTokenX,
+        userTokenY,
       })
+      .preInstructions(preInstructions)
+      .postInstructions(postInstructions)
       .transaction();
 
     tx.feePayer = params.payer;
@@ -402,6 +431,8 @@ export class PoolService extends DlmmProProgram {
       .swap(params.parameters, resolved.remainingAccountsInfo)
       .accountsPartial(resolved.accounts)
       .remainingAccounts(resolved.remainingAccounts)
+      .preInstructions(resolved.preInstructions)
+      .postInstructions(resolved.postInstructions)
       .transaction();
 
     tx.feePayer = params.user;
@@ -421,20 +452,49 @@ export class PoolService extends DlmmProProgram {
       this.programId,
     );
     const xIsInput = params.swapForY;
-    const transferHookReferral = await this.referralHook(
-      params.pool,
-      params.referral,
-      params.transferHookReferral,
-    );
-    const [pool, hooks] = await Promise.all([
+    const [pool, transferHookReferral] = await Promise.all([
       this.state.fetchPool(params.pool),
-      resolveInstructionHooks(this.connection, this.commitment, {
+      this.referralHook(
+        params.pool,
+        params.referral,
+        params.transferHookReferral,
+      ),
+    ]);
+    const tokenXProgram =
+      params.tokenXProgram ?? getTokenProgram(pool.tokenXFlag);
+    const tokenYProgram =
+      params.tokenYProgram ?? getTokenProgram(pool.tokenYFlag);
+    const {
+      accounts: [userTokenIn, userTokenOut],
+      preInstructions,
+      postInstructions,
+    } = await this.prepareTokenAccounts({
+      payer: params.user,
+      owner: params.user,
+      tokens: [
+        {
+          mint: xIsInput ? params.tokenXMint : params.tokenYMint,
+          tokenProgram: xIsInput ? tokenXProgram : tokenYProgram,
+          account: params.userTokenIn,
+          wrapAmount: params.parameters.inputAmount,
+        },
+        {
+          mint: xIsInput ? params.tokenYMint : params.tokenXMint,
+          tokenProgram: xIsInput ? tokenYProgram : tokenXProgram,
+          account: params.userTokenOut,
+        },
+      ],
+    });
+    const hooks = await resolveInstructionHooks(
+      this.connection,
+      this.commitment,
+      {
         transferHookX: {
           metas: params.transferHookX,
           leg: {
             mint: params.tokenXMint,
-            source: xIsInput ? params.userTokenIn : reserveX,
-            destination: xIsInput ? reserveX : params.userTokenOut,
+            source: xIsInput ? userTokenIn : reserveX,
+            destination: xIsInput ? reserveX : userTokenOut,
             authority: xIsInput ? params.user : poolAuthority,
           },
         },
@@ -442,14 +502,14 @@ export class PoolService extends DlmmProProgram {
           metas: params.transferHookY,
           leg: {
             mint: params.tokenYMint,
-            source: xIsInput ? reserveY : params.userTokenIn,
-            destination: xIsInput ? params.userTokenOut : reserveY,
+            source: xIsInput ? reserveY : userTokenIn,
+            destination: xIsInput ? userTokenOut : reserveY,
             authority: xIsInput ? poolAuthority : params.user,
           },
         },
         transferHookReferral,
-      }),
-    ]);
+      },
+    );
     const tickArrayBitmapExtension =
       params.tickArrayBitmapExtension !== undefined
         ? params.tickArrayBitmapExtension
@@ -458,6 +518,8 @@ export class PoolService extends DlmmProProgram {
           : null;
 
     return {
+      preInstructions,
+      postInstructions,
       remainingAccountsInfo: hooks.remainingAccountsInfo,
       remainingAccounts: [
         ...hooks.remainingAccounts,
@@ -468,15 +530,15 @@ export class PoolService extends DlmmProProgram {
         tickArrayBitmapExtension,
         reserveX,
         reserveY,
-        userTokenIn: params.userTokenIn,
-        userTokenOut: params.userTokenOut,
+        userTokenIn,
+        userTokenOut,
         referral: params.referral ?? null,
         tokenXMint: params.tokenXMint,
         tokenYMint: params.tokenYMint,
         oracle: deriveOracle(params.pool, this.programId),
         user: params.user,
-        tokenXProgram: params.tokenXProgram ?? getTokenProgram(pool.tokenXFlag),
-        tokenYProgram: params.tokenYProgram ?? getTokenProgram(pool.tokenYFlag),
+        tokenXProgram,
+        tokenYProgram,
       },
     };
   }
@@ -505,8 +567,10 @@ export class PoolService extends DlmmProProgram {
     pool: PublicKey;
     tokenXMint: PublicKey;
     tokenYMint: PublicKey;
-    receiverTokenX: PublicKey;
-    receiverTokenY: PublicKey;
+    /** Defaults to the signer's associated token account, created when missing. */
+    receiverTokenX?: PublicKey;
+    /** Defaults to the signer's associated token account, created when missing. */
+    receiverTokenY?: PublicKey;
     signer: PublicKey;
     maxAmountX: BN;
     maxAmountY: BN;
@@ -525,24 +589,46 @@ export class PoolService extends DlmmProProgram {
     const minAmountY = params.minAmountY ?? new BN(0);
     assertU64(minAmountX, "minAmountX");
     assertU64(minAmountY, "minAmountY");
+    const [tokenXProgram, tokenYProgram] = await this.tokenPrograms(params);
+    const {
+      accounts: [receiverTokenX, receiverTokenY],
+      preInstructions,
+      postInstructions,
+    } = await this.prepareTokenAccounts({
+      payer: params.signer,
+      owner: params.signer,
+      tokens: [
+        {
+          mint: params.tokenXMint,
+          tokenProgram: tokenXProgram,
+          account: params.receiverTokenX,
+        },
+        {
+          mint: params.tokenYMint,
+          tokenProgram: tokenYProgram,
+          account: params.receiverTokenY,
+        },
+      ],
+    });
     const { reserveX, reserveY, transferHookX, transferHookY } =
       reserveTransferLegs({
         pool: params.pool,
         tokenXMint: params.tokenXMint,
         tokenYMint: params.tokenYMint,
-        userTokenX: params.receiverTokenX,
-        userTokenY: params.receiverTokenY,
+        userTokenX: receiverTokenX,
+        userTokenY: receiverTokenY,
         authority: derivePoolAuthority(this.programId),
         deposit: false,
         programId: this.programId,
       });
-    const [hooks, [tokenXProgram, tokenYProgram]] = await Promise.all([
-      resolveInstructionHooks(this.connection, this.commitment, {
+    const hooks = await resolveInstructionHooks(
+      this.connection,
+      this.commitment,
+      {
         transferHookX: { metas: params.transferHookX, leg: transferHookX },
         transferHookY: { metas: params.transferHookY, leg: transferHookY },
-      }),
-      this.tokenPrograms(params),
-    ]);
+      },
+    );
 
     const tx = await this.program.methods
       .claimPartnerFee(
@@ -560,13 +646,15 @@ export class PoolService extends DlmmProProgram {
         reserveY,
         tokenXMint: params.tokenXMint,
         tokenYMint: params.tokenYMint,
-        receiverTokenX: params.receiverTokenX,
-        receiverTokenY: params.receiverTokenY,
+        receiverTokenX,
+        receiverTokenY,
         signer: params.signer,
         tokenXProgram,
         tokenYProgram,
       })
       .remainingAccounts(hooks.remainingAccounts)
+      .preInstructions(preInstructions)
+      .postInstructions(postInstructions)
       .transaction();
 
     tx.feePayer = params.signer;
