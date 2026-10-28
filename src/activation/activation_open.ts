@@ -38,6 +38,14 @@ export class ActivationOpenHandler {
   canSwap(_currentPoint: BN): boolean {
     return true;
   }
+
+  canAddLiquidity(_currentPoint: BN): boolean {
+    return true;
+  }
+
+  canRemoveLiquidity(_currentPoint: BN): boolean {
+    return true;
+  }
 }
 
 export function openActivationParameters(): PoolActivationInfoParameters {

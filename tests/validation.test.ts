@@ -2,6 +2,7 @@ import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
 import { describe, expect, it } from "vitest";
 import {
+  ActivationMode,
   calculateTransferFeeExcludedAmount,
   deriveStaticConfig,
   deriveTickArray,
@@ -13,7 +14,13 @@ import {
   positionIndexesFromBitmap,
 } from "../src";
 import { validateDynamicFeeParameters } from "../src/helpers/pool_fees";
-import { getActivationHandler } from "../src/activation";
+import {
+  bondingCurveActivationParameters,
+  encodeBondingCurveActivationData,
+  getActivationHandler,
+  openActivationParameters,
+  timeBasedActivationParameters,
+} from "../src/activation";
 import { getBaseFeeHandler } from "../src/base_fee";
 import { remainingAccountsFromHooks } from "../src/helpers/remaining_accounts";
 import { tickArrayRemainingAccounts } from "../src/helpers/tick_array";
@@ -132,6 +139,45 @@ describe("client-side validation", () => {
     expect(() => encodePoolExtensions([32 as never])).toThrow(
       expect.objectContaining({ code: PoolErrorCode.InvalidParameters }),
     );
+  });
+
+  it("gates each activation action on the program's predicate", () => {
+    const timeBased = getActivationHandler(
+      timeBasedActivationParameters({
+        swapPoint: new BN(60),
+        addLiquidityPoint: new BN(30),
+        removeLiquidityPoint: new BN(90),
+      }),
+    );
+    expect(timeBased.canAddLiquidity(new BN(29))).toBe(false);
+    expect(timeBased.canAddLiquidity(new BN(30))).toBe(true);
+    expect(timeBased.canSwap(new BN(30))).toBe(false);
+    expect(timeBased.canSwap(new BN(60))).toBe(true);
+    expect(timeBased.canRemoveLiquidity(new BN(60))).toBe(false);
+    expect(timeBased.canRemoveLiquidity(new BN(90))).toBe(true);
+
+    const open = getActivationHandler(openActivationParameters());
+    expect(open.canSwap(new BN(0))).toBe(true);
+    expect(open.canAddLiquidity(new BN(0))).toBe(true);
+    expect(open.canRemoveLiquidity(new BN(0))).toBe(true);
+
+    const belowTarget = getActivationHandler(
+      bondingCurveActivationParameters({ targetIncreaseBps: 20_000 }),
+    );
+    expect(belowTarget.canSwap(new BN(0))).toBe(true);
+    expect(belowTarget.canAddLiquidity(new BN(0))).toBe(false);
+    expect(belowTarget.canRemoveLiquidity(new BN(0))).toBe(false);
+
+    const data = encodeBondingCurveActivationData({
+      targetIncreaseBps: 20_000,
+    });
+    data[0] = 1;
+    const reachedTarget = getActivationHandler({
+      activationMode: ActivationMode.BondingCurve,
+      data,
+    });
+    expect(reachedTarget.canAddLiquidity(new BN(0))).toBe(true);
+    expect(reachedTarget.canRemoveLiquidity(new BN(0))).toBe(true);
   });
 
   it("uses LiquidityIsZero for empty token budgets", () => {

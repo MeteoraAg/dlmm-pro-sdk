@@ -114,6 +114,14 @@ export class ActivationTimeBasedHandler {
   canSwap(currentPoint: BN): boolean {
     return currentPoint.gte(this.inner.swapPoint);
   }
+
+  canAddLiquidity(currentPoint: BN): boolean {
+    return currentPoint.gte(this.inner.addLiquidityPoint);
+  }
+
+  canRemoveLiquidity(currentPoint: BN): boolean {
+    return currentPoint.gte(this.inner.removeLiquidityPoint);
+  }
 }
 
 export function timeBasedActivationParameters(

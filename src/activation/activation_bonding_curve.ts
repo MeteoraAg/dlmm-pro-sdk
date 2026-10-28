@@ -94,6 +94,14 @@ export class ActivationBondingCurveHandler {
   canSwap(_currentPoint: BN): boolean {
     return true;
   }
+
+  canAddLiquidity(_currentPoint: BN): boolean {
+    return this.inner.isReachTarget === 1;
+  }
+
+  canRemoveLiquidity(_currentPoint: BN): boolean {
+    return this.inner.isReachTarget === 1;
+  }
 }
 
 export function bondingCurveActivationParameters(
