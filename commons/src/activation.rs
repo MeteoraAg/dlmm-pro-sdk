@@ -30,6 +30,8 @@ pub fn get_current_point(activation_type: u8, clock: &Clock) -> Result<u64> {
 
 pub trait Activation {
     fn can_swap(&self, current_point: u64) -> Result<bool>;
+    fn can_add_liquidity(&self, current_point: u64) -> Result<bool>;
+    fn can_remove_liquidity(&self, current_point: u64) -> Result<bool>;
 }
 
 #[repr(C)]
@@ -41,6 +43,12 @@ pub struct PodAlignedActivationOpen {
 
 impl Activation for PodAlignedActivationOpen {
     fn can_swap(&self, _current_point: u64) -> Result<bool> {
+        Ok(true)
+    }
+    fn can_add_liquidity(&self, _current_point: u64) -> Result<bool> {
+        Ok(true)
+    }
+    fn can_remove_liquidity(&self, _current_point: u64) -> Result<bool> {
         Ok(true)
     }
 }
@@ -58,6 +66,12 @@ impl Activation for PodAlignedActivationBondingCurve {
     fn can_swap(&self, _current_point: u64) -> Result<bool> {
         Ok(true)
     }
+    fn can_add_liquidity(&self, _current_point: u64) -> Result<bool> {
+        Ok(self.is_reach_target == 1)
+    }
+    fn can_remove_liquidity(&self, _current_point: u64) -> Result<bool> {
+        Ok(self.is_reach_target == 1)
+    }
 }
 
 #[repr(C)]
@@ -72,6 +86,12 @@ pub struct PodAlignedActivationTimeBased {
 impl Activation for PodAlignedActivationTimeBased {
     fn can_swap(&self, current_point: u64) -> Result<bool> {
         Ok(current_point >= self.swap_point.into())
+    }
+    fn can_add_liquidity(&self, current_point: u64) -> Result<bool> {
+        Ok(current_point >= self.add_liquidity_point.into())
+    }
+    fn can_remove_liquidity(&self, current_point: u64) -> Result<bool> {
+        Ok(current_point >= self.remove_liquidity_point.into())
     }
 }
 
@@ -96,5 +116,56 @@ where
             let a: &PodAlignedActivationTimeBased = bytemuck::must_cast_ref(pool_activation_info);
             f(a)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn z40(value: u64) -> Z40 {
+        let bytes = value.to_le_bytes();
+        Z40 {
+            inner: bytes[..5].try_into().unwrap(),
+        }
+    }
+
+    #[test]
+    fn time_based_gates_each_action_on_its_own_point() {
+        let activation = PodAlignedActivationTimeBased {
+            swap_point: z40(60),
+            add_liquidity_point: z40(30),
+            remove_liquidity_point: z40(90),
+            ..Default::default()
+        };
+        assert!(!activation.can_add_liquidity(29).unwrap());
+        assert!(activation.can_add_liquidity(30).unwrap());
+        assert!(!activation.can_swap(30).unwrap());
+        assert!(activation.can_swap(60).unwrap());
+        assert!(!activation.can_remove_liquidity(60).unwrap());
+        assert!(activation.can_remove_liquidity(90).unwrap());
+    }
+
+    #[test]
+    fn open_activation_allows_every_action() {
+        let activation = PodAlignedActivationOpen::default();
+        assert!(activation.can_swap(0).unwrap());
+        assert!(activation.can_add_liquidity(0).unwrap());
+        assert!(activation.can_remove_liquidity(0).unwrap());
+    }
+
+    #[test]
+    fn bonding_curve_holds_liquidity_until_the_target() {
+        let closed = PodAlignedActivationBondingCurve::default();
+        assert!(closed.can_swap(0).unwrap());
+        assert!(!closed.can_add_liquidity(0).unwrap());
+        assert!(!closed.can_remove_liquidity(0).unwrap());
+
+        let open = PodAlignedActivationBondingCurve {
+            is_reach_target: 1,
+            ..Default::default()
+        };
+        assert!(open.can_add_liquidity(0).unwrap());
+        assert!(open.can_remove_liquidity(0).unwrap());
     }
 }
