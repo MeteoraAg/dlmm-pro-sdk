@@ -1,9 +1,6 @@
 # DLMM Pro SDK
 
-TypeScript SDK and Rust crate for the
-[Meteora DLMM Pro](https://github.com/MeteoraAg/dlmm-pro) program, release
-0.1.0: pool creation, quotes and swaps, multi-range positions, limit orders,
-and liquidity-mining rewards.
+TypeScript SDK and Rust crate for the Meteora DLMM Pro program.
 
 The function reference is in [docs.md](docs.md).
 
