@@ -76,7 +76,8 @@ export class RewardService extends DlmmProProgram {
   async setRewardEmission(params: {
     pool: PublicKey;
     rewardMint: PublicKey;
-    funderTokenAccount: PublicKey;
+    /** Defaults to the funder's associated token account. */
+    funderTokenAccount?: PublicKey;
     funder: PublicKey;
     authority: PublicKey;
     parameters: SetRewardEmissionParameters;
@@ -94,20 +95,41 @@ export class RewardService extends DlmmProProgram {
       params.parameters.index,
       this.programId,
     );
-    const [tokenProgram, hooks] = await Promise.all([
-      this.tokenProgramFor(params.rewardMint, params.tokenProgram),
-      resolveInstructionHooks(this.connection, this.commitment, {
+    const tokenProgram = await this.tokenProgramFor(
+      params.rewardMint,
+      params.tokenProgram,
+    );
+    const {
+      accounts: [funderTokenAccount],
+      preInstructions,
+      postInstructions,
+    } = await this.prepareTokenAccounts({
+      payer: params.funder,
+      owner: params.funder,
+      tokens: [
+        {
+          mint: params.rewardMint,
+          tokenProgram,
+          account: params.funderTokenAccount,
+          wrapAmount: params.parameters.maxAmount,
+        },
+      ],
+    });
+    const hooks = await resolveInstructionHooks(
+      this.connection,
+      this.commitment,
+      {
         transferHookReward: {
           metas: params.transferHookReward,
           leg: {
             mint: params.rewardMint,
-            source: params.funderTokenAccount,
+            source: funderTokenAccount,
             destination: rewardVault,
             authority: params.funder,
           },
         },
-      }),
-    ]);
+      },
+    );
 
     const tx = await this.program.methods
       .setRewardEmission(params.parameters, hooks.remainingAccountsInfo)
@@ -115,12 +137,14 @@ export class RewardService extends DlmmProProgram {
         pool: params.pool,
         rewardVault,
         rewardMint: params.rewardMint,
-        funderTokenAccount: params.funderTokenAccount,
+        funderTokenAccount,
         funder: params.funder,
         authority: params.authority,
         tokenProgram,
       })
       .remainingAccounts(hooks.remainingAccounts)
+      .preInstructions(preInstructions)
+      .postInstructions(postInstructions)
       .transaction();
 
     tx.feePayer = params.funder;
@@ -137,7 +161,8 @@ export class RewardService extends DlmmProProgram {
      */
     signer: PublicKey;
     rewardMint: PublicKey;
-    userTokenAccount: PublicKey;
+    /** Defaults to the owner's associated token account, created when missing. */
+    userTokenAccount?: PublicKey;
     rewardIndex: number;
     /** Minimum reward amount to receive after transfer fees; defaults to no minimum. */
     minAmount?: BN;
@@ -159,21 +184,41 @@ export class RewardService extends DlmmProProgram {
       params.rewardIndex,
       this.programId,
     );
-    const [{ tickSpacing }, tokenProgram, hooks] = await Promise.all([
+    const [{ tickSpacing }, tokenProgram] = await Promise.all([
       this.state.fetchPool(params.pool),
       this.tokenProgramFor(params.rewardMint, params.tokenProgram),
-      resolveInstructionHooks(this.connection, this.commitment, {
+    ]);
+    const {
+      accounts: [userTokenAccount],
+      preInstructions,
+      postInstructions,
+    } = await this.prepareTokenAccounts({
+      payer: params.signer,
+      owner: params.owner,
+      ownerSigns: params.signer.equals(params.owner),
+      tokens: [
+        {
+          mint: params.rewardMint,
+          tokenProgram,
+          account: params.userTokenAccount,
+        },
+      ],
+    });
+    const hooks = await resolveInstructionHooks(
+      this.connection,
+      this.commitment,
+      {
         transferHookReward: {
           metas: params.transferHookReward,
           leg: {
             mint: params.rewardMint,
             source: rewardVault,
-            destination: params.userTokenAccount,
+            destination: userTokenAccount,
             authority: derivePoolAuthority(this.programId),
           },
         },
-      }),
-    ]);
+      },
+    );
     const nftAccount =
       params.nftAccount ?? findNftAccount(params.nftMint, params.owner);
 
@@ -195,13 +240,18 @@ export class RewardService extends DlmmProProgram {
         signer: params.signer,
         rewardVault,
         rewardMint: params.rewardMint,
-        userTokenAccount: params.userTokenAccount,
+        userTokenAccount,
         tokenProgram,
       })
       .remainingAccounts(hooks.remainingAccounts)
       .instruction();
 
-    const tx = new Transaction().add(refresh, claim);
+    const tx = new Transaction().add(
+      ...preInstructions,
+      refresh,
+      claim,
+      ...postInstructions,
+    );
     tx.feePayer = params.signer;
     return { tx };
   }
@@ -209,8 +259,12 @@ export class RewardService extends DlmmProProgram {
   async withdrawIneligibleRewards(params: {
     pool: PublicKey;
     rewardMint: PublicKey;
-    /** Chosen by the reward authority; need not be the wallet that funded the reward. */
-    receiverTokenAccount: PublicKey;
+    /**
+     * Chosen by the reward authority; need not be the wallet that funded the
+     * reward. Defaults to the authority's associated token account, created
+     * when missing.
+     */
+    receiverTokenAccount?: PublicKey;
     authority: PublicKey;
     rewardIndex: number;
     minAmount?: BN;
@@ -224,20 +278,40 @@ export class RewardService extends DlmmProProgram {
       params.rewardIndex,
       this.programId,
     );
-    const [tokenProgram, hooks] = await Promise.all([
-      this.tokenProgramFor(params.rewardMint, params.tokenProgram),
-      resolveInstructionHooks(this.connection, this.commitment, {
+    const tokenProgram = await this.tokenProgramFor(
+      params.rewardMint,
+      params.tokenProgram,
+    );
+    const {
+      accounts: [receiverTokenAccount],
+      preInstructions,
+      postInstructions,
+    } = await this.prepareTokenAccounts({
+      payer: params.authority,
+      owner: params.authority,
+      tokens: [
+        {
+          mint: params.rewardMint,
+          tokenProgram,
+          account: params.receiverTokenAccount,
+        },
+      ],
+    });
+    const hooks = await resolveInstructionHooks(
+      this.connection,
+      this.commitment,
+      {
         transferHookReward: {
           metas: params.transferHookReward,
           leg: {
             mint: params.rewardMint,
             source: rewardVault,
-            destination: params.receiverTokenAccount,
+            destination: receiverTokenAccount,
             authority: derivePoolAuthority(this.programId),
           },
         },
-      }),
-    ]);
+      },
+    );
 
     const tx = await this.program.methods
       .withdrawIneligibleRewards(
@@ -249,11 +323,13 @@ export class RewardService extends DlmmProProgram {
         pool: params.pool,
         rewardVault,
         rewardMint: params.rewardMint,
-        receiverTokenAccount: params.receiverTokenAccount,
+        receiverTokenAccount,
         authority: params.authority,
         tokenProgram,
       })
       .remainingAccounts(hooks.remainingAccounts)
+      .preInstructions(preInstructions)
+      .postInstructions(postInstructions)
       .transaction();
 
     tx.feePayer = params.authority;

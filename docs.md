@@ -98,6 +98,8 @@
   - [PDA Helpers](#pda-helpers)
   - [findNftAccount](#findnftaccount)
   - [getTokenProgram](#gettokenprogram)
+  - [wrapSOLInstruction](#wrapsolinstruction)
+  - [unwrapSOLInstruction](#unwrapsolinstruction)
   - [readClock](#readclock)
   - [getExtraAccountMetasForTransferHook](#getextraaccountmetasfortransferhook)
 
@@ -172,6 +174,14 @@ const client = new DlmmProClient(connection);
 - Builders return `{ tx, ... }`. `tx` is an unsigned `Transaction` with
   `feePayer` set and no recent blockhash; each builder lists its signers.
   `sendAndConfirmTransaction(connection, tx, signers)` fills in the blockhash.
+- User token accounts are optional and default to the associated token
+  account of the wallet each parameter names. The builder creates a missing
+  associated token account, with the fee payer funding it. For native SOL it
+  also wraps the shortfall of the amount being paid from the owner's lamports
+  and closes the owner's wrapped-SOL account at the end, so the owner signs.
+  A delegate withdrawing native SOL leaves that account open. An account
+  passed explicitly is used as is. `initializeLaunchPool` wraps 1 lamport when
+  its SOL proof account is empty.
 - Builders read the accounts they need (pool, mints, transfer-hook accounts)
   at the client's commitment.
 - `state.fetchTokenBadge` always reads `ACCESS_REGISTRY_PROGRAM_ID`.
@@ -317,15 +327,15 @@ type SwapParams = {
   pool: PublicKey; // Pool address
   tokenXMint: PublicKey; // Pool token X mint
   tokenYMint: PublicKey; // Pool token Y mint
-  userTokenIn: PublicKey; // Pays the input
-  userTokenOut: PublicKey; // Receives the output
-  user: PublicKey; // Owner of userTokenIn; signer and fee payer
-  swapForY: boolean; // true sells X for Y; must match the mint of userTokenOut
+  user: PublicKey; // Pays the input; signer and fee payer
+  swapForY: boolean; // true sells X for Y
   tickArrays: PublicKey[]; // From quoteExactIn, in traversal order
   parameters: {
     inputAmount: BN; // Exact input, before the input mint's transfer fee
     minimumOutputAmount: BN; // Least the swapper accepts, after the output mint's transfer fee
   };
+  userTokenIn?: PublicKey; // Pays the input. Default: user's associated token account
+  userTokenOut?: PublicKey; // Receives the output; its mint sets the direction. Default: user's associated token account
   tokenXProgram?: PublicKey; // Default from the pool's token flag
   tokenYProgram?: PublicKey; // Default from the pool's token flag
   tickArrayBitmapExtension?: PublicKey | null; // Default: the pool's extension when it has one
@@ -348,8 +358,6 @@ const { tx } = await client.pool.swap({
   pool,
   tokenXMint: poolState.tokenXMint,
   tokenYMint: poolState.tokenYMint,
-  userTokenIn: userTokenX,
-  userTokenOut: userTokenY,
   user: user.publicKey,
   swapForY: true,
   tickArrays,
@@ -365,7 +373,8 @@ await sendAndConfirmTransaction(connection, tx, [user]);
   `amountLeft` is zero. The program reverts with `NotConsumingFullAmountIn`
   unless the swap consumes all of `inputAmount`.
 - The program takes the direction from the mint of `userTokenOut`; the
-  builder uses `swapForY` to resolve the transfer-hook accounts of each leg.
+  builder uses `swapForY` to pick the default accounts and resolve the
+  transfer-hook accounts of each leg.
 - `referral` must hold the fee token: the output mint, or token Y on a pool
   with `CollectFeeMode.OnlyY`. It may be the swapper's own account.
 - Throws `AmountIsZero` for a zero `inputAmount`.
@@ -581,8 +590,8 @@ type InitializeLaunchPoolParams = {
   creator: PublicKey; // Recorded as the pool creator
   payer: PublicKey; // Pays rent and the transaction fee
   parameters: InitializePoolWithDynamicParameters; // As for initializePoolWithDynamicConfig
-  userTokenX: PublicKey; // payer's token X account, non-zero balance
-  userTokenY: PublicKey; // payer's token Y account, non-zero balance
+  userTokenX?: PublicKey; // payer's token X account, non-zero balance. Default: payer's associated token account
+  userTokenY?: PublicKey; // payer's token Y account, non-zero balance. Default: payer's associated token account
   tokenXProgram?: PublicKey; // Default: the mint's owner
   tokenYProgram?: PublicKey; // Default: the mint's owner
   tokenBadgeX?: PublicKey | null; // deriveTokenBadge(tokenXMint) when X needs a badge
@@ -733,13 +742,13 @@ params: {
   pool: PublicKey; // Pool address
   tokenXMint: PublicKey; // Pool token X mint
   tokenYMint: PublicKey; // Pool token Y mint
-  receiverTokenX: PublicKey; // Receives token X
-  receiverTokenY: PublicKey; // Receives token Y
   signer: PublicKey; // The pool's partner; fee payer
   maxAmountX: BN; // Cap on token X claimed, before transfer fees
   maxAmountY: BN; // Cap on token Y claimed, before transfer fees
   minAmountX?: BN; // Minimum token X received after transfer fees; default 0
   minAmountY?: BN; // Minimum token Y received after transfer fees; default 0
+  receiverTokenX?: PublicKey; // Receives token X. Default: signer's associated token account
+  receiverTokenY?: PublicKey; // Receives token Y. Default: signer's associated token account
   tokenXProgram?: PublicKey; // Default: the mint's owner
   tokenYProgram?: PublicKey; // Default: the mint's owner
   transferHookX?: AccountMeta[]; // Default: resolved from the mint
@@ -759,8 +768,6 @@ const { tx } = await client.pool.claimPartnerFee({
   pool,
   tokenXMint: poolState.tokenXMint,
   tokenYMint: poolState.tokenYMint,
-  receiverTokenX,
-  receiverTokenY,
   signer: partner.publicKey,
   maxAmountX: poolState.poolPartner.pendingFeeX,
   maxAmountY: poolState.poolPartner.pendingFeeY,
@@ -807,8 +814,8 @@ type PositionTokenAccounts = {
   signer: PublicKey; // Owner or an approved delegate; fee payer
   tokenXMint: PublicKey; // Pool token X mint
   tokenYMint: PublicKey; // Pool token Y mint
-  userTokenX: PublicKey; // Token X source of a deposit or destination of a withdrawal
-  userTokenY: PublicKey; // Token Y source of a deposit or destination of a withdrawal
+  userTokenX?: PublicKey; // Token X source of a deposit or destination of a withdrawal. Default: the signer's associated token account for a deposit, the owner's for a withdrawal
+  userTokenY?: PublicKey; // Token Y source of a deposit or destination of a withdrawal. Default: as for userTokenX
   tokenXProgram?: PublicKey; // Default from the pool's token flag
   tokenYProgram?: PublicKey; // Default from the pool's token flag
   nftAccount?: PublicKey; // Default findNftAccount(nftMint, owner)
@@ -829,8 +836,6 @@ const accounts = {
   signer: owner.publicKey,
   tokenXMint: poolState.tokenXMint,
   tokenYMint: poolState.tokenYMint,
-  userTokenX,
-  userTokenY,
 };
 const { positionArray, positions } =
   await client.state.fetchPositionArrayWithPositions(derivePosition(nftMint), {
@@ -1180,8 +1185,8 @@ await sendAndConfirmTransaction(connection, tx, [owner]);
   liquidity stays.
 - The program fails with `ExceededSlippage` when a side receives less than
   its minimum.
-- A delegate needs `PositionDelegatePermission.RemoveLiquidity` and must pass
-  the owner's associated token accounts.
+- A delegate needs `PositionDelegatePermission.RemoveLiquidity` and can only
+  pay into the owner's associated token accounts, the defaults.
 - Same `liquidities` checks as `addLiquidity`.
 
 ---
@@ -1288,8 +1293,8 @@ await sendAndConfirmTransaction(connection, tx, [owner]);
 
 - Fees accrue to a slot when it is refreshed; select every slot whose fees
   you want. Unselected slots pay out only what is already pending.
-- A delegate needs `PositionDelegatePermission.ClaimFee` and must pass the
-  owner's associated token accounts.
+- A delegate needs `PositionDelegatePermission.ClaimFee` and can only pay
+  into the owner's associated token accounts, the defaults.
 
 ---
 
@@ -1809,8 +1814,8 @@ has left `[spacingAlignedMinTickId, spacingAlignedMaxTickId]`. Without it,
 
 The owner can approve a delegate on the NFT account (a Token-2022 `approve`
 of amount 0) and grant `LimitOrderDelegatePermission.CancelLimitOrder` with
-`updateLimitOrderDelegatePermission`. A delegate canceling an order must pass
-the owner's associated token accounts.
+`updateLimitOrderDelegatePermission`. A delegate canceling an order can only
+pay into the owner's associated token accounts, the defaults.
 
 ### openLimitOrder
 
@@ -1832,10 +1837,9 @@ openLimitOrder(params): Promise<{
 params: {
   pool: PublicKey; // Pool address
   nftMint: PublicKey; // Fresh keypair's public key
-  owner: PublicKey; // Receives the NFT; owner of userToken
+  owner: PublicKey; // Receives the NFT and pays the order amount
   payer: PublicKey; // Pays rent and the transaction fee
   tokenMint: PublicKey; // Token X mint for an ask, token Y mint for a bid
-  userToken: PublicKey; // Pays the order amount
   parameters: {
     isAskSide: boolean; // true sells X above the price, false buys X below it
     maxAmount: BN; // Cap on the total deposit, transfer fee included
@@ -1845,6 +1849,7 @@ params: {
     } | null; // null: ticks[].id are absolute tick ids
     ticks: { id: number; amount: BN }[]; // 1..=25 entries, strictly ascending ids, non-zero amounts
   };
+  userToken?: PublicKey; // Pays the order amount. Default: owner's associated token account
   tickArrays?: PublicKey[]; // Default: the arrays the order's ticks can land in; an explicit list is ascending by index
   tokenProgram?: PublicKey; // Default from the pool's token flag for that side
   tickArrayBitmapExtension?: PublicKey | null; // Default: the pool's extension when it has one and a tick array lies outside the inline bitmap
@@ -1886,7 +1891,6 @@ const { tx, limitOrder } = await client.limitOrder.openLimitOrder({
   owner: owner.publicKey,
   payer: owner.publicKey,
   tokenMint: poolState.tokenYMint,
-  userToken: userTokenY,
   parameters: {
     isAskSide: false,
     maxAmount: bid.amount,
@@ -1934,11 +1938,11 @@ params: {
   signer: PublicKey; // Owner or a delegate with CancelLimitOrder; fee payer
   tokenXMint: PublicKey; // Pool token X mint
   tokenYMint: PublicKey; // Pool token Y mint
-  userTokenX: PublicKey; // Receives token X
-  userTokenY: PublicKey; // Receives token Y
   tickIds?: number[]; // Strictly ascending; default every tick of the order not yet canceled
   minAmountX?: BN; // Minimum token X received after transfer fees; default 0
   minAmountY?: BN; // Minimum token Y received after transfer fees; default 0
+  userTokenX?: PublicKey; // Receives token X. Default: owner's associated token account
+  userTokenY?: PublicKey; // Receives token Y. Default: owner's associated token account
   tickArrays?: PublicKey[]; // Default: the arrays holding tickIds
   tokenXProgram?: PublicKey; // Default from the pool's token flag
   tokenYProgram?: PublicKey; // Default from the pool's token flag
@@ -1965,8 +1969,6 @@ const { tx } = await client.limitOrder.cancelLimitOrder({
   signer: owner.publicKey,
   tokenXMint: poolState.tokenXMint,
   tokenYMint: poolState.tokenYMint,
-  userTokenX,
-  userTokenY,
 });
 await sendAndConfirmTransaction(connection, tx, [owner]);
 ```
@@ -2173,8 +2175,7 @@ setRewardEmission(params): Promise<{ tx: Transaction; rewardVault: PublicKey }>
 params: {
   pool: PublicKey; // Pool address
   rewardMint: PublicKey; // The slot's mint
-  funderTokenAccount: PublicKey; // Source of the reward
-  funder: PublicKey; // Owner of funderTokenAccount; fee payer
+  funder: PublicKey; // Pays the reward; fee payer
   authority: PublicKey; // The slot's reward authority
   parameters: {
     index: number; // Reward slot
@@ -2183,6 +2184,7 @@ params: {
     emissionPerSecond: BN; // Q64.64 reward atoms per second
     maxAmount: BN; // Cap on the amount taken from funderTokenAccount, transfer fee included
   };
+  funderTokenAccount?: PublicKey; // Source of the reward. Default: funder's associated token account
   tokenProgram?: PublicKey; // Default: the mint's owner
   transferHookReward?: AccountMeta[]; // Default: resolved from the mint
 }
@@ -2202,7 +2204,6 @@ const emissionPerSecond = new BN(10).shln(64); // 10 atoms per second
 const { tx } = await client.reward.setRewardEmission({
   pool,
   rewardMint,
-  funderTokenAccount,
   funder: owner.publicKey,
   authority: owner.publicKey,
   parameters: {
@@ -2261,11 +2262,11 @@ params: {
   owner: PublicKey; // NFT owner
   signer: PublicKey; // Owner or a delegate with ClaimReward; fee payer
   rewardMint: PublicKey; // The reward slot's mint
-  userTokenAccount: PublicKey; // Receives the reward
   rewardIndex: number; // Reward slot
   minAmount?: BN; // Minimum received after transfer fees; default 0
   bitmap: BN; // Position slots to refresh before claiming (liquidityBitmap)
   tickRanges: TickRange[]; // Ranges of every selected slot that holds liquidity
+  userTokenAccount?: PublicKey; // Receives the reward. Default: owner's associated token account
   tokenProgram?: PublicKey; // Default: the mint's owner
   nftAccount?: PublicKey; // Default findNftAccount(nftMint, owner)
   transferHookReward?: AccountMeta[]; // Default: resolved from the mint
@@ -2290,7 +2291,6 @@ const { tx } = await client.reward.claimReward({
   owner: owner.publicKey,
   signer: owner.publicKey,
   rewardMint,
-  userTokenAccount,
   rewardIndex: CREATOR_REWARD_INDEX,
   bitmap,
   tickRanges,
@@ -2301,8 +2301,8 @@ await sendAndConfirmTransaction(connection, tx, [owner]);
 **Notes**
 
 - Rewards accrue to a slot when it is refreshed, as with `claimFee`.
-- A delegate must pass the owner's associated token account as
-  `userTokenAccount` (`IncorrectATA`).
+- A delegate can only pay into the owner's associated token account, the
+  default `userTokenAccount` (`IncorrectATA`).
 
 ---
 
@@ -2322,10 +2322,10 @@ withdrawIneligibleRewards(params): Promise<{ tx: Transaction }>
 params: {
   pool: PublicKey; // Pool address
   rewardMint: PublicKey; // The slot's mint
-  receiverTokenAccount: PublicKey; // Any token account of rewardMint
   authority: PublicKey; // The slot's reward authority; signer and fee payer
   rewardIndex: number; // Reward slot
   minAmount?: BN; // Minimum received after transfer fees; default 0
+  receiverTokenAccount?: PublicKey; // Any token account of rewardMint. Default: authority's associated token account
   tokenProgram?: PublicKey; // Default: the mint's owner
   transferHookReward?: AccountMeta[]; // Default: resolved from the mint
 }
@@ -3741,6 +3741,49 @@ const userTokenX = getAssociatedTokenAddressSync(
 **Notes**
 
 - Throws `TypeCastFailed` for any other flag.
+
+---
+
+### wrapSOLInstruction
+
+**Function**
+
+```typescript
+wrapSOLInstruction(from, to, amount): TransactionInstruction[]
+```
+
+**Parameters**
+
+```typescript
+from: PublicKey; // Source of the lamports; must sign
+to: PublicKey; // Wrapped SOL account
+amount: bigint; // Lamports to wrap
+```
+
+**Returns**
+
+A transfer of `amount` lamports and a sync-native instruction.
+
+---
+
+### unwrapSOLInstruction
+
+**Function**
+
+```typescript
+unwrapSOLInstruction(owner, receiver?): TransactionInstruction
+```
+
+**Parameters**
+
+```typescript
+owner: PublicKey; // Owner of the wrapped SOL account; must sign
+receiver?: PublicKey; // Receives the lamports; default owner
+```
+
+**Returns**
+
+A close of the owner's wrapped SOL account.
 
 ---
 

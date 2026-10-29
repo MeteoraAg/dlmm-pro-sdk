@@ -1,4 +1,9 @@
 import type { Program } from "@coral-xyz/anchor";
+import {
+  createAssociatedTokenAccountIdempotentInstruction,
+  getAssociatedTokenAddressSync,
+  unpackAccount,
+} from "@solana/spl-token";
 import type {
   AccountMeta,
   Commitment,
@@ -12,9 +17,12 @@ import {
   derivePoolAuthority,
   derivePosition,
   deriveReserve,
+  isNativeSol,
   readTokenAccountMint,
   resolveTokenProgram,
   tickArrayRemainingAccounts,
+  unwrapSOLInstruction,
+  wrapSOLInstruction,
   type TransferHookLeg,
 } from "../helpers";
 import type { DlmmPro } from "../idl/dlmm-pro/dlmm_pro";
@@ -36,6 +44,83 @@ export class DlmmProProgram {
     this.connection = client.connection;
     this.commitment = client.commitment;
     this.state = client.state;
+  }
+
+  /**
+   * Resolves each token to `account`, or to the owner's associated token
+   * account. Associated token accounts are created when missing. Native SOL in
+   * the owner's wrapped SOL account is topped up to `wrapAmount` before and
+   * closed after, both of which need the owner to sign.
+   */
+  protected async prepareTokenAccounts(params: {
+    payer: PublicKey;
+    owner: PublicKey;
+    /** Defaults to true; a delegate withdrawing to the owner leaves wrapped SOL in place. */
+    ownerSigns?: boolean;
+    tokens: readonly {
+      mint: PublicKey;
+      tokenProgram: PublicKey;
+      account?: PublicKey;
+      wrapAmount?: BN | null;
+    }[];
+  }): Promise<{
+    accounts: PublicKey[];
+    preInstructions: TransactionInstruction[];
+    postInstructions: TransactionInstruction[];
+  }> {
+    const tokens = params.tokens.map((token) => {
+      const ata = getAssociatedTokenAddressSync(
+        token.mint,
+        params.owner,
+        true,
+        token.tokenProgram,
+      );
+      const account = token.account ?? ata;
+      return { ...token, account, isAta: account.equals(ata) };
+    });
+    const atas = tokens.filter((token) => token.isAta);
+    const ataInfos =
+      atas.length === 0
+        ? []
+        : await this.connection.getMultipleAccountsInfo(
+            atas.map((token) => token.account),
+            this.commitment,
+          );
+
+    const preInstructions: TransactionInstruction[] = [];
+    const postInstructions: TransactionInstruction[] = [];
+    atas.forEach((token, index) => {
+      const info = ataInfos[index];
+      if (!info) {
+        preInstructions.push(
+          createAssociatedTokenAccountIdempotentInstruction(
+            params.payer,
+            token.account,
+            params.owner,
+            token.mint,
+            token.tokenProgram,
+          ),
+        );
+      }
+      if (!isNativeSol(token.mint) || params.ownerSigns === false) {
+        return;
+      }
+      const balance = info
+        ? unpackAccount(token.account, info, token.tokenProgram).amount
+        : 0n;
+      const wanted = BigInt(token.wrapAmount?.toString() ?? 0);
+      if (wanted > balance) {
+        preInstructions.push(
+          ...wrapSOLInstruction(params.owner, token.account, wanted - balance),
+        );
+      }
+      postInstructions.push(unwrapSOLInstruction(params.owner));
+    });
+    return {
+      accounts: tokens.map((token) => token.account),
+      preInstructions,
+      postInstructions,
+    };
   }
 
   protected async tokenProgramFor(

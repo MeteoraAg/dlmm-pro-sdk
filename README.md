@@ -25,8 +25,9 @@ const client = new DlmmProClient(connection); // commitment "confirmed"
 `client.pool`, `client.position`, `client.limitOrder`, and `client.reward`
 build unsigned transactions with the fee payer set; `client.state` reads accounts. Builders resolve Token-2022
 transfer-hook accounts and the pool's bitmap extension when you omit them,
-and the limit-order builders derive their tick arrays. Operator and admin
-instructions are not wrapped; build them with `client.program.methods`.
+and the limit-order builders derive their tick arrays. User token accounts
+default to associated token accounts, created when missing, and native SOL is
+wrapped and unwrapped in the same transaction.
 
 ## Swap
 
@@ -48,8 +49,6 @@ const { tx } = await client.pool.swap({
   pool,
   tokenXMint: poolState.tokenXMint,
   tokenYMint: poolState.tokenYMint,
-  userTokenIn: userTokenX,
-  userTokenOut: userTokenY,
   user: user.publicKey,
   swapForY: true,
   tickArrays,
@@ -103,8 +102,6 @@ const added = await client.position.addLiquidity({
   signer: owner.publicKey,
   tokenXMint: poolState.tokenXMint,
   tokenYMint: poolState.tokenYMint,
-  userTokenX,
-  userTokenY,
   tickRanges,
   parameters: {
     maxAmountX,
@@ -135,8 +132,6 @@ const { tx } = await client.position.claimFee({
   signer: owner.publicKey,
   tokenXMint: poolState.tokenXMint,
   tokenYMint: poolState.tokenYMint,
-  userTokenX,
-  userTokenY,
   bitmap: claimable.bitmap,
   tickRanges: claimable.tickRanges,
 });

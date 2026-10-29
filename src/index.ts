@@ -62,7 +62,12 @@ export {
   deriveTokenBadge,
 } from "./helpers/pda";
 export { readClock } from "./helpers/account_reads";
-export { findNftAccount, getTokenProgram } from "./helpers/token";
+export {
+  findNftAccount,
+  getTokenProgram,
+  unwrapSOLInstruction,
+  wrapSOLInstruction,
+} from "./helpers/token";
 export {
   decodeLimitOrderDataFromData,
   decodeObservationsFromData,

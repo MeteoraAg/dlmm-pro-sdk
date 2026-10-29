@@ -72,8 +72,16 @@ export type PositionTokenAccounts = {
   signer: PublicKey;
   tokenXMint: PublicKey;
   tokenYMint: PublicKey;
-  userTokenX: PublicKey;
-  userTokenY: PublicKey;
+  /**
+   * Defaults to the signer's associated token account for a deposit and the
+   * owner's for a withdrawal, created when missing.
+   */
+  userTokenX?: PublicKey;
+  /**
+   * Defaults to the signer's associated token account for a deposit and the
+   * owner's for a withdrawal, created when missing.
+   */
+  userTokenY?: PublicKey;
   tokenXProgram?: PublicKey;
   tokenYProgram?: PublicKey;
   nftAccount?: PublicKey;
@@ -256,6 +264,8 @@ function requireTick(
   return tick;
 }
 
+type UserTokenAccounts = { userTokenX: PublicKey; userTokenY: PublicKey };
+
 export class PositionService extends DlmmProProgram {
   /** The `nftMint` keypair must co-sign the transaction; the program initializes it as a new mint. */
   async openPosition(params: OpenPositionParams): Promise<{
@@ -304,11 +314,24 @@ export class PositionService extends DlmmProProgram {
       params.parameters.bitmap,
       params.parameters.liquidities,
     );
-    const ctx = await this.liquidityAccounts(params, "deposit");
+    const pool = await this.state.fetchPool(params.pool);
+    const tokens = await this.userTokens(
+      params,
+      pool,
+      params.signer,
+      params.parameters,
+    );
+    const ctx = await this.liquidityAccounts(
+      { ...params, ...tokens.accounts },
+      "deposit",
+      pool,
+    );
     const tx = await this.program.methods
       .addLiquidity(params.parameters, ctx.remainingAccountsInfo)
       .accountsPartial(ctx.accounts)
       .remainingAccounts(ctx.remainingAccounts)
+      .preInstructions(tokens.preInstructions)
+      .postInstructions(tokens.postInstructions)
       .transaction();
     tx.feePayer = params.signer;
     return { tx, position: ctx.position };
@@ -316,11 +339,24 @@ export class PositionService extends DlmmProProgram {
 
   async addLiquidityByWeight(params: AddLiquidityByWeightParams) {
     validateAddLiquidityByWeightParameters(params.parameters);
-    const ctx = await this.liquidityAccounts(params, "deposit");
+    const pool = await this.state.fetchPool(params.pool);
+    const tokens = await this.userTokens(
+      params,
+      pool,
+      params.signer,
+      params.parameters,
+    );
+    const ctx = await this.liquidityAccounts(
+      { ...params, ...tokens.accounts },
+      "deposit",
+      pool,
+    );
     const tx = await this.program.methods
       .addLiquidityByWeight(params.parameters, ctx.remainingAccountsInfo)
       .accountsPartial(ctx.accounts)
       .remainingAccounts(ctx.remainingAccounts)
+      .preInstructions(tokens.preInstructions)
+      .postInstructions(tokens.postInstructions)
       .transaction();
     tx.feePayer = params.signer;
     return { tx, position: ctx.position };
@@ -328,11 +364,24 @@ export class PositionService extends DlmmProProgram {
 
   async addLiquidityImbalance(params: AddLiquidityImbalanceParams) {
     this.validateAddLiquidityImbalance(params.parameters);
-    const ctx = await this.liquidityAccounts(params, "deposit");
+    const pool = await this.state.fetchPool(params.pool);
+    const tokens = await this.userTokens(
+      params,
+      pool,
+      params.signer,
+      params.parameters,
+    );
+    const ctx = await this.liquidityAccounts(
+      { ...params, ...tokens.accounts },
+      "deposit",
+      pool,
+    );
     const tx = await this.program.methods
       .addLiquidityImbalance(params.parameters, ctx.remainingAccountsInfo)
       .accountsPartial(ctx.accounts)
       .remainingAccounts(ctx.remainingAccounts)
+      .preInstructions(tokens.preInstructions)
+      .postInstructions(tokens.postInstructions)
       .transaction();
     tx.feePayer = params.signer;
     return { tx, position: ctx.position };
@@ -349,11 +398,19 @@ export class PositionService extends DlmmProProgram {
       params.parameters.bitmap,
       params.parameters.liquidities,
     );
-    const ctx = await this.liquidityAccounts(params, "withdraw");
+    const pool = await this.state.fetchPool(params.pool);
+    const tokens = await this.userTokens(params, pool, params.owner);
+    const ctx = await this.liquidityAccounts(
+      { ...params, ...tokens.accounts },
+      "withdraw",
+      pool,
+    );
     const tx = await this.program.methods
       .removeLiquidity(params.parameters, ctx.remainingAccountsInfo)
       .accountsPartial(ctx.accounts)
       .remainingAccounts(ctx.remainingAccounts)
+      .preInstructions(tokens.preInstructions)
+      .postInstructions(tokens.postInstructions)
       .transaction();
     tx.feePayer = params.signer;
     return { tx, position: ctx.position };
@@ -370,18 +427,36 @@ export class PositionService extends DlmmProProgram {
     if (params.parameters.bitmap !== null) {
       positionIndexesFromBitmap(params.parameters.bitmap);
     }
-    const ctx = await this.liquidityAccounts(params, "withdraw");
+    const pool = await this.state.fetchPool(params.pool);
+    const tokens = await this.userTokens(params, pool, params.owner);
+    const ctx = await this.liquidityAccounts(
+      { ...params, ...tokens.accounts },
+      "withdraw",
+      pool,
+    );
     const tx = await this.program.methods
       .removeLiquidityByBps(params.parameters, ctx.remainingAccountsInfo)
       .accountsPartial(ctx.accounts)
       .remainingAccounts(ctx.remainingAccounts)
+      .preInstructions(tokens.preInstructions)
+      .postInstructions(tokens.postInstructions)
       .transaction();
     tx.feePayer = params.signer;
     return { tx, position: ctx.position };
   }
 
   async claimFee(params: ClaimFeeParams): Promise<{ tx: Transaction }> {
-    const tx = new Transaction().add(...(await this.claimFeeIxs(params)));
+    const pool = await this.state.fetchPool(params.pool);
+    const tokens = await this.userTokens(params, pool, params.owner);
+    const claimIxs = await this.claimFeeIxs(
+      { ...params, ...tokens.accounts },
+      pool,
+    );
+    const tx = new Transaction().add(
+      ...tokens.preInstructions,
+      ...claimIxs,
+      ...tokens.postInstructions,
+    );
     tx.feePayer = params.signer;
     return { tx };
   }
@@ -474,6 +549,12 @@ export class PositionService extends DlmmProProgram {
     };
     this.validateAddLiquidityImbalance(parameters);
 
+    // The claim pays into the owner's accounts and the deposit draws on them,
+    // so only a cap the caller set is wrapped.
+    const tokens = await this.userTokens(params, pool, params.owner, {
+      maxAmountX: params.maxAmountX ?? null,
+      maxAmountY: params.maxAmountY ?? null,
+    });
     const accounts = {
       pool: params.pool,
       nftMint: params.nftMint,
@@ -482,8 +563,7 @@ export class PositionService extends DlmmProProgram {
       nftAccount: params.nftAccount,
       tokenXMint: params.tokenXMint,
       tokenYMint: params.tokenYMint,
-      userTokenX: params.userTokenX,
-      userTokenY: params.userTokenY,
+      ...tokens.accounts,
       tokenXProgram: params.tokenXProgram,
       tokenYProgram: params.tokenYProgram,
       transferHookX: params.transferHookX,
@@ -521,7 +601,12 @@ export class PositionService extends DlmmProProgram {
       .remainingAccounts(deposit.remainingAccounts)
       .instruction();
 
-    const tx = new Transaction().add(...claimIxs, depositIx);
+    const tx = new Transaction().add(
+      ...tokens.preInstructions,
+      ...claimIxs,
+      depositIx,
+      ...tokens.postInstructions,
+    );
     tx.feePayer = params.signer;
     return { tx, position: deposit.position, claimable, parameters };
   }
@@ -726,10 +811,64 @@ export class PositionService extends DlmmProProgram {
     return { tx };
   }
 
-  /** `compoundFees` passes the pool it already read. */
+  /**
+   * `owner`'s token accounts, created when missing, with native SOL wrapped
+   * up to `amounts` and unwrapped after when `owner` is the signer.
+   */
+  private async userTokens(
+    params: Pick<
+      PositionTokenAccounts,
+      | "signer"
+      | "tokenXMint"
+      | "tokenYMint"
+      | "userTokenX"
+      | "userTokenY"
+      | "tokenXProgram"
+      | "tokenYProgram"
+    >,
+    pool: Pool,
+    owner: PublicKey,
+    amounts?: { maxAmountX: BN | null; maxAmountY: BN | null },
+  ): Promise<{
+    accounts: UserTokenAccounts;
+    preInstructions: TransactionInstruction[];
+    postInstructions: TransactionInstruction[];
+  }> {
+    const {
+      accounts: [userTokenX, userTokenY],
+      preInstructions,
+      postInstructions,
+    } = await this.prepareTokenAccounts({
+      payer: params.signer,
+      owner,
+      ownerSigns: owner.equals(params.signer),
+      tokens: [
+        {
+          mint: params.tokenXMint,
+          tokenProgram:
+            params.tokenXProgram ?? getTokenProgram(pool.tokenXFlag),
+          account: params.userTokenX,
+          wrapAmount: amounts?.maxAmountX,
+        },
+        {
+          mint: params.tokenYMint,
+          tokenProgram:
+            params.tokenYProgram ?? getTokenProgram(pool.tokenYFlag),
+          account: params.userTokenY,
+          wrapAmount: amounts?.maxAmountY,
+        },
+      ],
+    });
+    return {
+      accounts: { userTokenX, userTokenY },
+      preInstructions,
+      postInstructions,
+    };
+  }
+
   private async claimFeeIxs(
-    params: ClaimFeeParams,
-    pool?: Pool,
+    params: ClaimFeeParams & UserTokenAccounts,
+    pool: Pool,
   ): Promise<TransactionInstruction[]> {
     const minAmountX = params.minAmountX ?? new BN(0);
     const minAmountY = params.minAmountY ?? new BN(0);
@@ -744,7 +883,7 @@ export class PositionService extends DlmmProProgram {
       signer: params.signer,
       bitmap: params.bitmap,
       tickRanges: params.tickRanges,
-      tickSpacing: ctx.pool.tickSpacing,
+      tickSpacing: pool.tickSpacing,
     });
     const claim = await this.program.methods
       .claimFee(minAmountX, minAmountY, ctx.hooks.remainingAccountsInfo)
@@ -759,9 +898,10 @@ export class PositionService extends DlmmProProgram {
     params: Omit<
       PositionTokenAccounts,
       "tickRanges" | "tickArrayBitmapExtension"
-    >,
+    > &
+      UserTokenAccounts,
     flow: "deposit" | "withdraw",
-    pool?: Pool,
+    pool: Pool,
   ) {
     const deposit = flow === "deposit";
     const { reserveX, reserveY, transferHookX, transferHookY } =
@@ -777,15 +917,15 @@ export class PositionService extends DlmmProProgram {
         deposit,
         programId: this.programId,
       });
-    const [poolState, hooks] = await Promise.all([
-      pool ?? this.state.fetchPool(params.pool),
-      resolveInstructionHooks(this.connection, this.commitment, {
+    const hooks = await resolveInstructionHooks(
+      this.connection,
+      this.commitment,
+      {
         transferHookX: { metas: params.transferHookX, leg: transferHookX },
         transferHookY: { metas: params.transferHookY, leg: transferHookY },
-      }),
-    ]);
+      },
+    );
     return {
-      pool: poolState,
       hooks,
       accounts: {
         pool: params.pool,
@@ -799,21 +939,19 @@ export class PositionService extends DlmmProProgram {
         tokenXMint: params.tokenXMint,
         tokenYMint: params.tokenYMint,
         signer: params.signer,
-        tokenXProgram:
-          params.tokenXProgram ?? getTokenProgram(poolState.tokenXFlag),
-        tokenYProgram:
-          params.tokenYProgram ?? getTokenProgram(poolState.tokenYFlag),
+        tokenXProgram: params.tokenXProgram ?? getTokenProgram(pool.tokenXFlag),
+        tokenYProgram: params.tokenYProgram ?? getTokenProgram(pool.tokenYFlag),
       },
     };
   }
 
   private async liquidityAccounts(
-    params: PositionTokenAccounts,
+    params: PositionTokenAccounts & UserTokenAccounts,
     flow: "deposit" | "withdraw",
-    pool?: Pool,
+    pool: Pool,
   ) {
     const ctx = await this.tokenAccounts(params, flow, pool);
-    const { tickSpacing, isBitmapExtensionInitialized } = ctx.pool;
+    const { tickSpacing, isBitmapExtensionInitialized } = pool;
     return {
       position: ctx.accounts.position,
       remainingAccountsInfo: ctx.hooks.remainingAccountsInfo,

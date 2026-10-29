@@ -1,14 +1,18 @@
 import { BN } from "@coral-xyz/anchor";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { beforeAll, describe, expect, it } from "vitest";
 import { DlmmProClient, PoolErrorCode } from "../src";
 import {
+  accountExists,
   big,
+  createAndFundWallet,
   createFundedMarket,
   createSvmConnection,
   getTokenAmount,
   initializeStaticPool,
   initializeSVM,
+  mintSplTokenTo,
   pushPrice,
   seedCrossArrayLiquidity,
   seedPoolLiquidity,
@@ -90,6 +94,39 @@ describe("swap", () => {
     const { tx } = await client.pool.swap(swapArgs);
     expect(accounts(tx)).toContain(tickArrayBitmapExtension.toBase58());
     sendTransaction(svm, tx, [market.swapper]);
+  });
+
+  it("creates the user's associated token accounts when none are passed", async () => {
+    const user = createAndFundWallet(svm);
+    mintSplTokenTo(svm, market.payer, market.tokenYMint, user.publicKey);
+    const userTokenX = getAssociatedTokenAddressSync(
+      market.tokenXMint,
+      user.publicKey,
+    );
+    expect(accountExists(svm, userTokenX)).toBe(false);
+
+    const { quote, tickArrays } = await client.pool.quoteExactIn({
+      pool,
+      inputAmount,
+      swapForY: false,
+    });
+    const { tx } = await client.pool.swap({
+      pool,
+      tokenXMint: market.tokenXMint,
+      tokenYMint: market.tokenYMint,
+      user: user.publicKey,
+      swapForY: false,
+      parameters: {
+        inputAmount,
+        minimumOutputAmount: quote.transferFeeExcludedOutAmount,
+      },
+      tickArrays,
+    });
+    sendTransaction(svm, tx, [user]);
+
+    expect(
+      getTokenAmount(svm, userTokenX).eq(quote.transferFeeExcludedOutAmount),
+    ).toBe(true);
   });
 
   it("rejects an input amount that does not fit in a u64", async () => {
