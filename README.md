@@ -18,7 +18,7 @@ npm install @meteora-ag/dlmm-pro-sdk
 import { Connection } from "@solana/web3.js";
 import { DlmmProClient } from "@meteora-ag/dlmm-pro-sdk";
 
-const connection = new Connection("https://api.devnet.solana.com");
+const connection = new Connection("https://api.mainnet-beta.solana.com");
 const client = new DlmmProClient(connection); // commitment "confirmed"
 ```
 
@@ -174,7 +174,7 @@ let quote = quote_exact_in(QuoteExactInParams { /* pool address, parsed accounts
 
 ## Program addresses
 
-- DLMM Pro: `dPro1D5wiqnGMH8vMDG23jh35btTHoWdyqXjqkqxe8n` (devnet)
+- DLMM Pro: `dPro1D5wiqnGMH8vMDG23jh35btTHoWdyqXjqkqxe8n`
 - Access registry: `regUFehW9oycnaV2auYyfqyYjKG1W1uLNT7rtUeemQr`
 
 The IDLs are exported as `DlmmProIDL` and `AccessRegistryIDL`, and as JSON

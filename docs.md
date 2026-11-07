@@ -165,7 +165,7 @@ class DlmmProClient {
 import { Connection } from "@solana/web3.js";
 import { DlmmProClient } from "@meteora-ag/dlmm-pro-sdk";
 
-const connection = new Connection("https://api.devnet.solana.com");
+const connection = new Connection("https://api.mainnet-beta.solana.com");
 const client = new DlmmProClient(connection);
 ```
 
