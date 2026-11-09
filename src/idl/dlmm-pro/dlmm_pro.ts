@@ -5848,7 +5848,7 @@ export type DlmmPro = {
           {
             "name": "initialSqrtPrice",
             "docs": [
-              "The init price of the pool as a sqrt(token_b/token_a) Q64.64 value"
+              "The init price of the pool as a sqrt(token_y/token_x) Q64.64 value"
             ],
             "type": "u128"
           },
