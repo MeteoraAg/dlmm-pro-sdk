@@ -6,6 +6,8 @@ import {
   AccessRegistryOperatorPermission,
   ActivationMode,
   ActivationType,
+  baseFeeParameters,
+  BaseFeeMode,
   bondingCurveActivationParameters,
   CollectFeeMode,
   deriveLaunchPool,
@@ -27,6 +29,7 @@ import {
   tickArraysForSwap,
   timeBasedActivationParameters,
   TokenProgramFlags,
+  type BaseFeeBpsParams,
   type StaticConfigParameters,
 } from "../src";
 import {
@@ -254,6 +257,77 @@ describe("initialize pool", () => {
       expect(poolState.tokenXMint.toBase58()).toBe(tokenXMint.toBase58());
       expect(poolState.tokenYMint.toBase58()).toBe(tokenYMint.toBase58());
       expect(poolState.tickSpacing).toBe(1);
+    });
+
+    it("initializes pools from the bps base fee builders", async () => {
+      const marketCap = {
+        startingBaseFeeBps: 1000,
+        endingBaseFeeBps: 25,
+        numberOfPeriod: 50,
+        priceMultiple: 100,
+        schedulerExpirationDuration: 86_400,
+      };
+      const cases: [string, BaseFeeBpsParams][] = [
+        ["fixed", { baseFeeMode: BaseFeeMode.Fixed, feeBps: 25 }],
+        [
+          "time linear",
+          {
+            baseFeeMode: BaseFeeMode.TimeSchedulerLinear,
+            startingBaseFeeBps: 5000,
+            endingBaseFeeBps: 100,
+            numberOfPeriod: 10,
+            totalDuration: 3600,
+          },
+        ],
+        [
+          "time exponential ending at 1 bps",
+          {
+            baseFeeMode: BaseFeeMode.TimeSchedulerExponential,
+            startingBaseFeeBps: 100,
+            endingBaseFeeBps: 1,
+            numberOfPeriod: 50,
+            totalDuration: 3600,
+          },
+        ],
+        [
+          "market cap linear",
+          { baseFeeMode: BaseFeeMode.MarketCapSchedulerLinear, ...marketCap },
+        ],
+        [
+          "market cap exponential between both fee bounds",
+          {
+            baseFeeMode: BaseFeeMode.MarketCapSchedulerExponential,
+            startingBaseFeeBps: 9900,
+            endingBaseFeeBps: 1,
+            numberOfPeriod: 100,
+            priceMultiple: 1000,
+            schedulerExpirationDuration: 86_400,
+          },
+        ],
+      ];
+
+      for (const [label, params] of cases) {
+        const baseFeeParameter = baseFeeParameters(params);
+        const { tx, pool } = await client.pool.initializePoolWithDynamicConfig({
+          config: await dynamicConfig(),
+          poolCreatorAuthority: creator.publicKey,
+          tokenXMint,
+          tokenYMint,
+          creator: creator.publicKey,
+          payer: payer.publicKey,
+          parameters: {
+            ...defaultDynamicPoolParameters(SQRT_PRICE_ONE),
+            poolFees: { baseFeeParameter, dynamicFeeParameter: null },
+          },
+        });
+        sendTransaction(svm, tx, [payer, creator]);
+
+        const { baseFee } = (await client.state.fetchPool(pool)).feeConfig;
+        expect(baseFee.baseFeeMode, label).toBe(baseFeeParameter.baseFeeMode);
+        expect(Array.from(baseFee.data), label).toEqual(
+          Array.from(baseFeeParameter.data),
+        );
+      }
     });
 
     it("initializes a pool when token x has a token badge", async () => {

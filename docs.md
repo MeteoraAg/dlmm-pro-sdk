@@ -109,6 +109,11 @@
   - [Raw Account Decoders](#raw-account-decoders)
 
 - [Base Fee and Activation Functions](#base-fee-and-activation-functions)
+  - [bpsToFeeNumerator](#bpstofeenumerator)
+  - [baseFeeParameters](#basefeeparameters)
+  - [fixedBaseFeeParameters](#fixedbasefeeparameters)
+  - [timeSchedulerBaseFeeParameters](#timeschedulerbasefeeparameters)
+  - [marketCapSchedulerBaseFeeParameters](#marketcapschedulerbasefeeparameters)
   - [encodeFixedBaseFeeData](#encodefixedbasefeedata)
   - [encodeTimeSchedulerBaseFeeData](#encodetimeschedulerbasefeedata)
   - [encodeMarketCapSchedulerBaseFeeData](#encodemarketcapschedulerbasefeedata)
@@ -3947,12 +3952,14 @@ connection.onAccountChange(derivePosition(nftMint), ({ data }) => {
 
 ## Base Fee and Activation Functions
 
-A pool's base fee is a `BaseFeeMode` plus 31 bytes of `data`; the encoders
-below produce the `data`. Fee numerators are over `FEE_DENOMINATOR`
+A pool's base fee is a `BaseFeeMode` plus 31 bytes of `data`. The builders
+below take fees in basis points and return the whole `baseFeeParameter`
+(mode and data); they reject schedules pool initialization would reject
+(`InvalidParameters`). The raw encoders produce only `data` and check that
+each field fits its integer width. Fee numerators are over `FEE_DENOMINATOR`
 (1,000,000,000), so 1,000,000 is 0.1%. Pool initialization requires every
 fee the schedule can reach to lie within `MIN_FEE_NUMERATOR..=MAX_FEE_NUMERATOR`
-(0.01% to 99%); the encoders check only that each field fits its integer
-width (`InvalidParameters`).
+(0.01% to 99%).
 
 A pool with the ActivationAccess extension has two activation slots and
 three whitelisted wallets (`poolActivation`). A swap, deposit, or withdrawal
@@ -3961,6 +3968,212 @@ position or order owner, is the matching whitelisted wallet. Pool
 initialization accepts these slot pairs, in this order: Open + Open,
 Open + BondingCurve, Open + TimeBased, BondingCurve + TimeBased. Without a
 TimeBased slot, `activationPoint` must be the current point; pass `null`.
+
+### bpsToFeeNumerator
+
+**Function**
+
+```typescript
+bpsToFeeNumerator(bps: number): BN
+```
+
+**Parameters**
+
+```typescript
+bps: number; // Integer in 0..=10000
+```
+
+**Returns**
+
+The fee over `FEE_DENOMINATOR`; 1 bps is 100,000.
+
+---
+
+### baseFeeParameters
+
+Picks the builder from `baseFeeMode`. Equivalent of the damm-v2 SDK's
+`getBaseFeeParams`, with each mode's fields at the top level instead of in a
+per-mode sub-object.
+
+**Function**
+
+```typescript
+baseFeeParameters(params: BaseFeeBpsParams): BaseFeeConfigParameters
+```
+
+**Parameters**
+
+```typescript
+type BaseFeeBpsParams =
+  | { baseFeeMode: BaseFeeMode.Fixed; feeBps: number }
+  | TimeSchedulerBpsParams
+  | MarketCapSchedulerBpsParams;
+```
+
+**Returns**
+
+The `baseFeeParameter` from `fixedBaseFeeParameters`,
+`timeSchedulerBaseFeeParameters` or `marketCapSchedulerBaseFeeParameters`.
+
+**Example**
+
+```typescript
+const baseFeeMode = BaseFeeMode.MarketCapSchedulerExponential; // e.g. from a UI selector
+const baseFeeParameter = baseFeeParameters({
+  baseFeeMode,
+  startingBaseFeeBps: 1000,
+  endingBaseFeeBps: 25,
+  numberOfPeriod: 50,
+  priceMultiple: 100,
+  schedulerExpirationDuration: 86_400,
+});
+```
+
+**Notes**
+
+- The params type is a union keyed on `baseFeeMode`, so TypeScript requires
+  the fields of the chosen mode.
+- Throws `InvalidBaseFeeMode` for an unknown mode; other errors come from the
+  chosen builder.
+
+---
+
+### fixedBaseFeeParameters
+
+**Function**
+
+```typescript
+fixedBaseFeeParameters(feeBps: number): BaseFeeConfigParameters
+```
+
+**Parameters**
+
+```typescript
+feeBps: number; // Integer in 1..=9900
+```
+
+**Returns**
+
+The `baseFeeParameter` for `BaseFeeMode.Fixed`.
+
+**Example**
+
+```typescript
+const baseFeeParameter = fixedBaseFeeParameters(25); // 0.25%
+```
+
+---
+
+### timeSchedulerBaseFeeParameters
+
+A fee that starts at `startingBaseFeeBps` at the activation point and settles
+at about `endingBaseFeeBps` after `totalDuration`. Equivalent of the damm-v2
+SDK's `getFeeTimeSchedulerParams`.
+
+**Function**
+
+```typescript
+timeSchedulerBaseFeeParameters(params: TimeSchedulerBpsParams): BaseFeeConfigParameters
+```
+
+**Parameters**
+
+```typescript
+type TimeSchedulerBpsParams = {
+  baseFeeMode:
+    BaseFeeMode.TimeSchedulerLinear | BaseFeeMode.TimeSchedulerExponential;
+  startingBaseFeeBps: number; // Integer in 1..=9900
+  endingBaseFeeBps: number; // Integer in 1..=9900, below startingBaseFeeBps
+  numberOfPeriod: number; // Non-zero u16
+  totalDuration: number; // Slots or seconds, per the pool's activation type
+};
+```
+
+**Returns**
+
+The `baseFeeParameter` for the chosen time scheduler mode.
+
+**Example**
+
+```typescript
+const baseFeeParameter = timeSchedulerBaseFeeParameters({
+  baseFeeMode: BaseFeeMode.TimeSchedulerLinear,
+  startingBaseFeeBps: 5000, // 50%
+  endingBaseFeeBps: 100, // 1%
+  numberOfPeriod: 10,
+  totalDuration: 3600, // seconds on a timestamp-activated pool
+});
+```
+
+**Notes**
+
+- The starting fee must be above the ending fee; for a constant fee use
+  `fixedBaseFeeParameters`.
+- The period length is `floor(totalDuration / numberOfPeriod)`, so the fee
+  settles at or before `totalDuration`.
+- Linear reduction is floored, so the settled fee is at or above the ending
+  fee. Exponential `reductionFactor` is whole basis points, so the settled
+  fee is at or just above `endingBaseFeeBps`.
+- Throws `InvalidParameters` if `reductionFactor` rounds to zero (too many
+  periods for the fee range).
+
+---
+
+### marketCapSchedulerBaseFeeParameters
+
+A fee that falls as the spot price rises above the initial price, settling at
+about `endingBaseFeeBps` at `priceMultiple` or after
+`schedulerExpirationDuration`, whichever comes first. Equivalent of the
+damm-v2 SDK's `getFeeMarketCapSchedulerParams`.
+
+**Function**
+
+```typescript
+marketCapSchedulerBaseFeeParameters(params: MarketCapSchedulerBpsParams): BaseFeeConfigParameters
+```
+
+**Parameters**
+
+```typescript
+type MarketCapSchedulerBpsParams = {
+  baseFeeMode:
+    | BaseFeeMode.MarketCapSchedulerLinear
+    | BaseFeeMode.MarketCapSchedulerExponential;
+  startingBaseFeeBps: number; // Integer in 1..=9900
+  endingBaseFeeBps: number; // Integer in 1..=9900, below startingBaseFeeBps
+  numberOfPeriod: number; // Non-zero u16
+  priceMultiple: number; // Spot-price multiple of the initial price at which the fee settles, > 1
+  schedulerExpirationDuration: number; // Slots or seconds after activation, per the pool's activation type
+};
+```
+
+**Returns**
+
+The `baseFeeParameter` for the chosen market cap scheduler mode.
+
+**Example**
+
+```typescript
+const baseFeeParameter = marketCapSchedulerBaseFeeParameters({
+  baseFeeMode: BaseFeeMode.MarketCapSchedulerLinear,
+  startingBaseFeeBps: 1000, // 10%
+  endingBaseFeeBps: 25, // 0.25%
+  numberOfPeriod: 50,
+  priceMultiple: 100,
+  schedulerExpirationDuration: 86_400,
+});
+```
+
+**Notes**
+
+- The starting fee must be above the ending fee; for a constant fee use
+  `fixedBaseFeeParameters`.
+- The sqrt-price step is `floor((sqrt(priceMultiple) - 1) * 10000 /
+numberOfPeriod)` bps, so the fee settles at or before `priceMultiple`.
+  Throws `InvalidParameters` if the step rounds to zero.
+- Reduction rounding is as for `timeSchedulerBaseFeeParameters`.
+
+---
 
 ### encodeFixedBaseFeeData
 

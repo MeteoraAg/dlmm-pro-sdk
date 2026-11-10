@@ -1,9 +1,15 @@
 import BN from "bn.js";
 import { PoolError } from "../errors";
 import { encodePodU16, encodePodU64, toPodBuffer } from "../helpers/pod";
+import { isIntegerIn } from "../helpers/validation";
 import { baseFeeNumeratorByPeriod } from "../math/base_fee_math";
 import { safeDiv, safeSub, tryCastU16, U64_MAX } from "../math/safe_math";
-import { BaseFeeMode, type BaseFeeConfig } from "../types";
+import {
+  BaseFeeMode,
+  type BaseFeeConfig,
+  type BaseFeeConfigParameters,
+} from "../types";
+import { getSchedulerFeeNumerators } from "./fee_bps";
 import { validateFeeBounds, validateSchedulerFields } from "./fee_bounds";
 
 export type PodAlignedFeeTimeScheduler = {
@@ -107,4 +113,47 @@ export class FeeTimeScheduler {
     const period = getPassedPeriod(this.inner, currentPoint, activationPoint);
     return this.getBaseFeeNumeratorByPeriod(period);
   }
+}
+
+export type TimeSchedulerBpsParams = {
+  baseFeeMode:
+    BaseFeeMode.TimeSchedulerLinear | BaseFeeMode.TimeSchedulerExponential;
+  startingBaseFeeBps: number;
+  endingBaseFeeBps: number;
+  numberOfPeriod: number;
+  totalDuration: number; // slots or seconds, per the pool's activation type
+};
+
+export function timeSchedulerBaseFeeParameters(
+  params: TimeSchedulerBpsParams,
+): BaseFeeConfigParameters {
+  const { baseFeeMode, numberOfPeriod, totalDuration } = params;
+  if (
+    baseFeeMode !== BaseFeeMode.TimeSchedulerLinear &&
+    baseFeeMode !== BaseFeeMode.TimeSchedulerExponential
+  ) {
+    throw PoolError.invalidBaseFeeMode();
+  }
+  const { cliffFeeNumerator, reductionFactor } = getSchedulerFeeNumerators(
+    baseFeeMode === BaseFeeMode.TimeSchedulerLinear,
+    params.startingBaseFeeBps,
+    params.endingBaseFeeBps,
+    numberOfPeriod,
+  );
+  if (!isIntegerIn(totalDuration, numberOfPeriod, Number.MAX_SAFE_INTEGER)) {
+    throw PoolError.invalidParameters(
+      "totalDuration must be an integer of at least numberOfPeriod",
+    );
+  }
+  const baseFee = {
+    baseFeeMode,
+    data: encodeTimeSchedulerBaseFeeData({
+      cliffFeeNumerator,
+      periodFrequency: Math.floor(totalDuration / numberOfPeriod),
+      reductionFactor,
+      numberOfPeriod,
+    }),
+  };
+  FeeTimeScheduler.fromBaseFeeConfig(baseFee).validate();
+  return baseFee;
 }

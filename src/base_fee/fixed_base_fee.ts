@@ -1,7 +1,12 @@
 import BN from "bn.js";
 import { encodePodU64, toPodBuffer } from "../helpers/pod";
-import { assertZeroPadding } from "../helpers/validation";
-import type { BaseFeeConfig } from "../types";
+import { assertBps, assertZeroPadding } from "../helpers/validation";
+import {
+  BaseFeeMode,
+  type BaseFeeConfig,
+  type BaseFeeConfigParameters,
+} from "../types";
+import { bpsToFeeNumerator } from "./fee_bps";
 import { validateFeeBounds } from "./fee_bounds";
 
 export type PodAlignedFixedFee = {
@@ -56,4 +61,16 @@ export class FixedBaseFeeHandler {
   ): BN {
     return this.inner.cliffFeeNumerator;
   }
+}
+
+export function fixedBaseFeeParameters(
+  feeBps: number,
+): BaseFeeConfigParameters {
+  assertBps(feeBps, "feeBps");
+  const baseFee = {
+    baseFeeMode: BaseFeeMode.Fixed,
+    data: encodeFixedBaseFeeData(bpsToFeeNumerator(feeBps)),
+  };
+  FixedBaseFeeHandler.fromBaseFeeConfig(baseFee).validate();
+  return baseFee;
 }
