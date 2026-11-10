@@ -133,11 +133,19 @@ export {
   type TickWeight,
 } from "./strategy";
 export {
+  baseFeeParameters,
+  bpsToFeeNumerator,
   encodeFixedBaseFeeData,
   encodeMarketCapSchedulerBaseFeeData,
   encodeTimeSchedulerBaseFeeData,
+  fixedBaseFeeParameters,
   getBaseFeeNumerator,
+  marketCapSchedulerBaseFeeParameters,
+  timeSchedulerBaseFeeParameters,
+  type BaseFeeBpsParams,
+  type MarketCapSchedulerBpsParams,
   type MarketCapSchedulerParams,
+  type TimeSchedulerBpsParams,
   type TimeSchedulerParams,
 } from "./base_fee";
 export {

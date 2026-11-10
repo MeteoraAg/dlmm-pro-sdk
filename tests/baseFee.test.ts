@@ -3,15 +3,21 @@ import BN from "bn.js";
 import { describe, expect, it } from "vitest";
 import {
   ActivationType,
+  baseFeeParameters,
   BaseFeeMode,
+  bpsToFeeNumerator,
   encodeFixedBaseFeeData,
   encodeMarketCapSchedulerBaseFeeData,
   encodeTimeSchedulerBaseFeeData,
+  fixedBaseFeeParameters,
   getBaseFeeNumerator,
   getSqrtPriceFromTickId,
+  marketCapSchedulerBaseFeeParameters,
   MAX_TICK_ID,
+  MIN_FEE_NUMERATOR,
   PoolErrorCode,
   bondingCurveActivationParameters,
+  timeSchedulerBaseFeeParameters,
   type BaseFeeConfig,
   Q64,
 } from "../src";
@@ -27,6 +33,7 @@ import {
   decodePodAlignedFeeMarketCapScheduler,
   decodePodAlignedFeeTimeScheduler,
   decodePodAlignedFixedFee,
+  FeeTimeScheduler,
   validateBaseFeeConfig,
 } from "../src/base_fee";
 import { alignTickDown } from "../src/helpers/tick_array";
@@ -381,5 +388,231 @@ describe("bonding curve initialize validation", () => {
         context(getSqrtPriceFromTickId(0), PublicKey.default),
       ),
     ).toThrow(invalidParameters);
+  });
+});
+
+describe("bps base fee builders", () => {
+  const timeParams = {
+    baseFeeMode: BaseFeeMode.TimeSchedulerLinear,
+    startingBaseFeeBps: 5000,
+    endingBaseFeeBps: 100,
+    numberOfPeriod: 10,
+    totalDuration: 3600,
+  } as const;
+  const marketCapParams = {
+    baseFeeMode: BaseFeeMode.MarketCapSchedulerLinear,
+    startingBaseFeeBps: 1000,
+    endingBaseFeeBps: 25,
+    numberOfPeriod: 50,
+    priceMultiple: 100,
+    schedulerExpirationDuration: 86400,
+  } as const;
+  const errorCode = (fn: () => unknown) =>
+    expect(fn).toThrow(
+      expect.objectContaining({ code: PoolErrorCode.InvalidBaseFeeMode }),
+    );
+
+  it("converts bps to a fee numerator", () => {
+    expect(bpsToFeeNumerator(1).toNumber()).toBe(100_000);
+    expect(bpsToFeeNumerator(10_000).toNumber()).toBe(1_000_000_000);
+    expect(() => bpsToFeeNumerator(-1)).toThrow(invalidParameters);
+    expect(() => bpsToFeeNumerator(0.5)).toThrow(invalidParameters);
+  });
+
+  it("dispatches baseFeeParameters by mode", () => {
+    expect(
+      baseFeeParameters({ baseFeeMode: BaseFeeMode.Fixed, feeBps: 25 }),
+    ).toEqual(fixedBaseFeeParameters(25));
+    for (const baseFeeMode of [
+      BaseFeeMode.TimeSchedulerLinear,
+      BaseFeeMode.TimeSchedulerExponential,
+    ] as const) {
+      const params = { ...timeParams, baseFeeMode };
+      expect(baseFeeParameters(params)).toEqual(
+        timeSchedulerBaseFeeParameters(params),
+      );
+    }
+    for (const baseFeeMode of [
+      BaseFeeMode.MarketCapSchedulerLinear,
+      BaseFeeMode.MarketCapSchedulerExponential,
+    ] as const) {
+      const params = { ...marketCapParams, baseFeeMode };
+      expect(baseFeeParameters(params)).toEqual(
+        marketCapSchedulerBaseFeeParameters(params),
+      );
+    }
+    errorCode(() => baseFeeParameters({ baseFeeMode: 9 } as never));
+  });
+
+  it("builds a fixed fee", () => {
+    expect(fixedBaseFeeParameters(25)).toEqual({
+      baseFeeMode: BaseFeeMode.Fixed,
+      data: encodeFixedBaseFeeData(2_500_000),
+    });
+    for (const bps of [0, 1.5, 9901]) {
+      expect(() => fixedBaseFeeParameters(bps)).toThrow(invalidParameters);
+    }
+  });
+
+  describe("time scheduler", () => {
+    it("builds a linear schedule", () => {
+      const baseFee = timeSchedulerBaseFeeParameters(timeParams);
+      const inner = decodePodAlignedFeeTimeScheduler(baseFee);
+      expect(inner.cliffFeeNumerator.toNumber()).toBe(500_000_000);
+      expect(inner.periodFrequency.toNumber()).toBe(360);
+      expect(inner.reductionFactor.toNumber()).toBe(49_000_000);
+      expect(inner.numberOfPeriod).toBe(10);
+
+      const fee = (point: number) =>
+        getBaseFeeNumerator(baseFee, new BN(point), new BN(1000), Q64, Q64);
+      expect(fee(1000).toNumber()).toBe(500_000_000);
+      expect(fee(1000 + 3600).toNumber()).toBe(10_000_000);
+    });
+
+    it("floors the period length", () => {
+      const inner = decodePodAlignedFeeTimeScheduler(
+        timeSchedulerBaseFeeParameters({
+          ...timeParams,
+          numberOfPeriod: 3,
+          totalDuration: 1000,
+        }),
+      );
+      expect(inner.periodFrequency.toNumber()).toBe(333);
+    });
+
+    it("builds the tightest exponential schedule", () => {
+      const baseFee = timeSchedulerBaseFeeParameters({
+        ...timeParams,
+        baseFeeMode: BaseFeeMode.TimeSchedulerExponential,
+        endingBaseFeeBps: 25,
+        numberOfPeriod: 100,
+      });
+      const inner = decodePodAlignedFeeTimeScheduler(baseFee);
+      expect(inner.reductionFactor.toNumber()).toBe(516);
+      expect(
+        FeeTimeScheduler.fromBaseFeeConfig(baseFee)
+          .getBaseFeeNumeratorByPeriod(100)
+          .toNumber(),
+      ).toBe(2_501_062);
+      expect(
+        getFeeInPeriod(
+          inner.cliffFeeNumerator,
+          inner.reductionFactor.addn(1),
+          100,
+        ).toNumber(),
+      ).toBe(2_474_828);
+    });
+
+    it("keeps an exponential schedule ending at 1 bps valid", () => {
+      const baseFee = timeSchedulerBaseFeeParameters({
+        ...timeParams,
+        baseFeeMode: BaseFeeMode.TimeSchedulerExponential,
+        startingBaseFeeBps: 100,
+        endingBaseFeeBps: 1,
+        numberOfPeriod: 50,
+      });
+      expect(() => validateBaseFeeConfig(baseFee)).not.toThrow();
+      const inner = decodePodAlignedFeeTimeScheduler(baseFee);
+      expect(inner.reductionFactor.toNumber()).toBe(879);
+      const settled = getFeeInPeriod(
+        inner.cliffFeeNumerator,
+        inner.reductionFactor,
+        50,
+      );
+      expect(settled.toNumber()).toBe(100_489);
+      expect(settled.gte(MIN_FEE_NUMERATOR)).toBe(true);
+    });
+
+    it("rejects invalid schedules", () => {
+      const rejects = (overrides: object) =>
+        expect(() =>
+          timeSchedulerBaseFeeParameters({ ...timeParams, ...overrides }),
+        ).toThrow(invalidParameters);
+      rejects({ endingBaseFeeBps: 5000 });
+      rejects({ startingBaseFeeBps: 50 });
+      rejects({ startingBaseFeeBps: 9950 });
+      rejects({ numberOfPeriod: 0 });
+      rejects({ totalDuration: 9 });
+      rejects({
+        baseFeeMode: BaseFeeMode.TimeSchedulerExponential,
+        startingBaseFeeBps: 2,
+        endingBaseFeeBps: 1,
+        numberOfPeriod: 65_535,
+      });
+      errorCode(() =>
+        timeSchedulerBaseFeeParameters({
+          ...timeParams,
+          baseFeeMode: BaseFeeMode.Fixed,
+        } as never),
+      );
+    });
+  });
+
+  describe("market cap scheduler", () => {
+    it("builds a linear schedule", () => {
+      const baseFee = marketCapSchedulerBaseFeeParameters(marketCapParams);
+      const inner = decodePodAlignedFeeMarketCapScheduler(baseFee);
+      expect(inner.sqrtPriceStepBps).toBe(1800);
+      expect(inner.cliffFeeNumerator.toNumber()).toBe(100_000_000);
+      expect(inner.reductionFactor.toNumber()).toBe(1_950_000);
+
+      const activationPoint = new BN(1000);
+      const fee = (currentPoint: number, sqrtPrice: BN) =>
+        getBaseFeeNumerator(
+          baseFee,
+          new BN(currentPoint),
+          activationPoint,
+          Q64,
+          sqrtPrice,
+        ).toNumber();
+      expect(fee(1000, Q64)).toBe(100_000_000);
+      expect(fee(1000, Q64.muln(10))).toBe(2_500_000);
+      expect(fee(1000 + 86400 + 1, Q64)).toBe(2_500_000);
+    });
+
+    it("builds the tightest exponential schedule", () => {
+      const baseFee = marketCapSchedulerBaseFeeParameters({
+        ...marketCapParams,
+        baseFeeMode: BaseFeeMode.MarketCapSchedulerExponential,
+        startingBaseFeeBps: 5000,
+        numberOfPeriod: 100,
+      });
+      const inner = decodePodAlignedFeeMarketCapScheduler(baseFee);
+      expect(inner.reductionFactor.toNumber()).toBe(516);
+      expect(inner.sqrtPriceStepBps).toBe(900);
+      expect(
+        getFeeInPeriod(
+          inner.cliffFeeNumerator,
+          inner.reductionFactor,
+          100,
+        ).toNumber(),
+      ).toBe(2_501_062);
+      expect(
+        getFeeInPeriod(
+          inner.cliffFeeNumerator,
+          inner.reductionFactor.addn(1),
+          100,
+        ).toNumber(),
+      ).toBe(2_474_828);
+    });
+
+    it("rejects invalid schedules", () => {
+      const rejects = (overrides: object) =>
+        expect(() =>
+          marketCapSchedulerBaseFeeParameters({
+            ...marketCapParams,
+            ...overrides,
+          }),
+        ).toThrow(invalidParameters);
+      rejects({ priceMultiple: 1 });
+      rejects({ priceMultiple: 1.0001 });
+      rejects({ schedulerExpirationDuration: 0 });
+      errorCode(() =>
+        marketCapSchedulerBaseFeeParameters({
+          ...marketCapParams,
+          baseFeeMode: BaseFeeMode.TimeSchedulerLinear,
+        } as never),
+      );
+    });
   });
 });

@@ -17,7 +17,12 @@ import {
   U64_MAX,
   U256_MAX,
 } from "../math/safe_math";
-import { BaseFeeMode, type BaseFeeConfig } from "../types";
+import {
+  BaseFeeMode,
+  type BaseFeeConfig,
+  type BaseFeeConfigParameters,
+} from "../types";
+import { getSchedulerFeeNumerators } from "./fee_bps";
 import { validateFeeBounds, validateSchedulerFields } from "./fee_bounds";
 
 export type PodAlignedFeeMarketCapScheduler = {
@@ -169,4 +174,56 @@ export class FeeMarketCapScheduler {
     );
     return this.getBaseFeeNumeratorByPeriod(period);
   }
+}
+
+export type MarketCapSchedulerBpsParams = {
+  baseFeeMode:
+    | BaseFeeMode.MarketCapSchedulerLinear
+    | BaseFeeMode.MarketCapSchedulerExponential;
+  startingBaseFeeBps: number;
+  endingBaseFeeBps: number;
+  numberOfPeriod: number;
+  priceMultiple: number; // spot-price multiple of the initial price at which the fee settles, > 1
+  schedulerExpirationDuration: number; // slots or seconds after activation when the fee settles regardless of price
+};
+
+export function marketCapSchedulerBaseFeeParameters(
+  params: MarketCapSchedulerBpsParams,
+): BaseFeeConfigParameters {
+  const { baseFeeMode, numberOfPeriod, priceMultiple } = params;
+  if (
+    baseFeeMode !== BaseFeeMode.MarketCapSchedulerLinear &&
+    baseFeeMode !== BaseFeeMode.MarketCapSchedulerExponential
+  ) {
+    throw PoolError.invalidBaseFeeMode();
+  }
+  const { cliffFeeNumerator, reductionFactor } = getSchedulerFeeNumerators(
+    baseFeeMode === BaseFeeMode.MarketCapSchedulerLinear,
+    params.startingBaseFeeBps,
+    params.endingBaseFeeBps,
+    numberOfPeriod,
+  );
+  if (!(Number.isFinite(priceMultiple) && priceMultiple > 1)) {
+    throw PoolError.invalidParameters("priceMultiple must be greater than 1");
+  }
+  const sqrtPriceStepBps = Math.floor(
+    ((Math.sqrt(priceMultiple) - 1) * MAX_BASIS_POINT) / numberOfPeriod,
+  );
+  if (sqrtPriceStepBps === 0) {
+    throw PoolError.invalidParameters(
+      "priceMultiple is too small for numberOfPeriod: sqrtPriceStepBps rounds to zero",
+    );
+  }
+  const baseFee = {
+    baseFeeMode,
+    data: encodeMarketCapSchedulerBaseFeeData({
+      cliffFeeNumerator,
+      reductionFactor,
+      sqrtPriceStepBps,
+      schedulerExpirationDuration: params.schedulerExpirationDuration,
+      numberOfPeriod,
+    }),
+  };
+  FeeMarketCapScheduler.fromBaseFeeConfig(baseFee).validate();
+  return baseFee;
 }
