@@ -89,6 +89,7 @@ describe("client-side validation", () => {
     for (const overrides of [
       { maxVolatilityAccumulator: -1 },
       { decayPeriod: 0x1_0000 },
+      { decayPeriod: 3_601 },
       { minDeltaTickForSignificantSwap: 0 },
       // The variable fee at the accumulator cap would exceed MAX_FEE_NUMERATOR.
       { maxVolatilityAccumulator: 0xff_ffff, variableFeeControl: 0xff_ffff },

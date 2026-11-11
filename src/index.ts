@@ -149,6 +149,14 @@ export {
   type TimeSchedulerParams,
 } from "./base_fee";
 export {
+  DYNAMIC_FEE_DECAY_PERIOD,
+  DYNAMIC_FEE_FILTER_PERIOD,
+  DYNAMIC_FEE_MAX_PRICE_CHANGE_BPS,
+  DYNAMIC_FEE_REDUCTION_FACTOR,
+  getDynamicFeeParams,
+  type DynamicFeeParamsOptions,
+} from "./helpers/pool_fees";
+export {
   bondingCurveActivationParameters,
   openActivationParameters,
   timeBasedActivationParameters,
