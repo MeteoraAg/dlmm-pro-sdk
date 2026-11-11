@@ -122,6 +122,9 @@
   - [bondingCurveActivationParameters](#bondingcurveactivationparameters)
   - [timeBasedActivationParameters](#timebasedactivationparameters)
 
+- [Dynamic Fee](#dynamic-fee)
+  - [getDynamicFeeParams](#getdynamicfeeparams)
+
 - [Types and Constants](#types-and-constants)
   - [Errors](#errors)
   - [Enums](#enums)
@@ -505,7 +508,7 @@ type InitializePoolWithDynamicParameters = {
       decayPeriod: number; // Seconds
       reductionFactor: number; // Basis points, 1..=10000
       minDeltaTickForSignificantSwap: number; // Tick move that counts as a significant swap
-    } | null; // null disables the dynamic fee
+    } | null; // null disables the dynamic fee; otherwise from getDynamicFeeParams
   };
   tickSpacing: number; // 1..=MAX_TICK_SPACING
   collectFeeMode: number; // CollectFeeMode
@@ -562,10 +565,10 @@ await sendAndConfirmTransaction(connection, tx, [owner, poolCreatorAuthority]);
 
 - The builder validates `parameters` before building (fee schedule and
   bounds, dynamic fee, tick spacing, price, extensions, activation slots) and
-  throws a `PoolError` on the first violation. With the
-  ActivationAccess extension it reads the clock to check the activation
-  points; see [Base Fee and Activation Functions](#base-fee-and-activation-functions)
-  for the rules.
+  throws a `PoolError` on the first violation. See
+  [Base Fee and Activation Functions](#base-fee-and-activation-functions) and
+  [Dynamic Fee](#dynamic-fee). With the ActivationAccess extension it reads
+  the clock to check the activation points.
 - With the ActivationAccess extension, `poolActivation` is required and
   `activationPoint` defaults to the current slot or timestamp. Without it,
   both must be `null`.
@@ -4442,6 +4445,60 @@ const activations = [
 
 ---
 
+## Dynamic Fee
+
+`getDynamicFeeParams` returns the `dynamicFeeParameter` for pool
+initialization. The variable fee stays within 20% of `baseFeeBps`. The
+volatility cap defaults to a 15% price move
+(`DYNAMIC_FEE_MAX_PRICE_CHANGE_BPS`); filter, decay and reduction are
+`DYNAMIC_FEE_FILTER_PERIOD` (10 s), `DYNAMIC_FEE_DECAY_PERIOD` (120 s) and
+`DYNAMIC_FEE_REDUCTION_FACTOR` (5,000, 50%).
+
+### getDynamicFeeParams
+
+**Function**
+
+```typescript
+getDynamicFeeParams(
+  baseFeeBps: number,
+  minDeltaTickForSignificantSwap: number,
+  options?: DynamicFeeParamsOptions,
+): DynamicFeeParameters
+```
+
+**Parameters**
+
+```typescript
+baseFeeBps: number; // Integer in 0..=10000
+minDeltaTickForSignificantSwap: number; // Non-zero u16
+type DynamicFeeParamsOptions = {
+  maxPriceChangeBps?: number; // Integer in 1..=10000; default 1500
+  maxVolatilityAccumulator?: number; // Non-zero u24; used instead of maxPriceChangeBps
+};
+```
+
+**Returns**
+
+The `dynamicFeeParameter` for `poolFees`.
+
+**Example**
+
+```typescript
+const dynamicFeeParameter = getDynamicFeeParams(25, 1); // 0.25% base fee
+```
+
+**Notes**
+
+- `variableFeeControl` is the largest value whose fee at the volatility cap
+  is still within 20% of `baseFeeBps`.
+- When `maxVolatilityAccumulator` is set, `maxPriceChangeBps` is ignored.
+- Throws `InvalidParameters` when `baseFeeBps` is outside `0..=10000`,
+  `minDeltaTickForSignificantSwap` is not a non-zero u16, `maxPriceChangeBps`
+  is outside `1..=10000`, or the volatility cap or `variableFeeControl` does
+  not fit in a u24.
+
+---
+
 ## Types and Constants
 
 ### Errors
@@ -4533,6 +4590,10 @@ Values are numbered from 0 in the order listed.
 | `MS_PER_SLOT`                         | 250 ms                                          |
 | `MAX_OBSERVATION_LENGTH`              | 500                                             |
 | `MAX_REFERENCE_AGE`                   | 3,600 s (`BN`)                                  |
+| `DYNAMIC_FEE_FILTER_PERIOD`           | 10 s                                            |
+| `DYNAMIC_FEE_DECAY_PERIOD`            | 120 s                                           |
+| `DYNAMIC_FEE_REDUCTION_FACTOR`        | 5,000 (50%)                                     |
+| `DYNAMIC_FEE_MAX_PRICE_CHANGE_BPS`    | 1,500 (15%)                                     |
 | `FEE_DENOMINATOR`                     | 1,000,000,000 (`BN`)                            |
 | `MIN_FEE_NUMERATOR`                   | 100,000, 0.01% (`BN`)                           |
 | `MAX_FEE_NUMERATOR`                   | 990,000,000, 99% (`BN`)                         |

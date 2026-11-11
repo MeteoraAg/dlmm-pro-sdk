@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added function `buildLiquidityShape` to build Spot, Curve, BidAsk or custom liquidity shapes, with `multiplierFromAmounts`, `encodeAddLiquidityByWeight`, `limitOrderTicksFromShape` and `relativeTickFromSlippage` to turn a shape into deposit or limit order parameters.
 - Added base fee and activation helpers for pool creation: `encodeFixedBaseFeeData`, `encodeTimeSchedulerBaseFeeData`, `encodeMarketCapSchedulerBaseFeeData`, `openActivationParameters`, `bondingCurveActivationParameters` and `timeBasedActivationParameters`.
 - Added base fee builders that take fees in basis points: `fixedBaseFeeParameters`, `timeSchedulerBaseFeeParameters` and `marketCapSchedulerBaseFeeParameters`, with `baseFeeParameters` to pick one by `baseFeeMode` and `bpsToFeeNumerator`.
+- Added `getDynamicFeeParams` to build a pool's dynamic fee from a base fee in basis points, capping the variable fee at 20% of that fee.
 - Added PDA, tick, liquidity and account decoding helpers.
 - Builders resolve Token-2022 transfer hook accounts, tick arrays and the tick array bitmap extension when they are not passed in.
 - Exported the DLMM Pro and access registry IDLs, also available as `@meteora-ag/dlmm-pro-sdk/idl/dlmm-pro` and `@meteora-ag/dlmm-pro-sdk/idl/access-registry`.
