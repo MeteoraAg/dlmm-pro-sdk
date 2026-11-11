@@ -118,7 +118,6 @@ export function updateVolatilityAccumulator(
   }
 }
 
-/** `getDeltaTick` volatility for a price increase of `maxPriceChangeBps`. */
 export function volatilityAccumulatorForPriceChange(
   maxPriceChangeBps: number,
 ): number {
@@ -141,7 +140,6 @@ export function volatilityAccumulatorForPriceChange(
   return volatility.toNumber();
 }
 
-/** Largest `variableFeeControl` whose fee at `volatilityAccumulator` is at most `maxFeeNumerator`. */
 export function variableFeeControlForCap(
   maxFeeNumerator: BN,
   volatilityAccumulator: number,
@@ -169,7 +167,7 @@ export function variableFeeControlForCap(
   return control.toNumber();
 }
 
-// Greatest Q64.64 sqrt price of 1 + bps/MAX_BASIS_POINT. sqrt(2) < 2.
+// floor(sqrt(1 + bps/MAX_BASIS_POINT) << 64). The price ratio is at most 2.
 function floorSqrtPriceRatioQ64(priceChangeBps: number): BN {
   const limit = Q64.sqr().muln(MAX_BASIS_POINT + priceChangeBps);
   let lo = Q64.clone();

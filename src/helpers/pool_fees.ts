@@ -62,7 +62,6 @@ export function validateDynamicFeeParameters(
   }
 }
 
-/** Variable fee capped at 20% of `baseFeeBps`. Defaults to a 15% price move. */
 export function getDynamicFeeParams(
   baseFeeBps: number,
   minDeltaTickForSignificantSwap: number,
@@ -73,6 +72,7 @@ export function getDynamicFeeParams(
     volatilityAccumulatorForPriceChange(
       options?.maxPriceChangeBps ?? DYNAMIC_FEE_MAX_PRICE_CHANGE_BPS,
     );
+  // 20% of baseFeeBps
   const maxDynamicFeeNumerator = bpsToFeeNumerator(baseFeeBps)
     .muln(20)
     .divn(100);

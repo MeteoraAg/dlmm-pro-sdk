@@ -21,8 +21,7 @@ auditConfig:
     - GHSA-hqr4-qq8f-hg3x
     - GHSA-mjw6-4jj6-33hc
     # toml (fixed in 5.0.1): @coral-xyz/anchor only parses Anchor.toml in `workspace`, which the
-    # SDK doesn't use. The older advisories were fixed in 5; GHSA-h895-cgqg-jf52 is prototype
-    # pollution in every release through 5.0.0
+    # SDK doesn't use
     - GHSA-4qx8-w7c3-pj3p
     - GHSA-82x6-q7mm-w9cf
     - GHSA-9j65-hcg3-gc64
