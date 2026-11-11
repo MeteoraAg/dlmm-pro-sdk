@@ -4,6 +4,7 @@ import {
   MAX_BASIS_POINT,
   MAX_FEE_NUMERATOR,
   MAX_REFERENCE_AGE,
+  Q64,
 } from "../constants";
 import { PoolError } from "../errors";
 import type { DynamicFeeConfig, FeeConfig } from "../types";
@@ -115,6 +116,73 @@ export function updateVolatilityAccumulator(
   } else {
     variableFee.volatilityAccumulator = volatilityAccumulator.toNumber();
   }
+}
+
+/** `getDeltaTick` volatility for a price increase of `maxPriceChangeBps`. */
+export function volatilityAccumulatorForPriceChange(
+  maxPriceChangeBps: number,
+): number {
+  if (
+    !Number.isInteger(maxPriceChangeBps) ||
+    maxPriceChangeBps < 1 ||
+    maxPriceChangeBps > MAX_BASIS_POINT
+  ) {
+    throw PoolError.invalidParameters(
+      "maxPriceChangeBps must be an integer in 1..=MAX_BASIS_POINT",
+    );
+  }
+  const volatility = getDeltaTick(
+    floorSqrtPriceRatioQ64(maxPriceChangeBps),
+    Q64,
+  ).muln(MAX_BASIS_POINT);
+  if (volatility.gtn(0xffffff)) {
+    throw PoolError.invalidParameters("maxVolatilityAccumulator exceeds a u24");
+  }
+  return volatility.toNumber();
+}
+
+/** Largest `variableFeeControl` whose fee at `volatilityAccumulator` is at most `maxFeeNumerator`. */
+export function variableFeeControlForCap(
+  maxFeeNumerator: BN,
+  volatilityAccumulator: number,
+): number {
+  if (
+    !Number.isInteger(volatilityAccumulator) ||
+    volatilityAccumulator < 1 ||
+    volatilityAccumulator > 0xffffff
+  ) {
+    throw PoolError.invalidParameters(
+      "volatilityAccumulator must be a non-zero u24",
+    );
+  }
+  if (maxFeeNumerator.isNeg() || maxFeeNumerator.gt(MAX_FEE_NUMERATOR)) {
+    throw PoolError.invalidParameters(
+      "maxFeeNumerator must be in 0..=MAX_FEE_NUMERATOR",
+    );
+  }
+  const control = maxFeeNumerator
+    .mul(V_FEE_SCALE)
+    .div(new BN(volatilityAccumulator).sqr());
+  if (control.gtn(0xffffff)) {
+    throw PoolError.invalidParameters("variableFeeControl exceeds a u24");
+  }
+  return control.toNumber();
+}
+
+// Greatest Q64.64 sqrt price of 1 + bps/MAX_BASIS_POINT. sqrt(2) < 2.
+function floorSqrtPriceRatioQ64(priceChangeBps: number): BN {
+  const limit = Q64.sqr().muln(MAX_BASIS_POINT + priceChangeBps);
+  let lo = Q64.clone();
+  let hi = Q64.muln(2);
+  while (lo.lt(hi)) {
+    const mid = lo.add(hi).addn(1).shrn(1);
+    if (mid.sqr().muln(MAX_BASIS_POINT).lte(limit)) {
+      lo = mid;
+    } else {
+      hi = mid.subn(1);
+    }
+  }
+  return lo;
 }
 
 export function calculateTradingFeeNumerator(
