@@ -90,6 +90,13 @@ export class PoolError extends Error {
     );
   }
 
+  static invalidTokenBadge(detail?: string): PoolError {
+    return new PoolError(
+      PoolErrorCode.InvalidTokenBadge,
+      detail ? `Invalid token badge: ${detail}` : "Invalid token badge",
+    );
+  }
+
   static invalidAccount(): PoolError {
     return new PoolError(
       PoolErrorCode.InvalidAccount,
