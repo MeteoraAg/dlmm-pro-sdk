@@ -1,6 +1,6 @@
 [package]
 name = "dlmm-pro-commons"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Off-chain commons library for integrating the DLMM Pro program"
 repository = "https://github.com/MeteoraAg/dlmm-pro-sdk"
