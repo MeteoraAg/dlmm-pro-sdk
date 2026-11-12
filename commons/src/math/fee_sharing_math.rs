@@ -104,18 +104,30 @@ pub fn split_fees(
         Rounding::Down,
     )?;
 
-    let (protocol_fee_on_limit_order_fee, limit_order_fee) = calculate_shared_amounts(
-        total_limit_order_fee,
-        fee_setting.limit_order_protocol_fee_bps.into(),
-        MAX_BASIS_POINT.into(),
-        Rounding::Down,
-    )?;
+    // Limit order input rounded down to zero output fills no maker, so protocol takes its fee.
+    // For market maker, it is still split into LP / protocol.
+    let (protocol_fee_on_limit_order_fee, limit_order_fee) =
+        if !filled_amount_result.has_limit_order_out() {
+            (total_limit_order_fee, 0)
+        } else {
+            calculate_shared_amounts(
+                total_limit_order_fee,
+                fee_setting.limit_order_protocol_fee_bps.into(),
+                MAX_BASIS_POINT.into(),
+                Rounding::Down,
+            )?
+        };
     // Edge case: when `excluded_fee_input_amount` is not enough to reach the tick's target price,
     // the MM fill step recomputes `next_sqrt_price`. An input too small to move the Q64.64
     // `sqrt_price` leaves `next_sqrt_price` == `current_sqrt_price` and `out_amount` == 0, while
     // the full `amount_in` is still consumed. The taker receives nothing, and the input splits
     // into:
     // - trading fee: always goes to MM, since `mm_share` == `total_share` here
+    // - fee excluded amount: stuck in the reserve as a dead amount
+    // Edge case: when the input left after the MM fill is too small to produce any limit order
+    // output, the LO fill step rounds `out_amount` down to 0 while still consuming the input.
+    // The taker receives nothing, and the input splits into:
+    // - trading fee: goes to protocol, since no maker was filled (`has_limit_order_out` is false)
     // - fee excluded amount: stuck in the reserve as a dead amount
     Ok(SplitFees {
         mm_fee,

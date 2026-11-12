@@ -373,6 +373,12 @@ pub struct FilledAmountResult {
     pub next_sqrt_price: u128,
 }
 
+impl FilledAmountResult {
+    pub fn has_limit_order_out(&self) -> bool {
+        self.processed_order_amount_out > 0 || self.open_order_amount_out > 0
+    }
+}
+
 struct LimitOrderSwapAmountFromInput {
     pub amount_in: u64,
     pub amount_left: u64,
