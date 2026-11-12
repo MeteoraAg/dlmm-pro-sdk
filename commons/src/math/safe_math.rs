@@ -124,6 +124,10 @@ pub fn down_scale_ceil<const BITS: usize, const LIMBS: usize>(
     value: Uint<BITS, LIMBS>,
     shift: usize,
 ) -> Uint<BITS, LIMBS> {
+    // trailing_zeros() of zero is BITS, which would round up when shift > BITS.
+    if value.is_zero() {
+        return Uint::<BITS, LIMBS>::ZERO;
+    }
     let quotient = value >> shift;
     // Any set bit below shift means a non zero remainder.
     if value.trailing_zeros() < shift {
@@ -191,5 +195,13 @@ mod tests {
                 "shift = 128, value = {value}"
             );
         }
+    }
+
+    #[test]
+    fn down_scale_ceil_shift_beyond_bits() {
+        assert_eq!(down_scale_ceil(U192::ZERO, 192), U192::ZERO);
+        assert_eq!(down_scale_ceil(U192::ZERO, 193), U192::ZERO);
+        assert_eq!(down_scale_ceil(U192::ONE, 193), U192::ONE);
+        assert_eq!(down_scale_ceil(U192::MAX, 193), U192::ONE);
     }
 }

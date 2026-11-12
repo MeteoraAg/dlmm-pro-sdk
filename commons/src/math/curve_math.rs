@@ -119,25 +119,20 @@ pub fn get_next_sqrt_price_from_input(
 /// Gets the next sqrt price √P' given a delta of token_x
 ///
 /// Always round up because
-/// 1. In the exact output case, token_x supply decreases leading to price increase.
-/// Move price up so that exact output is met.
-/// 2. In the exact input case, token_x supply increases leading to price decrease.
+/// In the exact input case, token_x supply increases leading to price decrease.
 /// Do not round down to minimize price impact. We only need to meet input
 /// change and not guarantee exact output.
-///
-/// Use function for exact input or exact output swaps for token_x
 ///
 /// # Formula
 ///
 /// * `√P' = √P * L / (L + Δx * √P)`
-/// * If Δx * √P overflows, use alternate form `√P' = L / (L/√P + Δx)`
 ///
 /// # Proof
 ///
 /// For constant L,
 ///
 ///  L = x * √P
-///  x' = x + Δa
+///  x' = x + Δx
 ///  x' * √P' = x * √P
 ///  (x + Δx) * √P' = x * √P
 ///  √P' = (x * √P) / (x + Δx)
@@ -169,10 +164,8 @@ fn get_next_sqrt_price_from_amount_in_x_rounding_up(
 /// Gets the next sqrt price given a delta of token_y
 ///
 /// Always round down because
-/// 1. In the exact output case, token_y supply decreases leading to price decrease.
-/// Move price down by rounding down so that exact output of token_a is met.
-/// 2. In the exact input case, token_y supply increases leading to price increase.
-/// Do not round down to minimize price impact. We only need to meet input
+/// In the exact input case, token_y supply increases leading to price increase.
+/// Do not round up to minimize price impact. We only need to meet input
 /// change and not guarantee exact output for token_x.
 ///
 ///

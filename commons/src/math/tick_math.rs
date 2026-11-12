@@ -336,8 +336,8 @@ pub(crate) fn mul_shift_96(n0: u128, n1: u128) -> u128 {
 
     // Full 256-bit product = ac × 2^128 + mid × 2^64 + (bd & 0xFFFF...)
     // After >> 96:
-    //   ac × 2^32 + mid >> 32
-    // (low 96 bits of bd discarded; bd_hi already merged into mid)
+    //   ac × 2^32 + (mid >> 32)
+    // (low 32 bits of mid and low 64 bits of bd discarded; bd_hi already merged into mid)
 
     let high = ac.wrapping_shl(32);
     let low = mid >> 32;

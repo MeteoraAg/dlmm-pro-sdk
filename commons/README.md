@@ -8,4 +8,4 @@ Off-chain math, quotes, account state, and PDA helpers for the DLMM Pro program.
 
 The `declare_program!` account types read the whole account after the discriminator as their header, so their `AccountDeserialize` panics on `Pool` accounts with extensions and on `TickArray`, `PositionArray`, `LimitOrder` and `Oracle` accounts. Parse those with `DynamicPool`, `DynamicTickArray`, `DynamicPositionArray`, `DynamicLimitOrder` and `DynamicOracle`. Parse the pool first, then pass `&pool.pool` to the tick-array and position-array parsers so they select the correct liquidity-mining layout.
 
-Pinned to dlmm-pro release 0.1.0 (4ac3a79). The LiteSVM tests load the binaries under `tests/fixtures/` at the repository root: the dlmm-pro 0.1.0 binary and the access-registry `d542263` binary, both built with `--features local`.
+Pinned to dlmm-pro release 0.1.0 (310b5ba), the commit deployed on mainnet. The LiteSVM tests load the binaries under `tests/fixtures/` at the repository root: the dlmm-pro 0.1.0 binary and the access-registry `d542263` binary, both built with `--features local`.
