@@ -378,6 +378,32 @@ describe("initialize pool", () => {
         ).rejects.toMatchObject({ code });
       }
     });
+
+    it("requires a token badge for OnlyY when token y is not wrapped SOL or USDC", async () => {
+      const config = await dynamicConfig();
+      const params = {
+        config,
+        poolCreatorAuthority: creator.publicKey,
+        tokenXMint,
+        tokenYMint,
+        creator: creator.publicKey,
+        payer: payer.publicKey,
+        parameters: {
+          ...defaultDynamicPoolParameters(SQRT_PRICE_ONE),
+          collectFeeMode: CollectFeeMode.OnlyY,
+        },
+      };
+
+      await expect(
+        client.pool.initializePoolWithDynamicConfig(params),
+      ).rejects.toMatchObject({ code: PoolErrorCode.InvalidTokenBadge });
+
+      const { tx } = await client.pool.initializePoolWithDynamicConfig({
+        ...params,
+        tokenBadgeY: Keypair.generate().publicKey,
+      });
+      expect(tx.instructions).toHaveLength(1);
+    });
   });
 
   describe("activation access", () => {

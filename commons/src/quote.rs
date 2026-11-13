@@ -481,3 +481,130 @@ pub fn quote_exact_in(params: QuoteExactInParams<'_>) -> Result<QuoteExactInResu
         next_liquidity: current_liquidity,
     })
 }
+
+// The zero-output limit order cases from the program's tests/test_fee_sharing.rs.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TOTAL_FEE: u64 = 100_000;
+    const TOTAL_SHARE: u64 = 100_000;
+
+    fn fee_setting(
+        has_referral: bool,
+        has_partner: bool,
+        mm_protocol_fee_bps: u16,
+        partner_fee_bps: u16,
+    ) -> FeeSetting {
+        FeeSetting {
+            fees_on_input: false,
+            fees_on_token_x: false,
+            has_referral,
+            has_partner,
+            mm_protocol_fee_bps,
+            limit_order_protocol_fee_bps: LIMIT_ORDER_PROTOCOL_FEE_BPS,
+            partner_fee_bps,
+        }
+    }
+
+    // Fees on input, where the limit order consumed `lo_amount_in` but rounded down to zero output.
+    fn filled_lo_zero_out(mm_amount_in: u64, lo_amount_in: u64) -> FilledAmountResult {
+        FilledAmountResult {
+            amount_in: mm_amount_in + lo_amount_in,
+            amount_left: 0,
+            out_amount: mm_amount_in,
+            mm_amount_in,
+            mm_amount_out: mm_amount_in,
+            processed_order_amount_out: 0,
+            open_order_amount_out: 0,
+            next_sqrt_price: 0,
+        }
+    }
+
+    fn fee_on_input_setting(has_referral: bool) -> FeeSetting {
+        FeeSetting {
+            fees_on_input: true,
+            ..fee_setting(has_referral, false, MM_PROTOCOL_FEE_BPS, 0)
+        }
+    }
+
+    /// Runs the full swap-fee pipeline against the split-only helper:
+    /// `split_fees` produces the four gross buckets, then
+    /// `get_protocol_fee_sharing_result` splits the protocol bucket into
+    /// protocol / host / partner.
+    fn split_and_share(
+        trading_fee: u64,
+        fs: &FeeSetting,
+        filled: &FilledAmountResult,
+    ) -> (SwapFinalResult, SwapProtocolFeeSharingResult) {
+        let split = split_fees(trading_fee, fs, filled).unwrap();
+
+        let result = SwapFinalResult {
+            mm_fee: split.mm_fee,
+            limit_order_fee: split.limit_order_fee,
+            protocol_fee_on_mm_fee: split.protocol_fee_on_mm_fee,
+            protocol_fee_on_limit_order_fee: split.protocol_fee_on_limit_order_fee,
+            ..Default::default()
+        };
+        let sharing = result.get_protocol_fee_sharing_result(fs).unwrap();
+        (result, sharing)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn assert_split(
+        result: &SwapFinalResult,
+        sharing: &SwapProtocolFeeSharingResult,
+        mm: u64,
+        lo: u64,
+        protocol: u64,
+        host: u64,
+        partner: u64,
+        total: u64,
+    ) {
+        assert_eq!(result.mm_fee, mm, "mm_fee");
+        assert_eq!(result.limit_order_fee, lo, "limit_order_fee");
+        assert_eq!(sharing.protocol_fee, protocol, "protocol_fee");
+        assert_eq!(sharing.host_fee, host, "host_fee");
+        assert_eq!(sharing.partner_fee, partner, "partner_fee");
+        // Conservation invariant: every unit of the trading fee must land in
+        // exactly one bucket. Nothing may be created or silently dropped.
+        assert_eq!(
+            mm + lo + protocol + host + partner,
+            total,
+            "conservation: buckets must sum to the trading fee"
+        );
+    }
+
+    #[test]
+    fn test_lo_zero_out_fee_to_protocol_mixed_referral_off() {
+        // MM keeps its share. The limit order consumed input but filled nothing, so the
+        // protocol takes its whole share instead of crediting the tick's maker bucket.
+        let (result, sharing) = split_and_share(
+            TOTAL_FEE,
+            &fee_on_input_setting(false),
+            &filled_lo_zero_out(TOTAL_SHARE / 2, TOTAL_SHARE / 2),
+        );
+        assert_split(&result, &sharing, 45_000, 0, 55_000, 0, 0, TOTAL_FEE);
+    }
+
+    #[test]
+    fn test_lo_zero_out_fee_to_protocol_mixed_referral_on() {
+        // The host cut stays capped at the mm protocol bps of the limit-order fee.
+        let (result, sharing) = split_and_share(
+            TOTAL_FEE,
+            &fee_on_input_setting(true),
+            &filled_lo_zero_out(TOTAL_SHARE / 2, TOTAL_SHARE / 2),
+        );
+        assert_split(&result, &sharing, 45_000, 0, 53_000, 2_000, 0, TOTAL_FEE);
+    }
+
+    #[test]
+    fn test_lo_zero_out_fee_to_protocol_pure_lo() {
+        let (result, sharing) = split_and_share(
+            TOTAL_FEE,
+            &fee_on_input_setting(false),
+            &filled_lo_zero_out(0, TOTAL_SHARE),
+        );
+        assert_split(&result, &sharing, 0, 0, 100_000, 0, 0, TOTAL_FEE);
+    }
+}

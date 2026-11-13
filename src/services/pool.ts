@@ -18,6 +18,7 @@ import {
   reserveTransferLegs,
   tickArrayMetas,
   validateInitializePoolWithDynamicParameters,
+  validatePoolInitializationWithCollectFeeMode,
 } from "../helpers";
 import { tickIdFromSqrtPrice } from "../math";
 import { assertNonZeroU16, assertU64 } from "../helpers/validation";
@@ -225,6 +226,11 @@ export class PoolService extends DlmmProProgram {
   ): Promise<InitializePoolResult> {
     this.assertDistinctMints(params.tokenXMint, params.tokenYMint);
     const staticConfig = await this.state.fetchStaticConfig(params.config);
+    validatePoolInitializationWithCollectFeeMode(
+      staticConfig.collectFeeMode,
+      params.tokenYMint,
+      params.tokenBadgeY,
+    );
 
     const pool = derivePool(
       params.config,
@@ -275,6 +281,11 @@ export class PoolService extends DlmmProProgram {
       params.parameters,
       this.commitment,
     );
+    validatePoolInitializationWithCollectFeeMode(
+      params.parameters.collectFeeMode,
+      params.tokenYMint,
+      params.tokenBadgeY,
+    );
 
     const pool = derivePool(
       params.config,
@@ -314,6 +325,11 @@ export class PoolService extends DlmmProProgram {
       this.connection,
       params.parameters,
       this.commitment,
+    );
+    validatePoolInitializationWithCollectFeeMode(
+      params.parameters.collectFeeMode,
+      params.tokenYMint,
+      params.tokenBadgeY,
     );
 
     const pool = deriveLaunchPool(

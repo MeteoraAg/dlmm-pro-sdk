@@ -19,6 +19,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## commons [0.1.1] - [PR #26](https://github.com/MeteoraAg/dlmm-pro-sdk/pull/26)
+
+### Fixed
+
+- `quote_exact_in()` now gives the protocol the whole limit order fee of a swap step whose limit order fill rounds down to zero output, as dlmm-pro 0.1.0 does.
+
+### Changed
+
+- Pinned to dlmm-pro 0.1.0 at `310b5ba`, the commit deployed on mainnet. `math/` now matches it, which adds a zero check to `down_scale_ceil()`.
+
+## @meteora-ag/dlmm-pro-sdk [0.1.1] - [PR #26](https://github.com/MeteoraAg/dlmm-pro-sdk/pull/26)
+
+### Fixed
+
+- `quoteExactIn` now gives the protocol the whole limit order fee of a swap step whose limit order fill rounds down to zero output, as dlmm-pro 0.1.0 does.
+- `initializePoolWithStaticConfig`, `initializePoolWithDynamicConfig` and `initializeLaunchPool` now throw `InvalidTokenBadge` for an `OnlyY` pool when token Y is not wrapped SOL or USDC and no `tokenBadgeY` is passed, instead of building a transaction the program rejects.
+
+### Changed
+
+- Rebuilt the LiteSVM test fixture `tests/fixtures/dlmm_pro.so` from dlmm-pro 0.1.0 at `310b5ba`.
+
 ## commons [0.1.0] - [PR #17](https://github.com/MeteoraAg/dlmm-pro-sdk/pull/17)
 
 ### Added

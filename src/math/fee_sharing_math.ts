@@ -39,6 +39,13 @@ export type FilledAmountResult = {
   nextSqrtPrice: BN;
 };
 
+function hasLimitOrderOut(filledAmountResult: FilledAmountResult): boolean {
+  return (
+    !filledAmountResult.processedOrderAmountOut.isZero() ||
+    !filledAmountResult.openOrderAmountOut.isZero()
+  );
+}
+
 export function calculateSharedAmounts(
   amount: BN,
   numerator: BN,
@@ -121,12 +128,18 @@ export function splitFees(
     Rounding.Down,
   );
 
-  const [protocolFeeOnLimitOrderFee, limitOrderFee] = calculateSharedAmounts(
-    totalLimitOrderFee,
-    new BN(feeSetting.limitOrderProtocolFeeBps),
-    new BN(MAX_BASIS_POINT),
-    Rounding.Down,
-  );
+  // A limit order fill that rounds down to zero output pays no maker, so the
+  // protocol takes its fee.
+  const [protocolFeeOnLimitOrderFee, limitOrderFee] = hasLimitOrderOut(
+    filledAmountResult,
+  )
+    ? calculateSharedAmounts(
+        totalLimitOrderFee,
+        new BN(feeSetting.limitOrderProtocolFeeBps),
+        new BN(MAX_BASIS_POINT),
+        Rounding.Down,
+      )
+    : [totalLimitOrderFee, new BN(0)];
 
   return {
     mmFee,

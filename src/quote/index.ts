@@ -245,7 +245,7 @@ function applyStepToFinalResult(
   );
 }
 
-function getProtocolFeeSharingResult(
+export function getProtocolFeeSharingResult(
   finalResult: SwapFinalResult,
   feeSetting: FeeSetting,
 ): { protocolFee: BN; hostFee: BN; partnerFee: BN } {

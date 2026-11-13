@@ -1,9 +1,10 @@
-import type { Commitment, Connection } from "@solana/web3.js";
+import type { Commitment, Connection, PublicKey } from "@solana/web3.js";
 import {
   MAX_SQRT_PRICE,
   MIN_SQRT_PRICE,
   NUMBER_OF_ACTIVATION_MODES,
   POOL_EXTENSION_VARIANT_COUNT,
+  WHITELISTED_QUOTE_MINTS,
 } from "../constants";
 import { PoolError } from "../errors";
 import {
@@ -19,6 +20,7 @@ import {
 } from "../math/safe_math";
 import {
   ActivationMode,
+  CollectFeeMode,
   PoolExtension,
   type InitializePoolWithDynamicParameters,
 } from "../types";
@@ -102,6 +104,22 @@ export async function validateInitializePoolWithDynamicParameters(
   } else if (parameters.activationPoint || parameters.poolActivation) {
     throw PoolError.invalidParameters(
       "activationPoint and poolActivation require the ActivationAccess extension",
+    );
+  }
+}
+
+export function validatePoolInitializationWithCollectFeeMode(
+  collectFeeMode: number,
+  tokenYMint: PublicKey,
+  tokenBadgeY: PublicKey | null | undefined,
+): void {
+  if (
+    collectFeeMode === CollectFeeMode.OnlyY &&
+    !WHITELISTED_QUOTE_MINTS.some((mint) => mint.equals(tokenYMint)) &&
+    !tokenBadgeY
+  ) {
+    throw PoolError.invalidTokenBadge(
+      "tokenBadgeY is required when collectFeeMode is OnlyY and token Y is not wrapped SOL or USDC",
     );
   }
 }

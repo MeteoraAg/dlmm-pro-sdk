@@ -462,7 +462,9 @@ await sendAndConfirmTransaction(connection, tx, [owner]);
 - The program creates the bitmap extension with the pool when the initial
   tick lies outside the inline bitmap.
 - Throws `InvalidParameters` for identical mints or an `initialSqrtPrice`
-  outside `MIN_SQRT_PRICE..=MAX_SQRT_PRICE`.
+  outside `MIN_SQRT_PRICE..=MAX_SQRT_PRICE`, and `InvalidTokenBadge` on an
+  `OnlyY` config when token Y is not in `WHITELISTED_QUOTE_MINTS` and
+  `tokenBadgeY` is not passed.
 
 ---
 

@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   getLiquidityFromAmounts,
   getSqrtPriceFromTickId,
+  LIMIT_ORDER_PROTOCOL_FEE_BPS,
   MAX_SQRT_PRICE,
   MAX_TICK_ID,
   MIN_SQRT_PRICE,
   MIN_TICK_ID,
+  MM_PROTOCOL_FEE_BPS,
   PoolErrorCode,
   Rounding,
   tickIdFromSqrtPrice,
@@ -17,6 +19,7 @@ import {
   getLiquidityFromAmountY,
   splitFees,
 } from "../src/math";
+import { getProtocolFeeSharingResult } from "../src/quote";
 import { big, SQRT_PRICE_ONE } from "./helpers";
 
 // [tick, sqrtPrice(tick), sqrtPrice(-tick)].
@@ -183,11 +186,11 @@ describe("fee sharing math", () => {
       {
         amountIn: new BN(3),
         amountLeft: new BN(0),
-        outAmount: new BN(0),
+        outAmount: new BN(2),
         mmAmountIn: new BN(1),
         mmAmountOut: new BN(0),
         processedOrderAmountOut: new BN(0),
-        openOrderAmountOut: new BN(0),
+        openOrderAmountOut: new BN(2),
         nextSqrtPrice: SQRT_PRICE_ONE,
       },
     );
@@ -228,5 +231,74 @@ describe("fee sharing math", () => {
     expect(split.mmFee.toNumber()).toBe(0);
     expect(split.protocolFeeOnLimitOrderFee.toNumber()).toBe(0);
     expect(split.limitOrderFee.toNumber()).toBe(0);
+  });
+
+  describe("limit order input that rounds down to zero output", () => {
+    const TOTAL_FEE = new BN(100_000);
+
+    function splitAndShare(hasReferral: boolean, mmAmountIn: number) {
+      const feeSetting = {
+        feesOnInput: true,
+        feesOnTokenX: false,
+        hasReferral,
+        hasPartner: false,
+        mmProtocolFeeBps: MM_PROTOCOL_FEE_BPS,
+        limitOrderProtocolFeeBps: LIMIT_ORDER_PROTOCOL_FEE_BPS,
+        partnerFeeBps: 0,
+      };
+      const split = splitFees(TOTAL_FEE, feeSetting, {
+        amountIn: new BN(100_000),
+        amountLeft: new BN(0),
+        outAmount: new BN(mmAmountIn),
+        mmAmountIn: new BN(mmAmountIn),
+        mmAmountOut: new BN(mmAmountIn),
+        processedOrderAmountOut: new BN(0),
+        openOrderAmountOut: new BN(0),
+        nextSqrtPrice: new BN(0),
+      });
+      const sharing = getProtocolFeeSharingResult(
+        {
+          userPayAmount: new BN(0),
+          userReceiveAmount: new BN(0),
+          amountLeft: new BN(0),
+          mmFee: split.mmFee,
+          limitOrderFee: split.limitOrderFee,
+          protocolFeeOnMmFee: split.protocolFeeOnMmFee,
+          protocolFeeOnLimitOrderFee: split.protocolFeeOnLimitOrderFee,
+        },
+        feeSetting,
+      );
+      return { split, sharing };
+    }
+
+    it("gives the limit order fee to the protocol in a mixed fill without referral", () => {
+      const { split, sharing } = splitAndShare(false, 50_000);
+
+      expect(split.mmFee.toNumber()).toBe(45_000);
+      expect(split.limitOrderFee.toNumber()).toBe(0);
+      expect(sharing.protocolFee.toNumber()).toBe(55_000);
+      expect(sharing.hostFee.toNumber()).toBe(0);
+      expect(sharing.partnerFee.toNumber()).toBe(0);
+    });
+
+    it("keeps the host cut capped at the mm protocol bps in a mixed fill with referral", () => {
+      const { split, sharing } = splitAndShare(true, 50_000);
+
+      expect(split.mmFee.toNumber()).toBe(45_000);
+      expect(split.limitOrderFee.toNumber()).toBe(0);
+      expect(sharing.protocolFee.toNumber()).toBe(53_000);
+      expect(sharing.hostFee.toNumber()).toBe(2_000);
+      expect(sharing.partnerFee.toNumber()).toBe(0);
+    });
+
+    it("gives the whole fee to the protocol in a pure limit order fill", () => {
+      const { split, sharing } = splitAndShare(false, 0);
+
+      expect(split.mmFee.toNumber()).toBe(0);
+      expect(split.limitOrderFee.toNumber()).toBe(0);
+      expect(sharing.protocolFee.toNumber()).toBe(100_000);
+      expect(sharing.hostFee.toNumber()).toBe(0);
+      expect(sharing.partnerFee.toNumber()).toBe(0);
+    });
   });
 });
