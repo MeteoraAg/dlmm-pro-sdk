@@ -1,6 +1,6 @@
 {
   "name": "@meteora-ag/dlmm-pro-sdk",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "TypeScript SDK for the Meteora DLMM Pro program.",
   "type": "module",
   "main": "./dist/index.cjs",

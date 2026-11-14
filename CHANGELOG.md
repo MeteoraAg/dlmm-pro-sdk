@@ -17,9 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `getSqrtPriceFromTickId` now throws `InvalidParameters` for a tick id outside `MIN_TICK_ID..=MAX_TICK_ID`, instead of returning the sqrt price of a different tick.
-
 ### Security
+
+## @meteora-ag/dlmm-pro-sdk [0.1.2] - [PR #27](https://github.com/MeteoraAg/dlmm-pro-sdk/pull/27)
+
+### Fixed
+
+- `getSqrtPriceFromTickId` now throws `InvalidParameters` for a tick id outside `MIN_TICK_ID..=MAX_TICK_ID`, instead of returning the sqrt price of a different tick.
 
 ## commons [0.1.1] - [PR #26](https://github.com/MeteoraAg/dlmm-pro-sdk/pull/26)
 
