@@ -3500,7 +3500,7 @@ getSqrtPriceFromTickId(tickId): BN
 **Parameters**
 
 ```typescript
-tickId: number; // Tick id
+tickId: number; // Tick id, an integer in MIN_TICK_ID..=MAX_TICK_ID
 ```
 
 **Returns**
@@ -3512,6 +3512,11 @@ The tick's Q64.64 sqrt price, `sqrt(1.0001^tickId) * 2^64`.
 ```typescript
 const initialSqrtPrice = getSqrtPriceFromTickId(0); // price 1
 ```
+
+**Notes**
+
+- Throws `InvalidParameters` for a tick id that is not an integer or lies
+  outside `MIN_TICK_ID..=MAX_TICK_ID`.
 
 ---
 
