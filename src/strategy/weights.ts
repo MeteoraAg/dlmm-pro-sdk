@@ -36,24 +36,11 @@ function toWeightSpot(
 
 type WeightAt = (distance: number, span: number, maxWeight: number) => number;
 
-function toWeightLinear(
-  minTickId: number,
-  maxTickId: number,
-  tickSpacing: number,
-  weightAt: WeightAt,
-): TickWeight[] {
-  const tickIds = tickIdsInRange(minTickId, maxTickId, tickSpacing);
-  const last = tickIds.length - 1;
-  const maxWeight = Math.min(tickIds.length, MAX_LIQUIDITY_WEIGHT);
-  return tickIds.map((tickId, index) => ({
-    tickId,
-    weight: weightAt(index, last, maxWeight),
-  }));
-}
-
 /**
- * Curve (`fallWeight`) peaks and BidAsk (`riseWeight`) dips at the active
- * tick; with the price outside the range the slope runs the whole range.
+ * Weighs each column by its distance from the active one: Curve (`fallWeight`)
+ * peaks there and BidAsk (`riseWeight`) dips there. With the price outside the
+ * range, the edge column nearest it stands in for the active one, so the slope
+ * runs the whole range.
  */
 function toWeightAroundActive(
   minTickId: number,
@@ -62,16 +49,12 @@ function toWeightAroundActive(
   tickSpacing: number,
   weightAt: WeightAt,
 ): TickWeight[] {
-  const opposite = weightAt === fallWeight ? riseWeight : fallWeight;
-  if (currentTickId < minTickId) {
-    return toWeightLinear(minTickId, maxTickId, tickSpacing, weightAt);
-  }
-  if (currentTickId > maxTickId) {
-    return toWeightLinear(minTickId, maxTickId, tickSpacing, opposite);
-  }
   const tickIds = tickIdsInRange(minTickId, maxTickId, tickSpacing);
   const last = tickIds.length - 1;
-  const activeIndex = Math.floor((currentTickId - minTickId) / tickSpacing);
+  const activeIndex = Math.min(
+    Math.max(Math.floor((currentTickId - minTickId) / tickSpacing), 0),
+    last,
+  );
   const maxWeight = Math.min(
     Math.max(activeIndex, last - activeIndex) + 1,
     MAX_LIQUIDITY_WEIGHT,
