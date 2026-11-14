@@ -27,8 +27,9 @@ const WAVE_BASE_WEIGHT = 4;
 const WAVE_EDGE_WEIGHT = 8;
 
 /**
- * Flat at `WAVE_BASE_WEIGHT` over the half of the span nearest the price, then
- * four steps up to `WAVE_EDGE_WEIGHT` at the edge.
+ * Spot near the price and BidAsk at the edge: flat at `WAVE_BASE_WEIGHT` over
+ * the half of the span nearest the price, then four steps up to
+ * `WAVE_EDGE_WEIGHT` at the edge.
  */
 function waveWeight(distance: number, span: number): number {
   if (span === 0) {

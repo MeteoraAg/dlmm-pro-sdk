@@ -2977,9 +2977,10 @@ const shape = buildLiquidityShape({
 
 - `Spot` weighs every column equally. `Curve` is heaviest at the column
   holding the current tick and falls off away from it; `BidAsk` is lightest
-  there and rises away from it. `Wave` is flat over the half of each side
-  nearest that column, then rises in four steps to twice that weight at the
-  edge, which takes at most nine ranges in either layout. With the current
+  there and rises away from it. `Wave` combines the two: flat like
+  `Spot` over the half of each side nearest that column, then rising like
+  `BidAsk` in four steps to twice that weight at the edge, which takes at most
+  nine ranges in either layout. With the current
   tick outside the range, `Curve` is heaviest and `BidAsk` and `Wave` are
   lightest at the nearest edge. `Custom`
   takes `weights` for usable tick ids, without duplicates; a zero weight
