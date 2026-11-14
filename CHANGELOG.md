@@ -9,8 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added `StrategyType.Wave` to `buildLiquidityShape`: flat around the current tick, with each edge stepping up to twice that weight, in at most nine ranges.
-
 ### Changed
 
 ### Deprecated
@@ -20,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Security
+
+## @meteora-ag/dlmm-pro-sdk [0.1.3] - [PR #28](https://github.com/MeteoraAg/dlmm-pro-sdk/pull/28)
+
+### Added
+
+- Added `StrategyType.Wave` to `buildLiquidityShape`: flat around the current tick, with each edge stepping up to twice that weight, in at most nine ranges.
 
 ## @meteora-ag/dlmm-pro-sdk [0.1.2] - [PR #27](https://github.com/MeteoraAg/dlmm-pro-sdk/pull/27)
 
