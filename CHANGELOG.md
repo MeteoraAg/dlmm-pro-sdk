@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Pinned to dlmm-pro 0.1.0 at `310b5ba`, the commit deployed on mainnet. `math/` now matches it, which adds a zero check to `down_scale_ceil()`.
+- Pinned to dlmm-pro 0.1.0, the release deployed on mainnet. `math/` now matches it, which adds a zero check to `down_scale_ceil()`.
 
 ## @meteora-ag/dlmm-pro-sdk [0.1.1] - [PR #26](https://github.com/MeteoraAg/dlmm-pro-sdk/pull/26)
 
@@ -40,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Rebuilt the LiteSVM test fixture `tests/fixtures/dlmm_pro.so` from dlmm-pro 0.1.0 at `310b5ba`.
+- Rebuilt the LiteSVM test fixture `tests/fixtures/dlmm_pro.so` from dlmm-pro 0.1.0.
 
 ## commons [0.1.0] - [PR #17](https://github.com/MeteoraAg/dlmm-pro-sdk/pull/17)
 
