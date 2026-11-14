@@ -115,8 +115,8 @@ await sendAndConfirmTransaction(connection, added.tx, [owner]);
 ```
 
 `buildLiquidityShape`, `multiplierFromAmounts`, and `addLiquidityByWeight`
-spread a deposit over many ranges with a Spot, Curve, BidAsk, or custom
-profile; see [docs.md](docs.md#liquidity-shape-functions).
+spread a deposit over many ranges with a Spot, Curve, BidAsk, Wave, or
+custom profile; see [docs.md](docs.md#liquidity-shape-functions).
 
 ## Claim fees
 

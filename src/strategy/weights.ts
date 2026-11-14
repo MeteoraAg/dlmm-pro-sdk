@@ -23,6 +23,23 @@ function fallWeight(distance: number, span: number, maxWeight: number): number {
   return Math.round(maxWeight - ((maxWeight - 1) * distance) / span);
 }
 
+const WAVE_BASE_WEIGHT = 4;
+const WAVE_EDGE_WEIGHT = 8;
+
+/**
+ * Flat at `WAVE_BASE_WEIGHT` over the half of the span nearest the price, then
+ * four steps up to `WAVE_EDGE_WEIGHT` at the edge.
+ */
+function waveWeight(distance: number, span: number): number {
+  if (span === 0) {
+    return WAVE_BASE_WEIGHT;
+  }
+  return Math.max(
+    WAVE_BASE_WEIGHT,
+    Math.ceil((WAVE_EDGE_WEIGHT * distance) / span),
+  );
+}
+
 function toWeightSpot(
   minTickId: number,
   maxTickId: number,
@@ -38,9 +55,9 @@ type WeightAt = (distance: number, span: number, maxWeight: number) => number;
 
 /**
  * Weighs each column by its distance from the active one: Curve (`fallWeight`)
- * peaks there and BidAsk (`riseWeight`) dips there. With the price outside the
- * range, the edge column nearest it stands in for the active one, so the slope
- * runs the whole range.
+ * peaks there, BidAsk (`riseWeight`) and Wave (`waveWeight`) are lowest there.
+ * With the price outside the range, the edge column nearest it stands in for
+ * the active one, so the profile runs the whole range.
  */
 function toWeightAroundActive(
   minTickId: number,
@@ -146,6 +163,14 @@ export function toWeightsByStrategy(args: {
         currentTickId,
         args.tickSpacing,
         riseWeight,
+      );
+    case StrategyType.Wave:
+      return toWeightAroundActive(
+        args.minTickId,
+        args.maxTickId,
+        currentTickId,
+        args.tickSpacing,
+        waveWeight,
       );
     case StrategyType.Custom:
       if (!args.weights) {

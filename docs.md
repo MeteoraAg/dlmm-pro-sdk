@@ -2924,7 +2924,7 @@ buildLiquidityShape(args): LiquidityShape
 
 ```typescript
 args: {
-  strategy: StrategyType; // Spot, Curve, BidAsk, or Custom
+  strategy: StrategyType; // Spot, Curve, BidAsk, Wave, or Custom
   minTickId: number; // First column, a usable tick
   maxTickId: number; // Last column, a usable tick
   tickSpacing: number; // The pool's tick spacing
@@ -2977,8 +2977,11 @@ const shape = buildLiquidityShape({
 
 - `Spot` weighs every column equally. `Curve` is heaviest at the column
   holding the current tick and falls off away from it; `BidAsk` is lightest
-  there and rises away from it. With the current tick outside the range,
-  `Curve` is heaviest and `BidAsk` lightest at the nearest edge. `Custom`
+  there and rises away from it. `Wave` is flat over the half of each side
+  nearest that column, then rises in four steps to twice that weight at the
+  edge, which takes at most nine ranges in either layout. With the current
+  tick outside the range, `Curve` is heaviest and `BidAsk` and `Wave` are
+  lightest at the nearest edge. `Custom`
   takes `weights` for usable tick ids, without duplicates; a zero weight
   leaves a gap. Weights above 255 are scaled down.
 - `Vertical` merges adjacent columns of equal weight into side-by-side
@@ -4557,7 +4560,7 @@ PoolErrorCode[6020]; // "NotConsumingFullAmountIn"
 | `PoolExtension`                    | `LiquidityMining`, `ActivationAccess`                                                                                   |
 | `PoolStatus`                       | `Swap`, `AddLiquidity`: bits of `poolState.poolStatus`; a set bit disables the action                                   |
 | `TokenProgramFlags`                | `TokenProgram`, `TokenProgram2022`                                                                                      |
-| `StrategyType`                     | `Spot`, `Curve`, `BidAsk`, `Custom`                                                                                     |
+| `StrategyType`                     | `Spot`, `Curve`, `BidAsk`, `Custom`, `Wave`                                                                             |
 | `LiquidityLayout`                  | `Vertical`, `Horizontal`                                                                                                |
 | `LiquiditySide`                    | `Bid`, `Ask`, `Active`                                                                                                  |
 | `Rounding`                         | `Up`, `Down`                                                                                                            |

@@ -530,6 +530,7 @@ describe("limit orders", () => {
       { name: "Spot", strategy: StrategyType.Spot },
       { name: "Curve", strategy: StrategyType.Curve },
       { name: "BidAsk", strategy: StrategyType.BidAsk },
+      { name: "Wave", strategy: StrategyType.Wave },
       {
         name: "Custom",
         strategy: StrategyType.Custom,
