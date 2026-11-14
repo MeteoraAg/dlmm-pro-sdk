@@ -71,6 +71,7 @@ describe("tick math", () => {
   it("rejects tick ids outside the tick bounds", () => {
     expect(getSqrtPriceFromTickId(MIN_TICK_ID).eq(MIN_SQRT_PRICE)).toBe(true);
     expect(getSqrtPriceFromTickId(MAX_TICK_ID).eq(MAX_SQRT_PRICE)).toBe(true);
+    expect(tickIdFromSqrtPrice(MIN_SQRT_PRICE)).toBe(MIN_TICK_ID);
     expect(tickIdFromSqrtPrice(MAX_SQRT_PRICE)).toBe(MAX_TICK_ID);
     // 524288 is 2^19, which the conversion would read as tick 0.
     for (const tickId of [MIN_TICK_ID - 1, MAX_TICK_ID + 1, 524288, 0.5]) {

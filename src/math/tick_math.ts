@@ -60,7 +60,7 @@ export function tickIdFromSqrtPrice(sqrtPrice: BN): number {
     return tickLow;
   }
 
-  const actualHighPrice = sqrtPriceFromTickId(tickHigh);
+  const actualHighPrice = getSqrtPriceFromTickId(tickHigh);
   if (actualHighPrice.lte(sqrtPrice)) {
     return tickHigh;
   }
@@ -77,12 +77,6 @@ export function getSqrtPriceFromTickId(tickId: number): BN {
       "tickId must be an integer in MIN_TICK_ID..=MAX_TICK_ID",
     );
   }
-  return sqrtPriceFromTickId(tickId);
-}
-
-// Only the bits up to 2^18 are read, so a tick id past the bounds would
-// return the price of another tick.
-function sqrtPriceFromTickId(tickId: number): BN {
   if (tickId >= 0) {
     return getSqrtPricePositiveTick(tickId);
   }
