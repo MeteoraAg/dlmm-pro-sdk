@@ -1,5 +1,10 @@
 import BN from "bn.js";
-import { MAX_SQRT_PRICE, MIN_SQRT_PRICE } from "../constants";
+import {
+  MAX_SQRT_PRICE,
+  MAX_TICK_ID,
+  MIN_SQRT_PRICE,
+  MIN_TICK_ID,
+} from "../constants";
 import { PoolError } from "../errors";
 import {
   safeMul,
@@ -55,7 +60,7 @@ export function tickIdFromSqrtPrice(sqrtPrice: BN): number {
     return tickLow;
   }
 
-  const actualHighPrice = getSqrtPriceFromTickId(tickHigh);
+  const actualHighPrice = sqrtPriceFromTickId(tickHigh);
   if (actualHighPrice.lte(sqrtPrice)) {
     return tickHigh;
   }
@@ -63,6 +68,21 @@ export function tickIdFromSqrtPrice(sqrtPrice: BN): number {
 }
 
 export function getSqrtPriceFromTickId(tickId: number): BN {
+  if (
+    !Number.isInteger(tickId) ||
+    tickId < MIN_TICK_ID ||
+    tickId > MAX_TICK_ID
+  ) {
+    throw PoolError.invalidParameters(
+      "tickId must be an integer in MIN_TICK_ID..=MAX_TICK_ID",
+    );
+  }
+  return sqrtPriceFromTickId(tickId);
+}
+
+// Only the bits up to 2^18 are read, so a tick id past the bounds would
+// return the price of another tick.
+function sqrtPriceFromTickId(tickId: number): BN {
   if (tickId >= 0) {
     return getSqrtPricePositiveTick(tickId);
   }
