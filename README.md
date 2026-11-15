@@ -191,6 +191,7 @@ pnpm install
 pnpm format     # prettier --check
 pnpm typecheck
 pnpm test
+pnpm test:charts # charts the liquidity shapes in the strategy tests
 pnpm build
 
 cargo fmt --all -- --check

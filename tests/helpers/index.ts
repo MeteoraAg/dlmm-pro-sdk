@@ -2,6 +2,7 @@ export * from "./accessRegistry";
 export * from "./actions";
 export * from "./bitmap";
 export * from "./bn";
+export * from "./chart";
 export * from "./connection";
 export * from "./constants";
 export * from "./delegate";

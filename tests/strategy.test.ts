@@ -32,7 +32,12 @@ import {
   toWeightsByStrategy,
 } from "../src/strategy";
 import { transferFeeIncludedAmountWithinU64 } from "../src/quote/transfer_fee";
-import { big, gridWeights, SQRT_PRICE_ONE } from "./helpers";
+import {
+  big,
+  debugLiquidityChart,
+  gridWeights,
+  SQRT_PRICE_ONE,
+} from "./helpers";
 
 const invalidParameters = expect.objectContaining({
   code: PoolErrorCode.InvalidParameters,
@@ -100,6 +105,7 @@ describe("liquidity shapes", () => {
       tickSpacing,
       currentTickId,
     });
+    debugLiquidityChart("Spot", result);
 
     expect(result.columns.map((column) => column.weight)).toEqual([
       1, 1, 1, 1, 1,
@@ -123,6 +129,7 @@ describe("liquidity shapes", () => {
       tickSpacing,
       currentTickId,
     });
+    debugLiquidityChart("Curve", result);
 
     expect(result.columns.map((column) => column.weight)).toEqual([
       1, 2, 3, 2, 1,
@@ -138,6 +145,7 @@ describe("liquidity shapes", () => {
       tickSpacing,
       currentTickId,
     });
+    debugLiquidityChart("BidAsk", result);
 
     expect(result.columns.map((column) => column.weight)).toEqual([
       3, 2, 1, 2, 3,
@@ -152,6 +160,7 @@ describe("liquidity shapes", () => {
       tickSpacing,
       currentTickId,
     });
+    debugLiquidityChart("Wave", result);
 
     expect(result.columns.map((column) => column.weight)).toEqual([
       8, 8, 7, 7, 6, 6, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 6, 7, 8,
@@ -169,6 +178,7 @@ describe("liquidity shapes", () => {
       currentTickId,
       weights: gridWeights(minTickId, tickSpacing, [8, 7, 6, 5, 0]),
     });
+    debugLiquidityChart("Custom", result);
 
     expect(result.columns.map((column) => column.weight)).toEqual([
       8, 7, 6, 5, 0,
@@ -358,6 +368,10 @@ describe("liquidity shapes", () => {
         [8, 7, 6, 5, 4, 3, 2, 1, 1, 1, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       ),
     });
+    debugLiquidityChart("Spot (21 columns)", spot);
+    debugLiquidityChart("Curve (21 columns)", curve);
+    debugLiquidityChart("BidAsk (21 columns)", bidAsk);
+    debugLiquidityChart("Custom (21 columns)", custom);
 
     expect(spot.columns).toHaveLength(21);
     expect(curve.columns.map((column) => column.weight)).toEqual([
@@ -383,6 +397,7 @@ describe("liquidity shapes", () => {
       strategy: StrategyType.Curve,
       ...asymmetric,
     });
+    debugLiquidityChart("Curve (asymmetric, current tick 4)", curve);
     const curveWeights = curve.columns.map((column) => column.weight);
     const peak = Math.max(...curveWeights);
     expect(curve.columns[1].tickId).toBe(0);
@@ -400,6 +415,7 @@ describe("liquidity shapes", () => {
       strategy: StrategyType.BidAsk,
       ...asymmetric,
     });
+    debugLiquidityChart("BidAsk (asymmetric, current tick 4)", bidAsk);
     const bidAskWeights = bidAsk.columns.map((column) => column.weight);
     const edge = Math.max(...bidAskWeights);
     expect(bidAsk.columns[1].tickId).toBe(0);
@@ -422,6 +438,7 @@ describe("liquidity shapes", () => {
       tickSpacing: 10,
       currentTickId: 0,
     });
+    debugLiquidityChart("Curve (weights capped at 255)", weights);
     expect(weights).toHaveLength(601);
     expect(weights[300].tickId).toBe(0);
     expect(weights[300].weight).toBe(255);
@@ -444,6 +461,7 @@ describe("liquidity shapes", () => {
       currentTickId,
       weights: gridWeights(minTickId, tickSpacing, [510, 255, 0, 51, 510]),
     });
+    debugLiquidityChart("Custom (normalized from 510/255/0/51/510)", shape);
     expect(shape.columns.map((column) => column.weight)).toEqual([
       255, 128, 0, 26, 255,
     ]);
@@ -574,6 +592,7 @@ describe("liquidity shapes", () => {
       tickSpacing: 10,
       currentTickId: 0,
     });
+    debugLiquidityChart("Curve (one-sided ask, price below range)", above);
     expect(above.columns.map((column) => column.weight)).toEqual([
       5, 4, 3, 2, 1,
     ]);
@@ -588,6 +607,7 @@ describe("liquidity shapes", () => {
       tickSpacing: 10,
       currentTickId: 0,
     });
+    debugLiquidityChart("Curve (one-sided bid, price above range)", below);
     expect(below.columns.map((column) => column.weight)).toEqual([
       1, 2, 3, 4, 5,
     ]);
@@ -604,6 +624,7 @@ describe("liquidity shapes", () => {
       tickSpacing: 10,
       currentTickId: 0,
     });
+    debugLiquidityChart("Wave (one-sided ask, price below range)", above);
     expect(above.columns.map((column) => column.weight)).toEqual([
       4, 4, 4, 4, 4, 5, 6, 7, 8,
     ]);
@@ -616,6 +637,7 @@ describe("liquidity shapes", () => {
       tickSpacing: 10,
       currentTickId: 0,
     });
+    debugLiquidityChart("Wave (one-sided bid, price above range)", below);
     expect(below.columns.map((column) => column.weight)).toEqual([
       8, 7, 6, 5, 4, 4, 4, 4, 4,
     ]);
