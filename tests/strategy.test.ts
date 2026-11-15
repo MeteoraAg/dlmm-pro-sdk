@@ -169,6 +169,21 @@ describe("liquidity shapes", () => {
     expect(result.ranges).toHaveLength(9);
   });
 
+  it("keeps each Wave edge at twice the active weight on sides too short for every step", () => {
+    const result = buildLiquidityShape({
+      strategy: StrategyType.Wave,
+      minTickId: -10,
+      maxTickId: 40,
+      tickSpacing,
+      currentTickId,
+    });
+    debugLiquidityChart("Wave (short sides)", result);
+
+    expect(result.columns.map((column) => column.weight)).toEqual([
+      8, 4, 4, 4, 6, 8,
+    ]);
+  });
+
   it("keeps Custom column weights and drops zero-weight columns from the ranges", () => {
     const result = buildLiquidityShape({
       strategy: StrategyType.Custom,
