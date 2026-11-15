@@ -32,7 +32,12 @@ import {
   toWeightsByStrategy,
 } from "../src/strategy";
 import { transferFeeIncludedAmountWithinU64 } from "../src/quote/transfer_fee";
-import { big, gridWeights, SQRT_PRICE_ONE } from "./helpers";
+import {
+  big,
+  debugLiquidityChart,
+  gridWeights,
+  SQRT_PRICE_ONE,
+} from "./helpers";
 
 const invalidParameters = expect.objectContaining({
   code: PoolErrorCode.InvalidParameters,
@@ -100,6 +105,7 @@ describe("liquidity shapes", () => {
       tickSpacing,
       currentTickId,
     });
+    debugLiquidityChart("Spot", result);
 
     expect(result.columns.map((column) => column.weight)).toEqual([
       1, 1, 1, 1, 1,
@@ -123,6 +129,7 @@ describe("liquidity shapes", () => {
       tickSpacing,
       currentTickId,
     });
+    debugLiquidityChart("Curve", result);
 
     expect(result.columns.map((column) => column.weight)).toEqual([
       1, 2, 3, 2, 1,
@@ -138,9 +145,42 @@ describe("liquidity shapes", () => {
       tickSpacing,
       currentTickId,
     });
+    debugLiquidityChart("BidAsk", result);
 
     expect(result.columns.map((column) => column.weight)).toEqual([
       3, 2, 1, 2, 3,
+    ]);
+  });
+
+  it("plots Wave flat around the active tick, stepping up to twice that at each edge", () => {
+    const result = buildLiquidityShape({
+      strategy: StrategyType.Wave,
+      minTickId: -160,
+      maxTickId: 80,
+      tickSpacing,
+      currentTickId,
+    });
+    debugLiquidityChart("Wave", result);
+
+    expect(result.columns.map((column) => column.weight)).toEqual([
+      8, 8, 7, 7, 6, 6, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 6, 7, 8,
+    ]);
+    expect(result.columns[16].side).toBe(LiquiditySide.Active);
+    expect(result.ranges).toHaveLength(9);
+  });
+
+  it("keeps each Wave edge at twice the active weight on sides too short for every step", () => {
+    const result = buildLiquidityShape({
+      strategy: StrategyType.Wave,
+      minTickId: -10,
+      maxTickId: 40,
+      tickSpacing,
+      currentTickId,
+    });
+    debugLiquidityChart("Wave (short sides)", result);
+
+    expect(result.columns.map((column) => column.weight)).toEqual([
+      8, 4, 4, 4, 6, 8,
     ]);
   });
 
@@ -153,6 +193,7 @@ describe("liquidity shapes", () => {
       currentTickId,
       weights: gridWeights(minTickId, tickSpacing, [8, 7, 6, 5, 0]),
     });
+    debugLiquidityChart("Custom", result);
 
     expect(result.columns.map((column) => column.weight)).toEqual([
       8, 7, 6, 5, 0,
@@ -342,6 +383,10 @@ describe("liquidity shapes", () => {
         [8, 7, 6, 5, 4, 3, 2, 1, 1, 1, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       ),
     });
+    debugLiquidityChart("Spot (21 columns)", spot);
+    debugLiquidityChart("Curve (21 columns)", curve);
+    debugLiquidityChart("BidAsk (21 columns)", bidAsk);
+    debugLiquidityChart("Custom (21 columns)", custom);
 
     expect(spot.columns).toHaveLength(21);
     expect(curve.columns.map((column) => column.weight)).toEqual([
@@ -367,6 +412,7 @@ describe("liquidity shapes", () => {
       strategy: StrategyType.Curve,
       ...asymmetric,
     });
+    debugLiquidityChart("Curve (asymmetric, current tick 4)", curve);
     const curveWeights = curve.columns.map((column) => column.weight);
     const peak = Math.max(...curveWeights);
     expect(curve.columns[1].tickId).toBe(0);
@@ -384,6 +430,7 @@ describe("liquidity shapes", () => {
       strategy: StrategyType.BidAsk,
       ...asymmetric,
     });
+    debugLiquidityChart("BidAsk (asymmetric, current tick 4)", bidAsk);
     const bidAskWeights = bidAsk.columns.map((column) => column.weight);
     const edge = Math.max(...bidAskWeights);
     expect(bidAsk.columns[1].tickId).toBe(0);
@@ -406,6 +453,7 @@ describe("liquidity shapes", () => {
       tickSpacing: 10,
       currentTickId: 0,
     });
+    debugLiquidityChart("Curve (weights capped at 255)", weights);
     expect(weights).toHaveLength(601);
     expect(weights[300].tickId).toBe(0);
     expect(weights[300].weight).toBe(255);
@@ -428,6 +476,7 @@ describe("liquidity shapes", () => {
       currentTickId,
       weights: gridWeights(minTickId, tickSpacing, [510, 255, 0, 51, 510]),
     });
+    debugLiquidityChart("Custom (normalized from 510/255/0/51/510)", shape);
     expect(shape.columns.map((column) => column.weight)).toEqual([
       255, 128, 0, 26, 255,
     ]);
@@ -558,6 +607,7 @@ describe("liquidity shapes", () => {
       tickSpacing: 10,
       currentTickId: 0,
     });
+    debugLiquidityChart("Curve (one-sided ask, price below range)", above);
     expect(above.columns.map((column) => column.weight)).toEqual([
       5, 4, 3, 2, 1,
     ]);
@@ -572,12 +622,41 @@ describe("liquidity shapes", () => {
       tickSpacing: 10,
       currentTickId: 0,
     });
+    debugLiquidityChart("Curve (one-sided bid, price above range)", below);
     expect(below.columns.map((column) => column.weight)).toEqual([
       1, 2, 3, 4, 5,
     ]);
     expect(
       below.columns.every((column) => column.side === LiquiditySide.Bid),
     ).toBe(true);
+  });
+
+  it("runs one-sided Wave weights up from the edge nearest the price", () => {
+    const above = buildLiquidityShape({
+      strategy: StrategyType.Wave,
+      minTickId: 20,
+      maxTickId: 100,
+      tickSpacing: 10,
+      currentTickId: 0,
+    });
+    debugLiquidityChart("Wave (one-sided ask, price below range)", above);
+    expect(above.columns.map((column) => column.weight)).toEqual([
+      4, 4, 4, 4, 4, 5, 6, 7, 8,
+    ]);
+    expect(above.ranges).toHaveLength(5);
+
+    const below = buildLiquidityShape({
+      strategy: StrategyType.Wave,
+      minTickId: -100,
+      maxTickId: -20,
+      tickSpacing: 10,
+      currentTickId: 0,
+    });
+    debugLiquidityChart("Wave (one-sided bid, price above range)", below);
+    expect(below.columns.map((column) => column.weight)).toEqual([
+      8, 7, 6, 5, 4, 4, 4, 4, 4,
+    ]);
+    expect(below.ranges).toHaveLength(5);
   });
 
   it("splits a shape into bid and ask limit-order ticks", () => {
@@ -819,6 +898,28 @@ describe("horizontal layout", () => {
     ]);
   });
 
+  it("stacks Wave steps at both edges over a base range", () => {
+    const shape = buildLiquidityShape({
+      strategy: StrategyType.Wave,
+      minTickId: -80,
+      maxTickId: 80,
+      tickSpacing: 10,
+      currentTickId: 0,
+      layout: LiquidityLayout.Horizontal,
+    });
+    expect(shape.ranges).toEqual([
+      { tickLowerId: -80, tickUpperId: 90, weight: 4 },
+      { tickLowerId: -80, tickUpperId: -40, weight: 1 },
+      { tickLowerId: 50, tickUpperId: 90, weight: 1 },
+      { tickLowerId: -80, tickUpperId: -50, weight: 1 },
+      { tickLowerId: 60, tickUpperId: 90, weight: 1 },
+      { tickLowerId: -80, tickUpperId: -60, weight: 1 },
+      { tickLowerId: 70, tickUpperId: 90, weight: 1 },
+      { tickLowerId: -80, tickUpperId: -70, weight: 1 },
+      { tickLowerId: 80, tickUpperId: 90, weight: 1 },
+    ]);
+  });
+
   it("puts the shared floor of a Custom stair-step in its base range", () => {
     const shape = buildLiquidityShape({
       ...base,
@@ -846,6 +947,7 @@ describe("horizontal layout", () => {
     { name: "Spot", strategy: StrategyType.Spot },
     { name: "Curve", strategy: StrategyType.Curve },
     { name: "BidAsk", strategy: StrategyType.BidAsk },
+    { name: "Wave", strategy: StrategyType.Wave },
     {
       name: "Custom",
       strategy: StrategyType.Custom,

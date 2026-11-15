@@ -23,6 +23,24 @@ function fallWeight(distance: number, span: number, maxWeight: number): number {
   return Math.round(maxWeight - ((maxWeight - 1) * distance) / span);
 }
 
+const WAVE_BASE_WEIGHT = 4;
+const WAVE_EDGE_WEIGHT = 8;
+
+/**
+ * Spot near the price and BidAsk at the edge: flat at `WAVE_BASE_WEIGHT` over
+ * the half of the span nearest the price, then four steps up to
+ * `WAVE_EDGE_WEIGHT` at the edge.
+ */
+function waveWeight(distance: number, span: number): number {
+  if (span === 0) {
+    return WAVE_BASE_WEIGHT;
+  }
+  return Math.max(
+    WAVE_BASE_WEIGHT,
+    Math.ceil((WAVE_EDGE_WEIGHT * distance) / span),
+  );
+}
+
 function toWeightSpot(
   minTickId: number,
   maxTickId: number,
@@ -36,24 +54,11 @@ function toWeightSpot(
 
 type WeightAt = (distance: number, span: number, maxWeight: number) => number;
 
-function toWeightLinear(
-  minTickId: number,
-  maxTickId: number,
-  tickSpacing: number,
-  weightAt: WeightAt,
-): TickWeight[] {
-  const tickIds = tickIdsInRange(minTickId, maxTickId, tickSpacing);
-  const last = tickIds.length - 1;
-  const maxWeight = Math.min(tickIds.length, MAX_LIQUIDITY_WEIGHT);
-  return tickIds.map((tickId, index) => ({
-    tickId,
-    weight: weightAt(index, last, maxWeight),
-  }));
-}
-
 /**
- * Curve (`fallWeight`) peaks and BidAsk (`riseWeight`) dips at the active
- * tick; with the price outside the range the slope runs the whole range.
+ * Weighs each column by its distance from the active one: Curve (`fallWeight`)
+ * peaks there, BidAsk (`riseWeight`) and Wave (`waveWeight`) are lowest there.
+ * With the price outside the range, the edge column nearest it stands in for
+ * the active one, so the profile runs the whole range.
  */
 function toWeightAroundActive(
   minTickId: number,
@@ -62,16 +67,12 @@ function toWeightAroundActive(
   tickSpacing: number,
   weightAt: WeightAt,
 ): TickWeight[] {
-  const opposite = weightAt === fallWeight ? riseWeight : fallWeight;
-  if (currentTickId < minTickId) {
-    return toWeightLinear(minTickId, maxTickId, tickSpacing, weightAt);
-  }
-  if (currentTickId > maxTickId) {
-    return toWeightLinear(minTickId, maxTickId, tickSpacing, opposite);
-  }
   const tickIds = tickIdsInRange(minTickId, maxTickId, tickSpacing);
   const last = tickIds.length - 1;
-  const activeIndex = Math.floor((currentTickId - minTickId) / tickSpacing);
+  const activeIndex = Math.min(
+    Math.max(Math.floor((currentTickId - minTickId) / tickSpacing), 0),
+    last,
+  );
   const maxWeight = Math.min(
     Math.max(activeIndex, last - activeIndex) + 1,
     MAX_LIQUIDITY_WEIGHT,
@@ -163,6 +164,14 @@ export function toWeightsByStrategy(args: {
         currentTickId,
         args.tickSpacing,
         riseWeight,
+      );
+    case StrategyType.Wave:
+      return toWeightAroundActive(
+        args.minTickId,
+        args.maxTickId,
+        currentTickId,
+        args.tickSpacing,
+        waveWeight,
       );
     case StrategyType.Custom:
       if (!args.weights) {

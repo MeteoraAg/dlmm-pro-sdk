@@ -1,6 +1,6 @@
 {
   "name": "@meteora-ag/dlmm-pro-sdk",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "TypeScript SDK for the Meteora DLMM Pro program.",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -35,6 +35,7 @@
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
     "test": "vitest run",
+    "test:charts": "DLMM_CHARTS=1 vitest run tests/strategy.test.ts --reporter=default",
     "test:watch": "vitest"
   },
   "license": "MIT",

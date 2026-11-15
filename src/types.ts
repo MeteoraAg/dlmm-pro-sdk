@@ -227,6 +227,7 @@ export enum StrategyType {
   Curve = 1,
   BidAsk = 2,
   Custom = 3,
+  Wave = 4,
 }
 
 export enum LiquiditySide {

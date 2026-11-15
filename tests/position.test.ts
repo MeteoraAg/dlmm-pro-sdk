@@ -346,6 +346,12 @@ describe("position instructions", () => {
         maxTickId: 20,
       },
       {
+        name: "Wave",
+        strategy: StrategyType.Wave,
+        minTickId: -80,
+        maxTickId: 80,
+      },
+      {
         name: "Custom",
         strategy: StrategyType.Custom,
         minTickId: -20,
