@@ -71,8 +71,8 @@ function q64ToDecimal(value: BN): Decimal {
 }
 
 export function tickPrice(tickId: number): Decimal {
-  const sqrtPrice = getSqrtPriceFromTickId(tickId);
-  return q64ToDecimal(sqrtPrice.mul(sqrtPrice).shrn(64));
+  const sqrtPrice = q64ToDecimal(getSqrtPriceFromTickId(tickId));
+  return sqrtPrice.mul(sqrtPrice);
 }
 
 export function tickUiPrice(

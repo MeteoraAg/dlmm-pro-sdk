@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `tickPrice` and `tickUiPrice` now keep the precision of the tick's sqrt price. They truncated the price to a multiple of 2^-64, which left about two significant digits near `MIN_TICK_ID`. The `priceLower` and `priceUpper` of the `buildLiquidityShape` columns use the same price.
+
 ### Security
 
 ## @meteora-ag/dlmm-pro-sdk [0.1.3] - [PR #28](https://github.com/MeteoraAg/dlmm-pro-sdk/pull/28)
