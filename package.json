@@ -2,15 +2,19 @@
   "name": "@meteora-ag/dlmm-pro-sdk",
   "version": "0.1.3",
   "description": "TypeScript SDK for the Meteora DLMM Pro program.",
-  "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
     },
     "./idl/dlmm-pro": "./dist/idl/dlmm-pro/dlmm_pro.json",
     "./idl/access-registry": "./dist/idl/access-registry/access_registry.json",
@@ -29,7 +33,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "rm -rf dist && tsup src/index.ts --format esm,cjs && tsc -p tsconfig.build.json && mkdir -p dist/idl/dlmm-pro dist/idl/access-registry && cp src/idl/dlmm-pro/dlmm_pro.json dist/idl/dlmm-pro/ && cp src/idl/access-registry/access_registry.json dist/idl/access-registry/",
+    "build": "rm -rf dist && tsup src/index.ts --format esm,cjs && tsc -p tsconfig.build.json && printf 'export * from \"./index.js\";\\n' > dist/index.d.mts && mkdir -p dist/idl/dlmm-pro dist/idl/access-registry && cp src/idl/dlmm-pro/dlmm_pro.json dist/idl/dlmm-pro/ && cp src/idl/access-registry/access_registry.json dist/idl/access-registry/",
     "clean": "rm -rf dist node_modules",
     "typecheck": "tsc -p tsconfig.tests.json",
     "format": "prettier --check .",
