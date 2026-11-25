@@ -6,6 +6,7 @@ import {
 } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
+import Decimal from "decimal.js";
 import { describe, expect, it } from "vitest";
 import {
   amountsFromShape,
@@ -17,6 +18,7 @@ import {
   LiquidityLayout,
   LiquiditySide,
   MAX_TICK_ID,
+  MIN_TICK_ID,
   multiplierFromAmounts,
   PoolErrorCode,
   POSITION_MAX_RANGE,
@@ -88,6 +90,14 @@ describe("tick prices", () => {
     // One atom of Y per atom of X is 1000 whole Y per whole X for 9/6 decimals.
     expect(tickUiPrice(0, 9, 6).toString()).toBe("1000");
     expect(tickUiPrice(0, 6, 9).toString()).toBe("0.001");
+  });
+
+  it("keeps the precision of the sqrt price at the lowest ticks", () => {
+    for (const tickId of [MIN_TICK_ID, -400_000, -200_000]) {
+      const expected = new Decimal("1.0001").pow(tickId);
+      const error = tickPrice(tickId).div(expected).minus(1).abs();
+      expect(error.lt("1e-8")).toBe(true);
+    }
   });
 });
 

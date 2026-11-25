@@ -19,6 +19,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## @meteora-ag/dlmm-pro-sdk [0.1.4] - [PR #29](https://github.com/MeteoraAg/dlmm-pro-sdk/pull/29)
+
+### Changed
+
+- The package is no longer `"type": "module"`, and `import` and `require` each have their own type declarations. `import` loads `dist/index.mjs` with `dist/index.d.mts`, and `require` loads `dist/index.js` with `dist/index.d.ts`, in place of `dist/index.js` and `dist/index.cjs` sharing one declaration file. Imports of `@meteora-ag/dlmm-pro-sdk` and its `idl` subpaths are unaffected.
+
+### Fixed
+
+- `tickPrice` and `tickUiPrice` now keep the precision of the tick's sqrt price. They truncated the price to a multiple of 2^-64, which left about two significant digits near `MIN_TICK_ID`. The `priceLower` and `priceUpper` of the `buildLiquidityShape` columns use the same price.
+- The type declarations now resolve under `moduleResolution` `Node16` and `NodeNext`, and a CommonJS file compiled with `Node16` no longer fails with `TS1479`. The package was `"type": "module"` with a single set of declarations, so TypeScript read them as ES modules and could not follow their extensionless relative imports. Enums and types such as `BaseFeeMode` and `Pool` were missing for those consumers.
+
 ## @meteora-ag/dlmm-pro-sdk [0.1.3] - [PR #28](https://github.com/MeteoraAg/dlmm-pro-sdk/pull/28)
 
 ### Added
